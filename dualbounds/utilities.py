@@ -167,6 +167,25 @@ def compute_est_bounds(summands, alpha=0.05):
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]
 	])
 
+def _sort_disc_dist(probs, vals):
+	"""
+	Parameters
+	----------
+	vals : (n, nvals)-shaped array.
+	probs : (n, nvals)-shaped array. probs.sum(axis=1) == 1
+
+	Returns
+	-------
+	vals_new : (n, nvals) array
+		``vals`` sorted so that vals[i] is in increasing order.
+	probs_new : (n, nvals) array
+		``probs`` sorted in the corresponding order as vals.
+	"""
+	inds = np.argsort(vals, axis=1)
+	new_vals = np.take_along_axis(vals, inds, axis=1)
+	new_probs = np.take_along_axis(probs, inds, axis=1)
+	return new_vals, new_probs
+
 class ConstantDist:
 
 	def __init__(self, loc=0, scale=1):
@@ -187,10 +206,9 @@ class BatchedCategorical:
 		vals : (n, nvals)-shaped array
 		probs : (n, nvals)-shaped array. probs.sum(axis=1) == 1.
 		"""
-		inds = np.argsort(vals, axis=1)
+		# sort
 		self.n, self.nvals = vals.shape
-		self.vals = np.take_along_axis(vals, inds, axis=1)
-		self.probs = np.take_along_axis(probs, inds, axis=1)
+		self.vals, self.probs = _sort_disc_dist(vals=vals, probs=probs)
 		self.cumprobs = np.cumsum(self.probs, axis=1)
 		# validate args
 		if np.any(self.probs < 0):

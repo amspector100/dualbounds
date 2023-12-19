@@ -1,4 +1,5 @@
 # Don't save data
+TODO.md
 data/*
 # Don't save test profiling
 prof/*

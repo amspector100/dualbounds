@@ -1,42 +1,15 @@
 import numpy as np
-import pandas as pd
 import cvxpy as cp
 from scipy import stats
-from . import gen_data
 from . import utilities
 from . import dist_reg
 from .utilities import BatchedCategorical
+from .interpolation import linear_interpolate
+from .generic import DualBounds
 
 """
 Helper functions
 """
-def interpolate(x, y, newx):
-	"""
-	x : np.array
-		n-length array of inputs. Must be sorted, although
-		this is not explicitly enforced to save time.
-	y : np.array
-		n-length array of outputs
-	newx : np.array
-		m-length array of new inputs
-	"""
-	if not utilities.haslength(newx):
-		newx = np.array([newx])
-	# for now, check sorting (TODO DELETE)
-	# if np.any(np.sort(x) != x):
-	# 	raise ValueError("NOT SORTED")
-	# interpolate points in the range of x
-	haty = np.interp(newx, x, y)
-	# adjust for points < x.min()
-	lflags = newx < x[0]
-	ldx = (y[1] - y[0]) / (x[1] - x[0])
-	haty[lflags] = y[0] + (newx[lflags] - x[0]) * ldx
-	# adjust for points > x.max()
-	uflags = newx > x[-1]
-	udx = (y[-1] - y[-2]) / (x[-1] - x[-2])
-	haty[uflags] = y[-1] + (newx[uflags] - x[-1]) * udx
-	return haty
-
 def compute_cvar(dists, n, alpha, lower=True, m=1000):
 	"""
 	Computes cvar using quantile approximation with m values.
@@ -172,7 +145,7 @@ def lee_bound_no_covariates(
 	abnds = compute_analytical_lee_bound(**args)[:, 0]
 	return abnds
 
-class LeeDualBounds:
+class LeeDualBounds(DualBounds):
 	"""
 	This class helps compute a lower (or upper) confidence
 	bound on
@@ -196,7 +169,7 @@ class LeeDualBounds:
 		# parameters
 		self.nu0 = cp.Variable((self.nvals0, 1))
 		self.nu1 = cp.Variable((1, self.nvals1))
-		self.f = cp.Parameter((self.nvals0, self.nvals1))
+		self.fparam = cp.Parameter((self.nvals0, self.nvals1))
 		self.probs0 = cp.Parameter((self.nvals0, 1))
 		self.probs1 = cp.Parameter((1, self.nvals1)) # np.ones((1, nvals1)) / nvals1
 
@@ -208,11 +181,11 @@ class LeeDualBounds:
 
 		# Lower and upper constraints
 		constraints_lower = [
-			nusum_mask <= cp.multiply(self.f, mask), 
+			nusum_mask <= cp.multiply(self.fparam, mask), 
 			cp.sum(self.nu0) == 0,
 		]
 		constraints_upper = [
-			nusum_mask >= cp.multiply(self.f, mask),
+			nusum_mask >= cp.multiply(self.fparam, mask),
 			cp.sum(self.nu0) == 0,
 		]
 		# assemble objective and constraints
@@ -233,8 +206,8 @@ class LeeDualBounds:
 		nu1,
 		y1_vals,
 		lower,
-		ymin=-100,
-		ymax=100,
+		ymin,
+		ymax,
 		grid_size=10000,
 	):
 		"""
@@ -249,7 +222,13 @@ class LeeDualBounds:
 
 		Returns
 		-------
-		dx : subtract dx from nu0 and we get valid dual variables.
+		new_nu0 : np.array
+			``nvals0`` length array of new dual vars. for Y(0)
+		new_nu1 : np.array
+			``nvals1`` length array of new dual vars. for Y(1)
+		dx : float
+			Constant which can be subtracted off to obtain valid 
+			dual variables. I.e., new_nk = nuk - dx/2.
 		"""
 		if y1_vals[0] != 0:
 			raise ValueError(
@@ -257,7 +236,7 @@ class LeeDualBounds:
 			)
 		dxs = []
 		new_yvals = np.linspace(ymin, ymax, grid_size)
-		interp_nu = interpolate(
+		interp_nu = linear_interpolate(
 			x=y1_vals[1:], y=nu1[1:], newx=new_yvals,
 		)
 		# only three options due to monotonicity
@@ -281,43 +260,6 @@ class LeeDualBounds:
 		else:
 			dx = np.min(np.array(dxs))
 		return nu0 - dx/2, nu1 - dx/2, dx
-
-	def discretize(
-		self, ydists, nvals, alphas=None,
-	):
-		"""
-		alphas : n-length array
-			alphas = s0_probs / s1_probs
-		"""
-		# make sure we get small enough quantiles
-		max_alpha = 1 / (2*nvals)
-		if alphas is not None:
-			alpha = min(max_alpha, alphas.min() / 2.1)
-			alpha = min(alpha, (1 - alphas).min() / 2.1)
-		else:
-			alpha = max_alpha
-		alpha = max(alpha, 1e-8)
-
-		# choose endpoints of bins for disc. approx
-		endpoints = np.sort(np.concatenate(
-			[[0, alpha/2, alpha],
-			np.linspace(1/(nvals-1), (nvals-2)/(nvals-1), nvals-1),
-			[1-alpha, 1-alpha/2, 1]],
-		))
-		qs = (endpoints[1:] + endpoints[0:-1])/2
-		# allow for batched setting
-		if not isinstance(ydists, list):
-			ydists = [ydists]
-		# loop through batches and concatenate
-		yvals = []
-		for dists in ydists:
-			yvals.append(dists.ppf(qs.reshape(-1, 1)).T)
-		yvals = np.concatenate(yvals, axis=0)
-		n = len(yvals)
-		# return
-		yprobs = endpoints[1:] - endpoints[0:-1]
-		yprobs = np.stack([yprobs for _ in range(n)], axis=0)
-		return yvals, yprobs
 
 	def solve_instances(
 		self,
@@ -353,12 +295,12 @@ class LeeDualBounds:
 		# discretize if Y is continuous
 		if y1_vals is None or y1_probs is None:
 			# law of Y(1) | S(1) = 1, Xi
-			y1_vals, y1_probs = self.discretize(y1_dists, nvals=self.nvals1-5)
+			y1_vals, y1_probs = self.discretize(
+				y1_dists, nvals=self.nvals1-5, alphas=s0_probs/s1_probs
+			)
 
 		# ensure y1_vals, y1_probs are sorted
-		inds = np.argsort(y1_vals, axis=1)
-		y1_vals = np.take_along_axis(y1_vals, inds, axis=1)
-		y1_probs = np.take_along_axis(y1_probs, inds, axis=1)
+		y1_vals, y1_probs = utilities._sort_disc_dist(vals=y1_vals, probs=y1_probs)
 		
 		## Adjust to make it law of Y(1) S(1) | Xi
 		# note: it is important that the value when S(1) = 0
@@ -390,7 +332,7 @@ class LeeDualBounds:
 		# loop through
 		for i in utilities.vrange(n, verbose=verbose):
 			# set parameter values
-			self.f.value = (
+			self.fparam.value = (
 				s0_vals * self.y1_vals_adj[i].reshape(1, -1)
 			).astype(float)
 			self.probs0.value = np.array(
@@ -460,7 +402,7 @@ class LeeDualBounds:
 					if S[i] == 0:
 						ds = self.nu1s[1 - lower, i, 0]
 					else:
-						ds = interpolate(
+						ds = linear_interpolate(
 							x=self.y1_vals_adj[i, 1:], y=self.nu1s[1-lower, i, 1:],
 							newx=Y[i],
 						)
@@ -491,7 +433,7 @@ class LeeDualBounds:
 			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
 		y0_dists : np.array
 			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
+			distribution is the conditional law of Yi(0) | S(0) = 1, Xi
 		y1_dists : np.array
 			batched scipy distribution of shape (n,) where the ith
 			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
