@@ -37,7 +37,7 @@ class TestCrossFit(unittest.TestCase):
 		Y = X @ beta + np.random.randn(n)
 		# cross-fitting approach one
 		rdr = dist_reg.RidgeDistReg(cv=cv)
-		preds0, preds1 = dist_reg._cross_fit_predictions(
+		preds0, preds1, _ = dist_reg._cross_fit_predictions(
 			W=W, Y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
 		mu0s, sigma0s = convert_norm_dists_to_array(preds0)

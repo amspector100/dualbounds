@@ -1,4 +1,4 @@
-from . import dist_reg, gen_data, lee, utilities
+from . import dist_reg, gen_data, lee, utilities, varite
 
 name = 'dualbounds'
 

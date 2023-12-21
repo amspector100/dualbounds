@@ -57,6 +57,7 @@ def _cross_fit_predictions(
 	starts, ends = create_folds(n=n, nfolds=nfolds)
 	# loop through folds
 	pred0s = []; pred1s = [] # results for W = 0, W = 1
+	fit_models = []
 	for start, end in zip(starts, ends):
 		# Pick out data from the other folds
 		not_in_fold = [i for i in np.arange(n) if i < start or i >= end]
@@ -81,11 +82,12 @@ def _cross_fit_predictions(
 		subX = X[start:end].copy(); subX[:, 0] = 1 # set selection = 1 for predictions
 		pred0, pred1 = reg_model.predict(subX)
 		pred0s.append(pred0); pred1s.append(pred1)
+		fit_models.append(reg_model)
 	# concatenate if arrays; else return
 	if isinstance(pred0s[0], np.ndarray):
 		pred0s = np.concatenate(pred0s, axis=0)
 		pred1s = np.concatenate(pred1s, axis=0)
-	return pred0s, pred1s
+	return pred0s, pred1s, fit_models
 
 class RidgeDistReg:
 	def __init__(
@@ -142,7 +144,80 @@ class RidgeDistReg:
 			W0 = np.zeros(n); W1 = np.ones(n)
 			return self.predict(X, W=W0), self.predict(X, W=W1)
 
+class LogisticCV(RidgeDistReg):
+	"""
+	Parameters
+	----------
+	kwargs : dict
+		kwargs to sklearn 
+	"""
+	def __init__(
+		self, monotonicity=False, **model_kwargs
+	):
+		self.monotonicity = monotonicity
+		self.model_kwargs = model_kwargs
+
+	def fit(self, W, X, Y):
+		# check Y is binary
+		if set(np.unique(Y).tolist()) != set([0,1]):
+			raise ValueError(f"Y must be binary; instead np.unique(Y)={np.unique(Y)}")
+		# fit 
+		features = self.feature_transform(W=W, X=X)
+		if not self.monotonicity:
+			self.model = LogisticRegressionCV(**self.model_kwargs)
+		else:
+			self.model = MonotoneLogisticReg(**self.model_kwargs)
+		self.model.fit(features, Y)
+
+	def predict_proba(
+		self, X, W=None
+	):
+		"""
+		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
+		Else, returns P(Y = 1 | W , X) 
+		"""
+		if W is not None:
+			# return predict P(Y = 1 | X, W)
+			return self.model.predict_proba(
+				self.feature_transform(W, X)
+			)[:, 1]
+		else:
+			# make predictions for W = 0 and W = 1
+			n = len(X)
+			W0 = np.zeros(n); W1 = np.ones(n)
+			p0s, p1s = self.predict_proba(X, W=W0), self.predict_proba(X, W=W1)
+			# enforce monotonicity
+			if self.monotonicity:
+				flags = p0s > p1s
+				avg = (p0s[flags] + p1s[flags]) / 2
+				p0s[flags] = avg
+				p1s[flags] = np.minimum(1, avg + 1e-5)
+			return p0s, p1s
+
+	def predict(self, X, W=None):
+		"""
+		If W is None, returns (y0_dists, y1_dists)
+		Else, returns (y_dists) 
+		"""
+		if W is not None:
+			# predict
+			features = self.feature_transform(W, X=X)
+			probs = self.model.predict_proba(features)
+			# return BatchedCategorical object
+			vals = np.zeros((len(X), 2))
+			vals[:, -1] += 1
+			return BatchedCategorical(
+				vals=vals, probs=probs
+			)
+		else:
+			n = len(X)
+			W0 = np.zeros(n); W1 = np.ones(n)
+			return self.predict(X, W=W0), self.predict(X, W=W1)
+
 class MonotoneLogisticReg:
+	"""
+	Helpful for Lee Bounds which enforce monotonicity.
+	"""
 	def __init__(self):
 		pass
 
@@ -167,44 +242,3 @@ class MonotoneLogisticReg:
 		mu = X @ self.beta
 		p1s = np.exp(mu) / (1 + np.exp(mu))
 		return np.stack([1 - p1s, p1s], axis=1)
-
-class LogisticCV:
-	def __init__(self, monotonicity, **model_kwargs):
-		self.monotonicity = monotonicity
-		self.model_kwargs = model_kwargs
-
-	def feature_transform(self, W, X):
-		""" Concatenates W, X and adds intercept currently """
-		return np.concatenate([W.reshape(-1, 1), X, np.ones((len(X), 1))], axis=1)
-
-	def fit(self, W, X, Y):
-		# fit sklearn model
-		self.model = MonotoneLogisticReg(**self.model_kwargs)
-		#self.model = LogisticRegression(**self.model_kwargs)
-		self.model.fit(
-			self.feature_transform(W, X),
-			Y
-		)
-
-	def predict(self, X, W=None):
-		"""
-		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
-		Else, returns P(Y = 1 | W , X) 
-		"""
-		if W is not None:
-			# return predict P(Y = 1 | X, W)
-			return self.model.predict_proba(
-				self.feature_transform(W, X)
-			)[:, 1]
-		else:
-			# make predictions for W = 0 and W = 1
-			n = len(X)
-			W0 = np.zeros(n); W1 = np.ones(n)
-			p0s, p1s = self.predict(X, W=W0), self.predict(X, W=W1)
-			# enforce monotonicity
-			if self.monotonicity:
-				flags = p0s > p1s
-				avg = (p0s[flags] + p1s[flags]) / 2
-				p0s[flags] = avg
-				p1s[flags] = np.minimum(1, avg + 1e-5)
-			return p0s, p1s

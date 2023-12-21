@@ -167,7 +167,7 @@ def compute_est_bounds(summands, alpha=0.05):
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]
 	])
 
-def _sort_disc_dist(probs, vals):
+def _sort_disc_dist(vals, probs):
 	"""
 	Parameters
 	----------
@@ -242,6 +242,10 @@ def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
 	dist = dist.lower()
 	if dist == 'constant':
 		return ConstantDist(loc=loc, scale=scale)
+	if dist == 'bernoulli':
+		prob = np.exp(loc / scale)
+		prob = prob / (1 + prob)
+		return stats.bernoulli(p=prob)
 	if dist == 'gaussian':
 		return stats.norm(loc=loc, scale=scale)
 	if dist == 'invchi2':

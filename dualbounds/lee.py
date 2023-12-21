@@ -145,12 +145,294 @@ def lee_bound_no_covariates(
 	abnds = compute_analytical_lee_bound(**args)[:, 0]
 	return abnds
 
+class LeeDualBoundsv2(DualBounds):
+	"""
+	Computes dual bounds on
+
+	E[Y(1) - Y(0) | S(1) = S(0) = 1]
+
+	for binary S(0) and either continuous or discrete Y(1).
+	These bounds assume monotonicity.
+
+	Parameters
+	----------
+	X : np.array
+		(n, p)-shaped array of covariates.
+	S : np.array
+		n-length array of binary selection indicators
+	W : np.array
+		n-length array of treatment indicators.
+	Y : np.array
+		n-length array of outcome measurements
+	pis : np.array
+		n-length array of propensity scores P(W=1 | X). 
+		If ``None``, will be estimated from the data itself.
+	discrete : bool
+		If True, treats y as a discrete variable. 
+		Defaults to None (inferred from the data).
+	"""	
+
+	def __init__(
+		self,
+		S,
+		*args,
+		monotonicity='conditional',  
+		**kwargs
+	):
+		self.monotonicity = monotonicity
+		self.S = S
+		super().__init__(*args, **kwargs)
+
+	def ensure_feasibility(
+		self,
+		nu0,
+		nu1,
+		y1_vals,
+		lower,
+		ymin,
+		ymax,
+		grid_size=10000,
+	):
+		"""
+		ensures nu0 + nu1 <= fvals (if lower)
+		or nu0 + nu1 >= fvals (if upper)
+		by performing a gridsearch.
+
+		Parameters
+		----------
+		nu1 : nvals1-length array
+			note nu1[0] is the dual variable for when s1=1.
+
+		Returns
+		-------
+		new_nu0 : np.array
+			``nvals0`` length array of new dual vars. for Y(0)
+		new_nu1 : np.array
+			``nvals1`` length array of new dual vars. for Y(1)
+		dx : float
+			Constant which can be subtracted off to obtain valid 
+			dual variables. I.e., new_nk = nuk - dx/2.
+		"""
+		if y1_vals[0] != 0:
+			raise ValueError(
+				"Expected y1_vals[0] to equal zero; this should be the case when s1 = 0."
+			)
+		dxs = []
+		new_yvals = np.linspace(ymin, ymax, grid_size)
+		interp_nu = linear_interpolate(
+			x=y1_vals[1:], y=nu1[1:], newx=new_yvals,
+		)
+		# only three options due to monotonicity
+		# if lower: nu0[s0] + nu1[s1 * y1] <= s0 s1 y1
+		# if not lower: nu0[s0] + nu1[s1 * y1] >= s0 s1 y1
+		for s0, s1 in zip(
+			[0, 0, 1], [0, 1, 1]
+		):
+			if s1 == 0:
+				dxs.append(nu0[s0] + nu1[0])
+			else:
+				deltas = nu0[s0] + interp_nu - s0 * s1 * new_yvals
+				if lower:
+					dxs.append(np.max(deltas))
+				else:
+					dxs.append(np.min(deltas))
+
+		# return valid dual variables
+		if lower:
+			dx = np.max(np.array(dxs))
+		else:
+			dx = np.min(np.array(dxs))
+		return nu0 - dx/2, nu1 - dx/2, dx
+
+	def compute_dual_variables(
+		self,
+		s0_probs,
+		s1_probs,
+		y1_dists=None,
+		y1_vals=None,
+		y1_probs=None,
+		verbose=False,
+		nvals=100,
+		#ymin=None,
+		#ymax=None,
+		**kwargs,
+	):
+		"""
+		Parameters
+		----------
+		s0_probs : np.array
+			n-length array where s0_probs[i] = P(S(0) = 1 | Xi)
+		s1_probs : np.array
+			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
+		y1_dists : np.array
+			batched scipy distribution of shape (n,) where the ith
+			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
+			OR 
+			list of scipy dists whose shapes add up to n.
+		y1_vals : np.array
+			(n, nvals1)-length array of values y1 can take.
+		y1_probs : np.array
+			(n, nvals1)-length array where
+			y0_probs[i, j] = P(Y(1) = yvals1[j] | S(1) = 1, Xi)
+		kwargs : dict
+			kwargs for ensure_feasibility method.
+			Includes ymin, ymax, grid_size.
+		"""
+		n = s0_probs.shape[0]
+		self.nvals0 = 2 # because S is binary
+		self.nvals1 = len(self.support) if self.discrete else nvals
+		self.interp_fn = interpolation.linear_interpolate
+
+		# discretize if Y is continuous
+		if y1_vals is None or y1_probs is None:
+			# tolerance parameter
+			alpha = min([np.min(s0_probs/s1_probs), np.min(1 - s0_probs/s1_probs)])
+			# law of Y(1) | S(1) = 1, Xi
+			y1_vals, y1_probs = self.discretize(
+				y1_dists, 
+				nvals=self.nvals1-1, 
+				alpha=alpha/2,
+				ninterp=0,
+				ymin=None,
+				ymax=None,
+			)
+
+		# ensure y1_vals, y1_probs are sorted
+		self.y1_vals, self.y1_probs = utilities._sort_disc_dist(vals=y1_vals, probs=y1_probs)
+		del y1_vals, y1_probs
+
+		## Adjust to make it law of Y(1) S(1) | Xi
+		# note: it is important that the value when S(1) = 0
+		# is the first value on the second axis
+		# so that the monotonicity constraint is correct.
+		self.y1_vals_adj = np.concatenate(
+			[np.zeros((n, 1)), y1_vals], axis=1
+		)
+		self.y1_probs_adj = np.concatenate(
+			[
+				1 - s1_probs.reshape(-1, 1),
+				s1_probs.reshape(-1, 1) * y1_probs
+			], 
+			axis=1
+		)
+
+		# useful constants
+		s0_vals = np.array([0, 1]).reshape(-1, 1)
+
+		# Initialize results
+		self.n = self.y1_vals.shape[0]
+		self.nu0s = np.zeros((2, n, self.nvals0)) # first dimension = [lower, upper]
+		self.nu1s = np.zeros((2, n, self.nvals1))
+		self.hatnu0s = np.zeros((2, self.n))
+		self.hatnu1s = np.zeros((2, self.n)) 
+		# estimated cond means of nu0s, nu1s
+		self.c0s = np.zeros((2, self.n))
+		self.c1s = np.zeros((2, self.n))
+		# objective values
+		self.objvals = np.zeros((2, self.n))
+		self.dxs = np.zeros((2, self.n))
+		# loop through
+		for i in utilities.vrange(self.n, verbose=verbose):
+			# set parameter values
+			fvals = (
+				s0_vals * self.y1_vals_adj[i].reshape(1, -1)
+			).astype(float)
+			# relax constraints due to monotonicity
+			fvals[1, 0] = np.inf
+			# solve 
+			for lower in [1, 0]:
+				nu0x, nu1x, objval = self._solve_single_instance(
+					probs0=np.array([1 - s0_probs[i], s0_probs[i]]),
+					probs1=self.y1_probs_adj[i],
+					fvals=fvals,
+					lower=lower
+				)
+				self.objvals[1 - lower, i] = objval
+				if not self.discrete:
+					nu0x, nu1x, dx = self.ensure_feasibility(
+						i=i, nu0=nu0x, nu1=nu1x, lower=lower, 
+						y0_min=y0_min, y0_max=y0_max,
+						y1_min=y1_min, y1_max=y1_max,
+						**kwargs,
+					)
+				# Set values
+				self.hatnu0s[1 - lower, i] = nu0x[self.S[i]]
+				if self.S[i] == 0:
+					self.hatnu1s[1 - lower, i] = nu1x[0]
+				if not self.discrete and self.S[i] == 1:
+					self.hatnu1s[1 - lower, i] = self.interp_fn(
+						x=self.y1_vals[i][1:], y=nu1x[1:], newx=self.y[i],
+					)
+				elif self.discrete and self.S[i] == 1:
+					j = np.where(self.y1_vals[i] == self.y[i])[0][0]
+					self.hatnu1s[1 - lower, i] = nu1x[j]
+					dx = 0
+
+				# Save intermediate quantities
+				self.nu0s[1 - lower, i] = nu0x
+				self.nu1s[1 - lower, i] = nu1x
+				self.c0s[1 - lower, i] = nu0x @ self.y0_probs[i]
+				self.c1s[1 - lower, i] = nu1x @ self.y1_probs_adj[i]
+				self.dxs[1 - lower, i] = dx
+
+	def fit_outcome_model(
+		self,
+		S_model,
+		Y_model,
+		nfolds=2,
+	):
+		"""
+		Returns
+		-------
+		s0_probs : np.array
+			n-length array where s0_probs[i] = P(S(0) = 1 | Xi)
+		s1_probs : np.array
+			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
+		y0_dists : np.array
+			batched scipy distribution of shape (n,) where the ith
+			distribution is the conditional law of Yi(0) | S(0) = 1, Xi
+		y1_dists : np.array
+			batched scipy distribution of shape (n,) where the ith
+			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
+		"""
+		# estimated selection probs and outcome model 
+		self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
+			W=self.W, X=self.X, Y=self.S, 
+			nfolds=nfolds, model=S_model,
+			#model_cls=S_model_cls, **model_kwargs,
+		)
+		self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
+			W=self.W, X=self.X, S=self.S, Y=self.Y, 
+			nfolds=nfolds, model=Y_model,
+		)
+		# compute predicted mean of y0 s0---
+		# to do this we need to loop through the batches
+		self.y0s0_cond_means = []
+		self.nstarts, self.nends = dist_reg.create_folds(n=len(self.Y), nfolds=nfolds)
+		for y0dist, nstart, nend in zip(
+			self.y0_dists, self.nstarts, self.nends
+		):
+			self.y0s0_cond_means.append(y0dist.mean() * self.s0_probs[nstart:nend])
+		self.y0s0_cond_means = np.concatenate(self.y0s0_cond_means, axis=0)
+		# returm
+		return self.s0_probs, self.s1_probs, self.y0_dists, self.y1_dists
+
+
+	def compute_final_bounds(self, aipw=True, alpha=0.05):
+		"""
+		Computes final bounds based in (A)IPW summands,
+		using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].
+		"""
+		raise NotImplementedError()
+
+
+
 class LeeDualBounds(DualBounds):
 	"""
 	This class helps compute a lower (or upper) confidence
 	bound on
 
-	E[Y(1) S(1) S(0)].
+	E[Y(1) - Y(0) | S(1) = S(0) = 1]
 
 	for binary S(0) and either continuous or discrete Y(1).
 
@@ -294,9 +576,16 @@ class LeeDualBounds(DualBounds):
 		n = s0_probs.shape[0]
 		# discretize if Y is continuous
 		if y1_vals is None or y1_probs is None:
+			# tolerance parameter
+			alpha = min([np.min(s0_probs/s1_probs), np.min(1 - s0_probs/s1_probs)])
 			# law of Y(1) | S(1) = 1, Xi
 			y1_vals, y1_probs = self.discretize(
-				y1_dists, nvals=self.nvals1-5, alphas=s0_probs/s1_probs
+				y1_dists, 
+				nvals=self.nvals1-1, 
+				alpha=alpha/2,
+				ninterp=0,
+				ymin=None,
+				ymax=None,
 			)
 
 		# ensure y1_vals, y1_probs are sorted
@@ -439,12 +728,12 @@ class LeeDualBounds(DualBounds):
 			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
 		"""
 		# estimated selection probs and outcome model 
-		self.s0_probs, self.s1_probs = dist_reg._cross_fit_predictions(
+		self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
 			W=self.W, X=self.X, Y=self.S, 
 			nfolds=nfolds, model=S_model,
 			#model_cls=S_model_cls, **model_kwargs,
 		)
-		self.y0_dists, self.y1_dists = dist_reg._cross_fit_predictions(
+		self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
 			W=self.W, X=self.X, S=self.S, Y=self.Y, 
 			nfolds=nfolds, model=Y_model,
 		)
@@ -459,10 +748,6 @@ class LeeDualBounds(DualBounds):
 		self.y0s0_cond_means = np.concatenate(self.y0s0_cond_means, axis=0)
 		# returm
 		return self.s0_probs, self.s1_probs, self.y0_dists, self.y1_dists
-
-
-	def fit_propensity_scores(self, nfolds):
-		raise NotImplementedError()
 
 	def compute_dual_bounds(
 		self,

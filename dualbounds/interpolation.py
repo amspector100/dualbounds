@@ -4,6 +4,7 @@ go from discrete dual variables to continuous ones.
 """
 
 import numpy as np
+import scipy as sp
 from . import utilities
 
 def linear_interpolate(x, y, newx):
@@ -32,3 +33,9 @@ def linear_interpolate(x, y, newx):
 	udx = (y[-1] - y[-2]) / (x[-1] - x[-2])
 	haty[uflags] = y[-1] + (newx[uflags] - x[-1]) * udx
 	return haty
+
+def spline_interpolate(
+    x, y, newx
+):
+    spline_rep = sp.interpolate.splrep(x=x, y=y)
+    return sp.interpolate.splev(newx, spline_rep)
