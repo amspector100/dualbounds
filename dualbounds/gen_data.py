@@ -5,7 +5,7 @@ Generate synthetic data for tests and illustrations.
 import numpy as np
 from scipy import stats
 from scipy.special import logsumexp
-from knockpy import dgp
+#from knockpy import dgp
 from .utilities import parse_dist, _convert_to_cat
 
 def heteroskedastic_scale(X, heterosked='constant'):
@@ -31,10 +31,10 @@ def create_cov(p, covmethod='identity'):
 	covmethod = str(covmethod).lower()
 	if covmethod == 'identity':
 		return np.eye(p)
-	elif covmethod == 'ar1':
-		return dgp.AR1(p=p)
-	elif covmethod == 'factor':
-		return dgp.FactorModel(p=p)
+	# elif covmethod == 'ar1':
+	# 	return dgp.AR1(p=p)
+	# elif covmethod == 'factor':
+	# 	return dgp.FactorModel(p=p)
 	else:
 		raise ValueError(f"Unrecognized covmethod={covmethod}")
 
