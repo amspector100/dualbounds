@@ -47,37 +47,15 @@ class TestVarITE(unittest.TestCase):
 				err_msg=f"Var(ITE) bounds are not consistent, n={n}"
 			)
 
-	def test_se_computation(self):
+	def test_varite_delta_method_se(self):
 		""" Tests that we correctly estimate the SE. """
-		n = 500
-		reps = 10000
-		mu = np.random.randn(3)
-		theta = mu[0] - (mu[1] - mu[2])**2
-		sbetas = 0.7 * np.random.randn(reps, n) + mu[0]
-		sk0s = 0.2 * np.random.randn(reps, n) + mu[1]
-		sk1s = 0.5 * np.random.randn(reps, n) + mu[2]
-		ests = np.zeros(reps); ses = np.zeros(reps)
-		for r in range(reps):
-			est, se = db.varite.varite_delta_method_se(
-				sbetas=sbetas[r], skappa1s=sk1s[r], skappa0s=sk0s[r]
-			)
-			ests[r] = est
-			ses[r] = se
-		# test approximate unbiasedness
-		np.testing.assert_array_almost_equal(
-			ests.mean(),
-			theta,
-			decimal=2,
-			err_msg=f"Var(ITE) plug-in estimator is not unbiased"
+		context._run_se_computation_test(
+			dim=3,
+			f=lambda x, y, z: x - (y-z)**2,
+			arg_names=['sbetas', 'skappa1s', 'skappa0s'],
+			testname='Var(ITE)',
+			se_function=db.varite.varite_delta_method_se,
 		)
-		# test SE estimation
-		np.testing.assert_array_almost_equal(
-			ests.std(),
-			ses.mean(),
-			decimal=2,
-			err_msg=f"Var(ITE) SE estimator is not consistent"
-		)
-
 
 	def test_no_error(self):
 		""" This tests if the code runs without error for continuous Y. """

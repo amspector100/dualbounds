@@ -80,25 +80,6 @@ def old_conditional_lee_bound(
 	term1 = y1_vals[0:(k+1)] @ cond_probs
 	return term1 - y0_vals @ py0_given_s0
 
-def slow_interpolation(x, y, newx):
-	"""
-	same as lee.interpolate but slower and more readable.
-	"""
-	if not utilities.haslength(newx):
-		newx = np.array([newx])
-	# compute differences
-	n = len(x); m = len(newx)
-	diffs = x.reshape(n, 1) - newx.reshape(1, m)
-	# identify closest points to newx
-	inds = np.argsort(np.abs(diffs), axis=0)[0:2]
-	i1 = inds[0]; x1 = x[i1]; y1 = y[i1]
-	i2 = inds[1]; x2 = x[i2]; y2 = y[i2]
-	# interpolate
-	dx = x2 - x1
-	dy = y2 - y1
-	haty = y1 + dy / dx * (newx - x1)
-	return haty
-
 def compute_cvar_samples(dists, n, alpha, lower=True, reps=100000):
 	"""
 	Batched computation of 
@@ -199,22 +180,16 @@ class TestHelpers(unittest.TestCase):
 			err_msg="discrete analytical vs. cts analytical bounds do not match"
 		)
 
-	# def test_interpolation(self):
-	# 	np.random.seed(1234)
-	# 	n = 100
-	# 	m = 30
-	# 	x = np.sort(np.random.randn(n))
-	# 	y = np.random.randn(n) + x
-	# 	newx = np.random.randn(m)
-	# 	expected = slow_interpolation(
-	# 		x=x, y=y, newx=newx,
-	# 	)
-	# 	result = lee.interpolate(
-	# 		x=x, y=y, newx=newx,
-	# 	)
-	# 	np.testing.assert_array_almost_equal(
-	# 		expected, result, decimal=5, err_msg="Interp. fns do not agree"
-	# 	)
+	def test_lee_delta_method_se(self):
+		""" Tests that we correctly estimate the SE. """
+		context._run_se_computation_test(
+			dim=3,
+			f=lambda x, y, z: (x - y) / z,
+			arg_names=['sbetas', 'skappas', 'sgammas'],
+			testname='Lee bound',
+			se_function=db.lee.lee_delta_method_se,
+			param_shift=1,
+		)
 
 class TestDualLeeBounds(unittest.TestCase):
 

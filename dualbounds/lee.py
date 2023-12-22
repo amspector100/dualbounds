@@ -146,6 +146,27 @@ def lee_bound_no_covariates(
 	abnds = compute_analytical_lee_bound(**args)[:, 0]
 	return abnds
 
+def lee_delta_method_se(
+	sbetas, skappas, sgammas
+):			
+	# estimate
+	hat_beta = sbetas.mean()
+	hat_kappa = skappas.mean()
+	hat_gamma = sgammas.mean()
+	hattheta = (hat_beta - hat_kappa) / hat_gamma
+	# standard error
+	hatSigma = np.cov(
+		np.stack([sbetas, skappas, sgammas], axis=0)
+	) # 3 x 3 cov matrix
+	grad = np.array([
+		1 / hat_gamma,
+		- 1 / hat_gamma,
+		-(hat_beta - hat_kappa) / (hat_gamma**2)
+	])
+	# estimate
+	se = np.sqrt(grad @ hatSigma @ grad / len(sbetas))
+	return hattheta, se
+
 class LeeDualBounds(DualBounds):
 	"""
 	Computes dual bounds on
@@ -504,30 +525,17 @@ class LeeDualBounds(DualBounds):
 		for lower in [1, 0]:
 			# beta = part. identifiable component E[Y(1) S(0)]
 			sbetas = summands[1-lower]
-			hat_beta = sbetas.mean()
 			# kappa = E[Y(0) S(0)]
 			skappas = (1 - self.W) * (self.y * self.S - self.y0s0_cond_means) 
 			skappas = skappas / (1-self.pis)
 			skappas += self.y0s0_cond_means
-			hat_kappa = skappas.mean()
 			# gamma = E[S(0)]
 			sgammas = (1-self.W) * (self.S - self.s0_probs) / (1-self.pis)
 			sgammas += self.s0_probs
-			hat_gamma = sgammas.mean()
-			# estimate
-			hattheta = (hat_beta - hat_kappa) / hat_gamma
+			hattheta, se = lee_delta_method_se(
+				sbetas=sbetas, skappas=skappas, sgammas=sgammas,
+			)
 			ests.append(hattheta)
-			# standard error
-			hatSigma = np.cov(
-				np.stack([sbetas, skappas, sgammas], axis=0)
-			) # 3 x 3 cov matrix
-			grad = np.array([
-				1 / hat_gamma,
-				- 1 / hat_gamma,
-				-(hat_beta - hat_kappa) / (hat_gamma**2)
-			])
-			# estimate
-			se = np.sqrt(grad @ hatSigma @ grad / len(sbetas))
 			ses.append(se)
 			if lower:
 				bounds.append(hattheta - scale * se)
