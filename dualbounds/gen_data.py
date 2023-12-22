@@ -53,6 +53,7 @@ def gen_regression_data(
 	heterosked='constant',
 	tauv=1, # Var(Y(1) | X ) / Var(Y(0) | X)
 	r2=0,
+	interactions=True,
 	tau=0,
 	betaW_norm=0,
 	covmethod='identity',
@@ -64,7 +65,16 @@ def gen_regression_data(
 	Sigma = create_cov(p=p, covmethod=covmethod)
 	# Create beta
 	beta_norm = r2 / (1 - r2) if r2 > 0 else 0
-	beta = _sample_norm_vector(p, beta_norm)
+	# No interactions with treatment
+	if not interactions:
+		beta = _sample_norm_vector(p, beta_norm)
+		beta_int = np.zeros(p)
+	# interactions with treatment
+	else:
+		beta = _sample_norm_vector(2*p, beta_norm)
+		beta_int = beta[p:].copy()
+		beta = beta[0:p].copy()
+
 	# Create beta_W (for W | X)
 	betaW = _sample_norm_vector(p, betaW_norm)
 
@@ -98,8 +108,9 @@ def gen_regression_data(
 	y0_dists = parse_dist(
 		eps_dist, loc=mu, scale=sigmas0
 	)
+	cates = X @ beta_int + tau
 	y1_dists = parse_dist(
-		eps_dist, loc=mu+tau, scale=sigmas1
+		eps_dist, loc=mu+cates, scale=sigmas1
 	)
 	Y0 = y0_dists.rvs(); Y1 = y1_dists.rvs()
 	Y = Y0.copy(); Y[W == 1] = Y1[W == 1]
@@ -113,6 +124,8 @@ def gen_regression_data(
 		pis=pis,
 		Sigma=Sigma,
 		beta=beta,
+		beta_int=beta_int,
+		cates=y1_dists.mean() - y0_dists.mean(),
 		betaW=betaW,
 	)
 	# for convenience

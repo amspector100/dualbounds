@@ -1,5 +1,5 @@
+import warnings
 import numpy as np
-#import cvxpy as cp
 import ot
 from scipy import stats
 from . import utilities, dist_reg, interpolation
@@ -7,6 +7,15 @@ from .utilities import BatchedCategorical
 
 MIN_NVALS = 7
 DISC_THRESH = 10 # treat vars. with <= 10 observations as discrete
+CROSSFIT_WARNING = """
+==================================================
+Not fitting a model because y0_dists/y1_dists were
+directly provided. Please ensure cross-fitting is
+employed correctly, else inference will be invalid
+(see https://arxiv.org/abs/2310.08115). To suppress
+this warning, set ``supress_warning=True``.
+==================================================
+"""
 
 def get_default_model(discrete, support, Y_model=None):
 	if Y_model is not None:
@@ -18,6 +27,27 @@ def get_default_model(discrete, support, Y_model=None):
 	else:
 		raise NotImplementedError("Currently no default for non-binary discrete data")
 
+def infer_discrete(discrete, support, y):
+	n = len(y)
+	### Check if discrete
+	if n <= 10:
+		if discrete is None:
+			raise ValueError("Please specify the value of discrete as n <= 10")
+		if discrete and support is None:
+			raise ValueError("Please specify the value of support as n <= 10")
+	if support is None:
+		support = np.unique(y)
+	if discrete is None:
+		if len(support) <= DISC_THRESH:
+			discrete = True
+		else:
+			discrete = False
+
+	# Adjust support to avoid being misleading
+	# in the continuous case
+	if not discrete:
+		support = None
+	return discrete, support
 
 class DualBounds:
 	"""
@@ -57,28 +87,15 @@ class DualBounds:
 		self.y = y
 		self.W = W
 		self.pis = pis
-		self.discrete = discrete
-		self.support = support
+		# self.discrete = discrete
+		# self.support = support
+		self.n = len(self.y)
 		#self.n, self.p = self.X.shape
 
 		### Check if discrete
-		if len(self.y) <= 10:
-			if self.discrete is None:
-				raise ValueError("Please specify the value of discrete as n <= 10")
-			if self.discrete and self.support is None:
-				raise ValueError("Please specify the value of support as n <= 10")
-		if self.support is None:
-			self.support = np.unique(self.y)
-		if self.discrete is None:
-			if len(self.support) <= DISC_THRESH:
-				self.discrete = True
-			else:
-				self.discrete = False
-
-		# Adjust support to avoid being misleading
-		# in the continuous case
-		if not self.discrete:
-			self.support = None
+		self.discrete, self.support = infer_discrete(
+			discrete=discrete, support=support, y=self.y
+		)
 
 		# Initialize
 		self.y0_dists = None
@@ -426,7 +443,7 @@ class DualBounds:
 		del y0_vals, y1_vals, y0_probs, y1_probs
 
 		# Initialize results
-		self.n = self.y0_vals.shape[0]
+		#self.n = self.y0_vals.shape[0]
 		self.nu0s = np.zeros((2, self.n, self.nvals0)) # first dimension = [lower, upper]
 		self.nu1s = np.zeros((2, self.n, self.nvals1))
 		# estimated cond means of nu0s, nu1s
@@ -555,6 +572,30 @@ class DualBounds:
 		self.mu0 = np.concatenate([x.mean() for x in y0_dists])
 		self.mu1 = np.concatenate([x.mean() for x in y1_dists])
 
+	def cross_fit(
+		self,
+		Y_model=None,
+		nfolds=5,
+		suppress_warning=False,
+	):
+
+		# if pis not supplied: will use cross-fitting
+		if self.pis is None:
+			self.fit_propensity_scores(nfolds=nfolds)
+
+		# Fit model
+		if self.y0_dists is None or self.y1_dists is None:
+			self.Y_model = get_default_model(
+				discrete=self.discrete, support=self.support, Y_model=Y_model
+			)
+			self.y0_dists, self.y1_dists, self.model_fits = dist_reg._cross_fit_predictions(
+				W=self.W, X=self.X, Y=self.y, 
+				nfolds=nfolds, model=self.Y_model,
+			)
+		elif not suppress_warning:
+			warnings.warn(CROSSFIT_WARNING)
+
+
 
 	def compute_dual_bounds(
 		self,
@@ -562,6 +603,9 @@ class DualBounds:
 		nfolds=5,
 		aipw=True,
 		alpha=0.05,
+		y0_dists=None,
+		y1_dists=None,
+		suppress_warning=False,
 		**solve_kwargs,
 	):
 		"""
@@ -574,18 +618,18 @@ class DualBounds:
 		solve_kwargs : dict
 			kwargs to self.compute_dual_variables(), 
 			e.g., ``verbose``, ``nvals0``, ``grid_size``
+		y0_dists : list of scipy dists
+			Optional input in place of model
+		y1_dists : list of scipy dists
+			Optional input in place of model
+		suppress_warning : bool
+			If True, suppresses warning about cross-fitting.
 		"""
-		# if pis not supplied: will use cross-fitting
-		if self.pis is None:
-			self.fit_propensity_scores(nfolds=nfolds)
-
-		# Fit model
-		self.Y_model = get_default_model(
-			discrete=self.discrete, support=self.support, Y_model=Y_model
-		)
-		self.y0_dists, self.y1_dists, self.model_fits = dist_reg._cross_fit_predictions(
-			W=self.W, X=self.X, Y=self.y, 
-			nfolds=nfolds, model=self.Y_model,
+		# Fit model of W | X and Y | X if not provided
+		self.y0_dists, self.y1_dists = y0_dists, y1_dists
+		self.cross_fit(
+			Y_model=Y_model, nfolds=nfolds, 
+			suppress_warning=suppress_warning
 		)
 
 		# compute dual variables

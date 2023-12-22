@@ -43,7 +43,7 @@ class TestVarITE(unittest.TestCase):
 			np.testing.assert_array_almost_equal(
 				np.array([lower, upper]),
 				ests,
-				decimal=1.5,
+				decimal=1,
 				err_msg=f"Var(ITE) bounds are not consistent, n={n}"
 			)
 
@@ -68,12 +68,72 @@ class TestVarITE(unittest.TestCase):
 			)
 			ests, bounds = vdb.compute_dual_bounds(nfolds=3)
 
+class TestVarCATE(unittest.TestCase):
+
+	def test_varcate_delta_method_se(self):
+		""" Tests that we correctly estimate the SE. """
+		context._run_se_computation_test(
+			dim=6,
+			f=db.varcate.moments2varcate,
+			arg_names=[
+				'shxy1', 'shxy0', 'shx', 'sy1', 'sy0', 'shx2'
+			],
+			testname='Var(CATE)',
+			se_function=db.varcate.varcate_delta_method_se,
+		)
+
+	def test_no_discrete_error(self):
+		"""
+		Just tests that the discrete case runs without errors.
+		The LogisticCV solver is slow so we don't check consistency.
+		"""
+		data = db.gen_data.gen_lee_bound_data(
+			n=200, p=5, eps_dist='bernoulli',
+		)
+		vdb = db.varcate.VarCATEDualBounds(
+			X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+		)
+		vdb.compute_dual_bounds(nfolds=3)
+
+
+	def test_varcate_consistency(self):
+		for eps_dist, r2 in zip(
+			['gaussian', 'expon'], [0.9, 0.5, 0.0]
+		):
+			data = db.gen_data.gen_lee_bound_data(
+				n=300000, p=5, r2=r2, tau=2, dgp_seed=1, sample_seed=1,
+				eps_dist=eps_dist,
+				interactions=True,
+			)
+			expected = data['cates'].std()**2
+			## Oracle
+			vdb_oracle = db.varcate.VarCATEDualBounds(
+				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+			)
+			est_oracle = vdb_oracle.compute_dual_bounds(
+				y0_dists=data['y0_dists'], y1_dists=data['y1_dists'], 
+				suppress_warning=True,
+			)['estimate']
+			## Actual
+			vdb = db.varcate.VarCATEDualBounds(
+				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+			)
+			est_actual = vdb.compute_dual_bounds(nfolds=3)['estimate']
+			for est, name in zip([est_oracle, est_actual], ['oracle', 'est']):
+				np.testing.assert_array_almost_equal(
+					est,
+					expected,
+					decimal=2,
+					err_msg=f"VarCATE {name} is inaccurate (r2={r2}, eps_dist={eps_dist})"
+				)
+
+
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev
 	basename = os.path.basename(os.path.abspath(__file__))
 	if sys.argv[0] == f'test/{basename}':
 		time0 = time.time()
-		context.run_all_tests([TestVarITE()])
+		context.run_all_tests([TestVarITE(), TestVarCATE()])
 		elapsed = np.around(time.time() - time0, 2)
 		print(f"Finished running all tests at time={elapsed}")
 

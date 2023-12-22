@@ -104,7 +104,7 @@ def compute_cvar_samples(dists, n, alpha, lower=True, reps=100000):
 	# Return
 	return cvar_est
 
-class TestHelpers(unittest.TestCase):
+class TestLeeHelpers(unittest.TestCase):
 	"""
 	tests
 	"""

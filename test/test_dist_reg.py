@@ -36,7 +36,7 @@ class TestCrossFit(unittest.TestCase):
 		beta = np.random.randn(p)
 		Y = X @ beta + np.random.randn(n)
 		# cross-fitting approach one
-		rdr = dist_reg.RidgeDistReg(cv=cv)
+		rdr = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
 		preds0, preds1, _ = dist_reg._cross_fit_predictions(
 			W=W, Y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
@@ -48,7 +48,7 @@ class TestCrossFit(unittest.TestCase):
 		p0s = []; p1s = []
 		for start, end in zip(starts, ends):
 			not_in_fold = [i for i in range(n) if i < start or i >= end]
-			model = dist_reg.RidgeDistReg(cv=cv)
+			model = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
 			model.fit(W=W[not_in_fold], X=X[not_in_fold], Y=Y[not_in_fold])
 			pr0s, pr1s = model.predict(X=X[start:end])
 			p0s.append(pr0s); p1s.append(pr1s)
@@ -65,19 +65,12 @@ class TestCrossFit(unittest.TestCase):
 				actual, expected, decimal=3, err_msg=f"{name} from _cross_fit_predictions did not match manual method"
 			)
 
-class TestEx2(unittest.TestCase):
-	"""
-	another test class
-	"""
-	def test_ex2(self):
-		pass
-
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev
 	basename = os.path.basename(os.path.abspath(__file__))
 	if sys.argv[0] == f'test/{basename}':
 		time0 = time.time()
-		context.run_all_tests([TestCrossFit(), TextEx2()])
+		context.run_all_tests([TestCrossFit()])
 		elapsed = np.around(time.time() - time0, 2)
 		print(f"Finished running all tests at time={elapsed}")
 

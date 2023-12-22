@@ -98,6 +98,7 @@ class RidgeDistReg:
 	def __init__(
 		self,
 		eps_dist='gaussian',
+		how_transform='interactions',
 		**model_kwargs,
 		#heterosked=False,
 	):
@@ -111,13 +112,23 @@ class RidgeDistReg:
 		"""
 		self.eps_dist = eps_dist
 		self.model_kwargs = model_kwargs
+		self.how_transform = str(how_transform).lower()
 		#self.heterosked = heterosked
 
 	def feature_transform(self, W, X):
 		"""
 		In the future, can add splines/basis functions.
 		"""
-		return np.concatenate([W.reshape(-1, 1), X],axis=1)
+		if self.how_transform in ['none', 'identity']:
+			return np.concatenate([W.reshape(-1, 1), X],axis=1)
+		elif self.how_transform in [
+			'int', 'interaction', 'interactions'
+		]:
+			return np.concatenate([
+				W.reshape(-1, 1), W.reshape(-1, 1) * X, X], axis=1
+			)
+		else:
+			raise ValueError(f"Unrecognized transformation {self.how_transform}")
 
 	def fit(self, W, X, Y):
 		"""
@@ -157,10 +168,11 @@ class LogisticCV(RidgeDistReg):
 		kwargs to sklearn 
 	"""
 	def __init__(
-		self, monotonicity=False, **model_kwargs
+		self, monotonicity=False, how_transform='interactions', **model_kwargs
 	):
 		self.monotonicity = monotonicity
 		self.model_kwargs = model_kwargs
+		self.how_transform = str(how_transform).lower()
 
 	def fit(self, W, X, Y):
 		# check Y is binary
