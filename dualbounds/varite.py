@@ -40,6 +40,26 @@ def compute_analytical_varite_bound(
 	upper = np.std(y1 - y0u)**2
 	return lower, upper
 
+def varite_delta_method_se(
+	sbetas, skappa1s, skappa0s
+):
+	# estimate
+	hat_beta = sbetas.mean()
+	hat_kappa1 = skappa1s.mean()
+	hat_kappa0 = skappa0s.mean()
+	ate = hat_kappa1 - hat_kappa0 # average treatment effect
+	hattheta = hat_beta - ate**2
+	# standard error
+	hatSigma = np.cov(
+		np.stack([sbetas, skappa1s, skappa0s], axis=0)
+	) # 3 x 3 cov matrix
+	grad = np.array(
+		[1, - 2 * ate, 2 * ate]
+	)
+	# estimate
+	se = np.sqrt(grad @ hatSigma @ grad / len(sbetas))
+	return hattheta, se
+
 class VarITEDualBounds(DualBounds):
 	"""
 	Computes dual bounsd on Var(Y(1) - Y(0)).
@@ -71,24 +91,14 @@ class VarITEDualBounds(DualBounds):
 		for lower in [1, 0]:
 			# part. identifiable component
 			sbetas = summands[1-lower]
-			hat_beta = sbetas.mean()
 			# kappa1 = E[Y(1)], kappa0 = E[Y(0)] are ident components
 			skappa1s = self.W * (self.y - self.mu1) / self.pis + self.mu1
-			hat_kappa1 = skappa1s.mean()
 			skappa0s = (1-self.W) * (self.y - self.mu0) / (1-self.pis) + self.mu0
-			hat_kappa0 = skappa0s.mean()
-			ate = hat_kappa1 - hat_kappa0 # average treatment effect
 			# estimate
-			hattheta = hat_beta - ate**2; ests.append(hattheta)
-			# standard error
-			hatSigma = np.cov(
-				np.stack([sbetas, skappa1s, skappa0s], axis=0)
-			) # 3 x 3 cov matrix
-			grad = np.array(
-				[1, - 2 * ate, 2 * ate]
+			hattheta, se = varite_delta_method_se(
+				sbetas=sbetas, skappa1s=skappa1s, skappa0s=skappa0s
 			)
-			# estimate
-			se = np.sqrt(grad @ hatSigma @ grad / len(sbetas))
+			ests.append(hattheta)
 			ses.append(se)
 			if lower:
 				bounds.append(hattheta - scale * se)

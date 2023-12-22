@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats
 from scipy.special import logsumexp
 from knockpy import dgp
-from .utilities import parse_dist
+from .utilities import parse_dist, _convert_to_cat
 
 def heteroskedastic_scale(X, heterosked='constant'):
 	n, p = X.shape
@@ -104,7 +104,7 @@ def gen_regression_data(
 	Y0 = y0_dists.rvs(); Y1 = y1_dists.rvs()
 	Y = Y0.copy(); Y[W == 1] = Y1[W == 1]
 	# return everything
-	return dict(
+	out = dict(
 		X=X,
 		W=W,
 		Y=Y,
@@ -115,6 +115,18 @@ def gen_regression_data(
 		beta=beta,
 		betaW=betaW,
 	)
+	# for convenience
+	if eps_dist == 'bernoulli':
+		out.update(dict(
+			_y0_dists_4input=_convert_to_cat(y0_dists, n=n),
+			_y1_dists_4input=_convert_to_cat(y1_dists, n=n)
+		))
+	else:
+		out.update(dict(
+			_y0_dists_4input=y0_dists,
+			_y1_dists_4input=y1_dists,
+		))
+	return out
 
 def gen_lee_bound_data(
 	stau=1, betaS_norm=1, **kwargs

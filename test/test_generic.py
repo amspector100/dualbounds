@@ -15,17 +15,7 @@ except ImportError:
 	from context import dualbounds as db
 
 from dualbounds import generic, utilities, gen_data
-from dualbounds.utilities import parse_dist
-
-def _convert_to_cat(bern_dist, n):
-	"""
-	Convert bernoulli dist. object to BatchedCategorical
-	"""
-	vals = np.zeros((n, 2)); vals[:, 1] += 1
-	probs = bern_dist.mean()
-	return utilities.BatchedCategorical(
-		vals=vals, probs=np.stack([1-probs, probs], axis=1)
-	)
+from dualbounds.utilities import parse_dist, _convert_to_cat
 
 
 class TestGenericDualBounds(unittest.TestCase):

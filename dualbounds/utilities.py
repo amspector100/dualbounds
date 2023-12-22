@@ -233,6 +233,16 @@ class BatchedCategorical:
 			qvals[:, i] = self.vals[i][np.argmax(flags, axis=0)]
 		return qvals
 
+def _convert_to_cat(bern_dist, n):
+	"""
+	Convert bernoulli dist. object to BatchedCategorical
+	"""
+	vals = np.zeros((n, 2)); vals[:, 1] += 1
+	probs = bern_dist.mean()
+	return BatchedCategorical(
+		vals=vals, probs=np.stack([1-probs, probs], axis=1)
+	)
+
 def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
 	# sometimes return a regular dist object
 	if not isinstance(dist, str):

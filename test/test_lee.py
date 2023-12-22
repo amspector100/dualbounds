@@ -281,11 +281,7 @@ class TestDualLeeBounds(unittest.TestCase):
 				scale=np.random.uniform(0.1, 1, size=n),
 			)
 			if eps_dist == 'bernoulli':
-				vals = np.zeros((n, 2)); vals[:, 1] += 1
-				y1_probs = y1_dists.mean()
-				y1_dists_input = utilities.BatchedCategorical(
-					vals=vals, probs=np.stack([1-y1_probs, y1_probs], axis=1)
-				)
+				y1_dists_input = utilities._convert_to_cat(y1_dists, n=n)
 			else:
 				y1_dists_input = y1_dists
 
