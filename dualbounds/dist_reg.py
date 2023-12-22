@@ -1,6 +1,5 @@
 import copy
 import numpy as np
-import pandas as pd
 import cvxpy as cp
 from scipy import stats
 from sklearn.linear_model import RidgeCV, LogisticRegression, LogisticRegressionCV
