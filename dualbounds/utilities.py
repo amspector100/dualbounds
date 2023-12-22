@@ -256,7 +256,7 @@ def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
 		prob = np.exp(loc / scale)
 		prob = prob / (1 + prob)
 		return stats.bernoulli(p=prob)
-	if dist == 'gaussian':
+	if dist in ['gaussian', 'normal']:
 		return stats.norm(loc=loc, scale=scale)
 	if dist == 'invchi2':
 		return stats.chi2(df=df, loc=loc, scale=scale/df)

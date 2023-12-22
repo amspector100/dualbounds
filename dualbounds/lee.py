@@ -94,7 +94,10 @@ def compute_analytical_lee_bound(
 
 	Returns
 	-------
-	bounds : np.array
+	agg_bounds : np.array
+		(2,)-length array of lower and upper bound. This integrates 
+		across all n y0_dists/y1_dists, etc.
+	cond_bounds : np.array
 		(2, n)-length array where bounds[0,i] is the ith lower bound
 		and bounds[1,i] is the ith upper bound.
 	"""
@@ -119,7 +122,9 @@ def compute_analytical_lee_bound(
 	cvars_lower = compute_cvar(y1_dists, n, alpha=alphas, lower=True, m=m)
 	cvars_upper = compute_cvar(y1_dists, n, alpha=1-alphas, lower=False, m=m)
 	y0ms = y0_dists.mean()
-	return np.stack([cvars_lower - y0ms, cvars_upper - y0ms], axis=0)
+	cond_bounds = np.stack([cvars_lower - y0ms, cvars_upper - y0ms], axis=0)
+	agg_bounds = np.mean(cond_bounds * s0_probs, axis=1) / np.mean(s0_probs)
+	return agg_bounds, cond_bounds
 
 def lee_bound_no_covariates(
 	W, S, Y,
@@ -143,7 +148,7 @@ def lee_bound_no_covariates(
 		y1_vals=y1_vals.reshape(1, -1)
 	)
 	# compute lower, upper bounds
-	abnds = compute_analytical_lee_bound(**args)[:, 0]
+	abnds = compute_analytical_lee_bound(**args)[1][:, 0]
 	return abnds
 
 def lee_delta_method_se(
@@ -449,10 +454,11 @@ class LeeDualBounds(DualBounds):
 		self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
 			W=self.W, X=self.X, Y=self.S, 
 			nfolds=nfolds, model=S_model,
+			probs_only=True,
 			#model_cls=S_model_cls, **model_kwargs,
 		)
 		self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
-			W=self.W, X=self.X, S=self.S, Y=self.Y, 
+			W=self.W, X=self.X, S=self.S, Y=self.y, 
 			nfolds=nfolds, model=Y_model,
 		)
 		# return
@@ -500,8 +506,8 @@ class LeeDualBounds(DualBounds):
 			s0_probs=self.s0_probs,
 			s1_probs=self.s1_probs,
 			y1_dists=self.y1_dists,
-			ymin=self.Y.min(),
-			ymax=self.Y.max(),
+			ymin=self.y.min(),
+			ymax=self.y.max(),
 			**solve_kwargs,
 		)
 
@@ -522,16 +528,18 @@ class LeeDualBounds(DualBounds):
 		ses = []
 		bounds = []
 		scale = stats.norm.ppf(1-alpha/2)
+		# kappa = E[Y(0) S(0)]
+		skappas = (1 - self.W) * (self.y * self.S - self.y0s0_cond_means) 
+		skappas = skappas / (1-self.pis)
+		skappas += self.y0s0_cond_means
+		self.skappas = skappas
+		# gamma = E[S(0)]
+		sgammas = (1-self.W) * (self.S - self.s0_probs) / (1-self.pis)
+		sgammas += self.s0_probs
+		self.sgammas = sgammas
 		for lower in [1, 0]:
 			# beta = part. identifiable component E[Y(1) S(0)]
 			sbetas = summands[1-lower]
-			# kappa = E[Y(0) S(0)]
-			skappas = (1 - self.W) * (self.y * self.S - self.y0s0_cond_means) 
-			skappas = skappas / (1-self.pis)
-			skappas += self.y0s0_cond_means
-			# gamma = E[S(0)]
-			sgammas = (1-self.W) * (self.S - self.s0_probs) / (1-self.pis)
-			sgammas += self.s0_probs
 			hattheta, se = lee_delta_method_se(
 				sbetas=sbetas, skappas=skappas, sgammas=sgammas,
 			)
@@ -547,43 +555,28 @@ class LeeDualBounds(DualBounds):
 		self.bounds = np.maximum(np.array(bounds), 0)
 		return self.ests, self.bounds
 
-# class OracleLeeBounds(LeeDualBounds):
+class OracleLeeBounds(LeeDualBounds):
 
-# 	def compute_oracle_bounds(
-# 		self,
-# 		X,
-# 		W,
-# 		S,
-# 		Y,
-# 		pis,
-# 		s0_probs,
-# 		s1_probs,
-# 		y0_dists,
-# 		y1_dists,
-# 		aipw=True,
-# 		**solve_kwargs,
-# 	):	
-# 		# dual variables
-# 		self.solve_instances(
-# 			s0_probs=s0_probs,
-# 			s1_probs=s1_probs,
-# 			y1_dists=y1_dists,
-# 			ymin=Y.min(),
-# 			ymax=Y.max(),
-# 			**solve_kwargs,
-# 		)
-# 		y0s0_cond_means = y0_dists.mean() * s0_probs
-# 		# ipw summands
-# 		self.compute_ipw_summands(
-# 			Y=Y,
-# 			S=S,
-# 			W=W,
-# 			pis=pis,
-# 			y0s0_cond_means=y0s0_cond_means,
-# 		)
-# 		raise ValueError()
-# 		# estimators and bounds
-# 		self.ests, self.bounds = utilities.compute_est_bounds(
-# 			summands = self.aipw_summands if aipw else self.ipw_summands
-# 		)
-# 		return self.ests, self.bounds
+	def compute_oracle_bounds(
+		self,
+		s0_probs,
+		s1_probs,
+		y0_dists,
+		y1_dists,
+		aipw=True,
+		**solve_kwargs,
+	):	
+		# dual variables
+		self.y0_dists = y0_dists
+		self.s0_probs = s0_probs
+		self.compute_dual_variables(
+			s0_probs=s0_probs,
+			s1_probs=s1_probs,
+			y1_dists=y1_dists,
+			ymin=self.y.min(),
+			ymax=self.y.max(),
+			**solve_kwargs,
+		)
+		self.compute_final_bounds()
+		return self.ests, self.bounds
+		

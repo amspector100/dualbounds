@@ -171,7 +171,7 @@ class TestHelpers(unittest.TestCase):
 			y0_probs=y0_probs, y1_probs=y1_probs,
 			y1_vals=y1_vals, y0_vals=y0_vals,
 		)
-		abounds = lee.compute_analytical_lee_bound(**new_args, m=10000)
+		_, abounds = lee.compute_analytical_lee_bound(**new_args, m=10000)
 
 		# assert equality
 		np.testing.assert_array_almost_equal(
@@ -213,7 +213,7 @@ class TestDualLeeBounds(unittest.TestCase):
 			s0_probs=s0_probs, s1_probs=s1_probs, y1_dists=y1_dists,
 		)
 		# analytical solution
-		abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
+		_, expected = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
 		# analytical bounds based on linear programming
 		ldb = lee.LeeDualBounds(
 			y=y, X=None, W=None, S=np.random.binomial(1, 0.5, n),
@@ -223,7 +223,6 @@ class TestDualLeeBounds(unittest.TestCase):
 		)
 		lp_bounds = ldb.objvals - ldb.dxs - y0_dists.mean() * s0_probs
 		lp_bounds = lp_bounds / s0_probs
-		expected = abounds
 		np.testing.assert_array_almost_equal(
 			lp_bounds,
 			expected,
@@ -276,7 +275,7 @@ class TestDualLeeBounds(unittest.TestCase):
 			S = S0.copy(); S[W == 1] = S1[W == 1]
 
 			# analytical solution
-			abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
+			_, abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
 			# convert to E[Y(1) S(0)]
 			expected = np.mean(abounds * s0_probs + s0_probs * y0_dists.mean(), axis=1)
 			# compute dual variables
@@ -308,6 +307,44 @@ class TestDualLeeBounds(unittest.TestCase):
 					decimal=2,
 					err_msg=f"{method} bounds do not agree with analytical bounds",
 				)
+
+	@pytest.mark.slow
+	def test_lee_consistency(self):
+		n = 50000
+		p = 3
+		r2 = 0.0
+		tau = 2
+		for eps_dist in ['bernoulli', 'gaussian']:
+			data = db.gen_data.gen_lee_bound_data(
+				n=n, p=p, r2=r2, tau=tau, dgp_seed=1, sample_seed=1,
+				eps_dist=eps_dist,
+			)
+			oracle_args = dict(
+				s0_probs=data['s0_probs'], 
+				s1_probs=data['s1_probs'],
+				y0_dists=data['_y0_dists_4input'], 
+				y1_dists=data['_y1_dists_4input'],
+			)
+			## Ground truth
+			expected, _ = lee.compute_analytical_lee_bound(**oracle_args)
+			## Oracle test
+			ldb_oracle = lee.OracleLeeBounds(
+				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+			)
+			est_oracle, _ = ldb_oracle.compute_oracle_bounds(**oracle_args)
+			## Actual dual bounds
+			ldb = lee.LeeDualBounds(
+				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+			)
+			est_actual, _ = ldb.compute_dual_bounds(nfolds=3)
+			for est, name in zip([est_oracle, est_actual], ['Oracle', 'Dual']):
+				np.testing.assert_array_almost_equal(
+					est,
+					expected,
+					decimal=1.5,
+					err_msg=f"{name} Lee bound is not consistent with n={n}"
+				)
+
 
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev

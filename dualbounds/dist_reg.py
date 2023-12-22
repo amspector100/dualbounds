@@ -22,6 +22,7 @@ def _cross_fit_predictions(
 	train_on_selections=False,
 	model=None,
 	model_cls=None, 
+	probs_only=False,
 	**model_kwargs
 ):
 	"""
@@ -37,6 +38,8 @@ def _cross_fit_predictions(
 		n-length array of selection indicators. Optional, may not be provided.
 	train_on_selections : bool
 		If True, trains model only on data where S[i] == 1.
+	probs_only : bool
+		For binary data, returns P(Y = 1 | X, W) instead of a distribution.
 
 	Returns
 	-------
@@ -80,7 +83,10 @@ def _cross_fit_predictions(
 
 		# predict and append on this fold
 		subX = X[start:end].copy(); subX[:, 0] = 1 # set selection = 1 for predictions
-		pred0, pred1 = reg_model.predict(subX)
+		if not probs_only:
+			pred0, pred1 = reg_model.predict(subX)
+		else:
+			pred0, pred1 = reg_model.predict_proba(subX)
 		pred0s.append(pred0); pred1s.append(pred1)
 		fit_models.append(reg_model)
 	# concatenate if arrays; else return

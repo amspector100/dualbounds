@@ -1,5 +1,8 @@
+"""
+Methods for bounding Var(E[Y(1) - Y(0)]), the
+variance of the individual treatment effect (ITE).
+"""
 import numpy as np
-#import cvxpy as cp
 from scipy import stats
 from .generic import DualBounds
 
