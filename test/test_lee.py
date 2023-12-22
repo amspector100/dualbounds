@@ -78,8 +78,7 @@ def old_conditional_lee_bound(
 	if np.abs(np.sum(cond_probs) - 1) > 1e-8: 
 		raise ValueError(f"Cond probs sum to {np.sum(cond_probs)} != 1")
 	term1 = y1_vals[0:(k+1)] @ cond_probs
-	return (term1 - y0_vals @ py0_given_s0) * ps0[1]
-
+	return term1 - y0_vals @ py0_given_s0
 
 def slow_interpolation(x, y, newx):
 	"""
@@ -153,7 +152,7 @@ class TestHelpers(unittest.TestCase):
 
 	def test_analytical_lee_bnds(self):
 		# Create dgp
-		n = 50
+		n = 40
 		nvals = 20
 		s0_probs = np.random.uniform(0, 0.9, size=n)
 		s1_probs = s0_probs + 0.1
@@ -219,10 +218,10 @@ class TestHelpers(unittest.TestCase):
 
 class TestDualLeeBounds(unittest.TestCase):
 
-	def test_dual_lee_lp_bounds(self):
+	def test_dual_lee_lp_solver(self):
 		np.random.seed(1234)
 		# Create dgp
-		n = 5
+		n = 11
 		nvals = 1000
 		s0_probs = np.random.uniform(0, 0.9, size=n)
 		s1_probs = s0_probs + 0.1
@@ -233,6 +232,7 @@ class TestDualLeeBounds(unittest.TestCase):
 		y1_dists = stats.expon(
 			loc=0.3*np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n),
 		)
+		y = y1_dists.rvs() # placeholder, not important
 		# args
 		args = dict(
 			s0_probs=s0_probs, s1_probs=s1_probs, y1_dists=y1_dists,
@@ -240,19 +240,27 @@ class TestDualLeeBounds(unittest.TestCase):
 		# analytical solution
 		abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
 		# analytical bounds based on linear programming
-		ldb = lee.LeeDualBounds(nvals=nvals)
-		ldb.solve_instances(
-			**args, ymin=-10, ymax=10,
+		ldb = lee.LeeDualBounds(
+			y=y, X=None, W=None, S=np.random.binomial(1, 0.5, n),
 		)
-		lp_bounds = ldb.objvals - ldb.dxs
-		# subtract off E[Y(0) S(0)]
-		lp_bounds -= y0_dists.mean() * s0_probs
+		ldb.compute_dual_variables(
+			**args, ymin=-10, ymax=10, nvals=nvals
+		)
+		lp_bounds = ldb.objvals - ldb.dxs - y0_dists.mean() * s0_probs
+		lp_bounds = lp_bounds / s0_probs
 		expected = abounds
 		np.testing.assert_array_almost_equal(
 			lp_bounds,
 			expected,
 			decimal=2,
-			err_msg="LP bounds do not agree with analytical bounds",
+			err_msg="Lee LP bounds do not agree with analytical bounds",
+		)
+		# Test that dx == 0
+		np.testing.assert_array_almost_equal(
+			ldb.dxs,
+			np.zeros(ldb.dxs.shape),
+			decimal=5,
+			err_msg=f"Lee bound dxs are too large"
 		)
 
 	def test_dual_lee_ipw_bounds(self):
@@ -263,59 +271,72 @@ class TestDualLeeBounds(unittest.TestCase):
 		s0_probs = np.random.uniform(0, 0.9, size=n)
 		s1_probs = s0_probs + 0.1
 		# create dists
-		y0_dists = stats.norm(
-			loc=0.3*np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n),
-		)
-		y1_dists = stats.expon(
-			loc=0.3*np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n),
-		)
-		# args
-		args = dict(
-			s0_probs=s0_probs, s1_probs=s1_probs, y1_dists=y1_dists,
-		)
-		# analytical solution
-		abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
-		expected = abounds.mean(axis=1)
-		# compute dual variables
-		ldb = lee.LeeDualBounds(nvals=nvals)
-		ldb.solve_instances(**args, ymin=-5, ymax=5)
-		# sample data. a trick to make the test run faster
-		# is to sample many values of y per dual variable
-		N = 2000 # num samples per value of x
-		W = np.random.binomial(1, 0.5, size=(N,n))
-		Y0 = y0_dists.rvs(size=(N,n))
-		Y1 = y1_dists.rvs(size=(N,n))
-		Y = Y0.copy(); Y[W == 1] = Y1[W == 1]
-		S0 = np.random.binomial(1, s0_probs, size=(N,n))
-		S1 = np.random.binomial(1, s1_probs, size=(N,n))
-		S = S0.copy(); S[W == 1] = S1[W == 1]
-		# compute IPW/AIPW summands
-		ipws = []
-		aipws = []
-		for i in range(N):
-			ldb.compute_ipw_summands(
-				Y=Y[i], S=S[i], W=W[i], 
-				pis=0.5*np.ones((n,)),
-				y0s0_cond_means=y0_dists.mean() * s0_probs,
+		for eps_dist in ['bernoulli', 'expon']:
+			y0_dists = utilities.parse_dist(
+				eps_dist, loc=np.random.randn(n),
+				scale=np.random.uniform(0.1, 1, size=n),
 			)
-			ipws.append(ldb.ipw_summands)
-			aipws.append(ldb.aipw_summands)
-		ipw_ests = np.concatenate(ipws, axis=1).mean(axis=1)
-		aipw_ests = np.concatenate(aipws, axis=1).mean(axis=1)
-		for method, ests in zip(['ipw', 'aipw'], [ipw_ests, aipw_ests]):
-			np.testing.assert_array_almost_equal(
-				ests,
-				expected,
-				decimal=2,
-				err_msg=f"{method} bounds do not agree with analytical bounds",
+			y1_dists = utilities.parse_dist(
+				eps_dist, loc=np.random.randn(n), 
+				scale=np.random.uniform(0.1, 1, size=n),
 			)
+			if eps_dist == 'bernoulli':
+				vals = np.zeros((n, 2)); vals[:, 1] += 1
+				y1_probs = y1_dists.mean()
+				y1_dists_input = utilities.BatchedCategorical(
+					vals=vals, probs=np.stack([1-y1_probs, y1_probs], axis=1)
+				)
+			else:
+				y1_dists_input = y1_dists
 
-class TestEx2(unittest.TestCase):
-	"""
-	another test class
-	"""
-	def test_ex2(self):
-		pass
+			args = dict(
+				s0_probs=s0_probs, s1_probs=s1_probs, y1_dists=y1_dists_input,
+			)
+			# sample data. a trick to make the test run faster
+			# is to sample many values of y per dual variable
+			N = 2000 # num samples per value of x
+			pis = np.ones(n) / 2
+			W = np.random.binomial(1, pis, size=(N,n))
+			Y0 = y0_dists.rvs(size=(N,n))
+			Y1 = y1_dists.rvs(size=(N,n))
+			Y = Y0.copy(); Y[W == 1] = Y1[W == 1]
+			S0 = np.random.binomial(1, s0_probs, size=(N,n))
+			S1 = np.random.binomial(1, s1_probs, size=(N,n))
+			S = S0.copy(); S[W == 1] = S1[W == 1]
+
+			# analytical solution
+			abounds = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
+			# convert to E[Y(1) S(0)]
+			expected = np.mean(abounds * s0_probs + s0_probs * y0_dists.mean(), axis=1)
+			# compute dual variables
+			ldb = lee.LeeDualBounds(
+				y=Y[0], S=S[0], W=W[0], X=None, pis=pis
+			)
+			ldb.y0_dists = y0_dists
+			ldb.s0_probs = s0_probs
+			ldb.compute_dual_variables(**args, ymin=-5, ymax=5)
+			# compute IPW/AIPW summands
+			ipws = []
+			aipws = []
+			for i in range(N):
+				# use same dual variables, new data
+				ldb.y = Y[i]
+				ldb.S = S[i]
+				ldb.W = W[i]
+				ldb._compute_realized_dual_variables(y=Y[i], S=S[i])
+				ldb.compute_ipw_summands()
+				ipws.append(ldb.ipw_summands)
+				aipws.append(ldb.aipw_summands)
+			objval = ldb.objvals.mean(axis=1)
+			ipw_ests = np.concatenate(ipws, axis=1).mean(axis=1)
+			aipw_ests = np.concatenate(aipws, axis=1).mean(axis=1)
+			for method, ests in zip(['ipw', 'aipw', 'LP'], [ipw_ests, aipw_ests, objval]):
+				np.testing.assert_array_almost_equal(
+					ests,
+					expected,
+					decimal=2,
+					err_msg=f"{method} bounds do not agree with analytical bounds",
+				)
 
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev

@@ -17,6 +17,16 @@ except ImportError:
 from dualbounds import generic, utilities, gen_data
 from dualbounds.utilities import parse_dist
 
+def _convert_to_cat(bern_dist, n):
+	"""
+	Convert bernoulli dist. object to BatchedCategorical
+	"""
+	vals = np.zeros((n, 2)); vals[:, 1] += 1
+	probs = bern_dist.mean()
+	return utilities.BatchedCategorical(
+		vals=vals, probs=np.stack([1-probs, probs], axis=1)
+	)
+
 
 class TestGenericDualBounds(unittest.TestCase):
 
@@ -24,9 +34,11 @@ class TestGenericDualBounds(unittest.TestCase):
 		# create dists
 		np.random.seed(123)
 		n = 1
-		for dist0, dist1 in zip(
-			['gaussian', 'expon', 'tdist'],
-			['gaussian', 'gaussian', 'expon'],
+		for dist0, dist1, discrete, support in zip(
+			['gaussian', 'expon', 'tdist', 'bernoulli'],
+			['gaussian', 'gaussian', 'expon', 'bernoulli'],
+			[False, False, False, True],
+			[None, None, None, np.array([0,1])],
 		):
 			y0_dists = parse_dist(
 				dist0, loc=np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n)
@@ -34,6 +46,8 @@ class TestGenericDualBounds(unittest.TestCase):
 			y1_dists = parse_dist(
 				dist1, loc=np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n)
 			)
+			y0_dists_input = _convert_to_cat(y0_dists, n=n) if discrete else y0_dists
+			y1_dists_input = _convert_to_cat(y1_dists, n=n) if discrete else y1_dists
 			# analytically compute lower/upper bounds on var(ITE)
 			reps = 100000
 			U = np.random.uniform(size=reps)
@@ -50,10 +64,12 @@ class TestGenericDualBounds(unittest.TestCase):
 				W=np.zeros(1),
 				pis=np.ones(1) * 1/2,
 				y=np.zeros(1),
+				discrete=discrete,
+				support=support,
 			)
 			vdb.compute_dual_variables(
-				y0_dists=y0_dists, 
-				y1_dists=y1_dists, 
+				y0_dists=y0_dists_input, 
+				y1_dists=y1_dists_input, 
 				y0_min=np.min(y0l),
 				y0_max=np.max(y0l),
 				y1_min=np.min(y1), 

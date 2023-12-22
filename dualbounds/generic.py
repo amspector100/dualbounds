@@ -8,6 +8,17 @@ from .utilities import BatchedCategorical
 MIN_NVALS = 7
 DISC_THRESH = 10 # treat vars. with <= 10 observations as discrete
 
+def get_default_model(discrete, support, Y_model=None):
+	if Y_model is not None:
+		return Y_model
+	elif not discrete:
+		return dist_reg.RidgeDistReg(eps_dist='gaussian')
+	elif discrete and set(support) == set([0, 1]):
+		return dist_reg.LogisticCV()
+	else:
+		raise NotImplementedError("Currently no default for non-binary discrete data")
+
+
 class DualBounds:
 	"""
 	Computes dual bounds on E[f(Y(0),Y(1), X)].
@@ -38,6 +49,7 @@ class DualBounds:
 		y,
 		pis=None,
 		discrete=None,
+		support=None,
 	):
 		### Data
 		self.f = f
@@ -46,19 +58,27 @@ class DualBounds:
 		self.W = W
 		self.pis = pis
 		self.discrete = discrete
+		self.support = support
 		#self.n, self.p = self.X.shape
 
 		### Check if discrete
-		support = np.unique(self.y); nv = len(support)
+		if len(self.y) <= 10:
+			if self.discrete is None:
+				raise ValueError("Please specify the value of discrete as n <= 10")
+			if self.discrete and self.support is None:
+				raise ValueError("Please specify the value of support as n <= 10")
+		if self.support is None:
+			self.support = np.unique(self.y)
 		if self.discrete is None:
-			if nv <= DISC_THRESH and nv / len(self.y) <= 1/2:
+			if len(self.support) <= DISC_THRESH:
 				self.discrete = True
 			else:
 				self.discrete = False
-		if self.discrete:
-			self.support = support
-		else:
-			self.support = None # signals not discrete
+
+		# Adjust support to avoid being misleading
+		# in the continuous case
+		if not self.discrete:
+			self.support = None
 
 		# Initialize
 		self.y0_dists = None
@@ -128,6 +148,7 @@ class DualBounds:
 		# concatenate y probs
 		yprobs = endpoints[1:] - endpoints[0:-1]
 		yprobs = np.stack([yprobs for _ in range(n)], axis=0)
+
 		### Insert additional support points with zero prob
 		if ninterp > 0:
 			to_add = np.linspace(ymin, yvals.min(axis=1), ninterp+1)[0:-1].T
@@ -408,8 +429,6 @@ class DualBounds:
 		self.n = self.y0_vals.shape[0]
 		self.nu0s = np.zeros((2, self.n, self.nvals0)) # first dimension = [lower, upper]
 		self.nu1s = np.zeros((2, self.n, self.nvals1))
-		self.hatnu0s = np.zeros((2, self.n))
-		self.hatnu1s = np.zeros((2, self.n)) 
 		# estimated cond means of nu0s, nu1s
 		self.c0s = np.zeros((2, self.n))
 		self.c1s = np.zeros((2, self.n))
@@ -440,25 +459,40 @@ class DualBounds:
 						y1_min=y1_min, y1_max=y1_max,
 						**kwargs,
 					)
-					# interpolate to find realized values
-					self.hatnu0s[1 - lower, i] = self.interp_fn(
-						x=self.y0_vals[i], y=nu0x, newx=self.y[i],
-					)
-					self.hatnu1s[1 - lower, i] = self.interp_fn(
-						x=self.y1_vals[i], y=nu1x, newx=self.y[i],
-					)
 				else:
-					j0 = np.where(self.y0_vals[i] == self.y[i])[0][0]
-					j1 = np.where(self.y1_vals[i] == self.y[i])[0][0]
-					self.hatnu0s[1 - lower, i] = nu0x[j0]
-					self.hatnu1s[1 - lower, i] = nu1x[j1]
 					dx = 0
-
+				# Save solutions
 				self.nu0s[1 - lower, i] = nu0x
 				self.nu1s[1 - lower, i] = nu1x
 				self.c0s[1 - lower, i] = nu0x @ self.y0_probs[i]
 				self.c1s[1 - lower, i] = nu1x @ self.y1_probs[i]
 				self.dxs[1 - lower, i] = dx
+
+		# Compute realized dual variables
+		self._compute_realized_dual_variables(y=self.y)
+
+	def _compute_realized_dual_variables(self, y=None):
+		y = self.y if y is None else y
+		### Compute realized hatnu1s/hatnu0s
+		self.hatnu0s = np.zeros((2, self.n))
+		self.hatnu1s = np.zeros((2, self.n))
+		for i in range(self.n):
+			for lower in [0, 1]:
+				nu0x = self.nu0s[1-lower, i]
+				nu1x = self.nu1s[1-lower, i]
+				if not self.discrete:
+					# interpolate to find realized values for cts case
+					self.hatnu0s[1 - lower, i] = self.interp_fn(
+						x=self.y0_vals[i], y=nu0x, newx=y[i],
+					)[0]
+					self.hatnu1s[1 - lower, i] = self.interp_fn(
+						x=self.y1_vals[i], y=nu1x, newx=y[i],
+					)[0]
+				else:
+					j0 = np.where(self.y0_vals[i] == y[i])[0][0]
+					j1 = np.where(self.y1_vals[i] == y[i])[0][0]
+					self.hatnu0s[1 - lower, i] = nu0x[j0]
+					self.hatnu1s[1 - lower, i] = nu1x[j1]
 
 	def compute_ipw_summands(self):
 		"""
@@ -466,9 +500,8 @@ class DualBounds:
 		Must be run AFTER running ``self.compute_dual_variables``
 		"""
 		# initialize outputs
-		n = len(self.y)
-		self.ipw_summands = np.zeros((2, n))
-		self.aipw_summands = np.zeros((2, n))
+		self.ipw_summands = np.zeros((2, self.n))
+		self.aipw_summands = np.zeros((2, self.n))
 
 		# compute IPW summands and AIPW summands
 		for lower in [0, 1]:
@@ -486,8 +519,9 @@ class DualBounds:
 	def compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
 		Computes final bounds as a function of the data and IPW summands.
-		Must be run AFTER running ``compute_ipw_summands``.
+		Must be run AFTER running ``compute_dual_variables``.
 		"""
+		self.compute_ipw_summands()
 		self.ests, self.bounds = utilities.compute_est_bounds(
 			summands=self.aipw_summands if aipw else self.ipw_summands,
 			alpha=alpha
@@ -546,14 +580,9 @@ class DualBounds:
 			self.fit_propensity_scores(nfolds=nfolds)
 
 		# Fit model
-		if Y_model is None and not self.discrete:
-			Y_model = dist_reg.RidgeDistReg(eps_dist='gaussian')
-		elif Y_model is None and set(self.support) == set([0, 1]):
-			Y_model = dist_reg.LogisticCV()
-		else:
-			raise NotImplementedError()
-
-		self.Y_model = Y_model
+		self.Y_model = get_default_model(
+			discrete=self.discrete, support=self.support, Y_model=Y_model
+		)
 		self.y0_dists, self.y1_dists, self.model_fits = dist_reg._cross_fit_predictions(
 			W=self.W, X=self.X, Y=self.y, 
 			nfolds=nfolds, model=self.Y_model,
@@ -570,5 +599,4 @@ class DualBounds:
 			**solve_kwargs,
 		)
 		# compute dual bounds
-		self.compute_ipw_summands()
 		return self.compute_final_bounds(aipw=aipw, alpha=alpha)

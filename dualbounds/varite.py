@@ -59,6 +59,7 @@ class VarITEDualBounds(DualBounds):
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for Var(Y(1) - Y(0)).
 		"""
+		self.compute_ipw_summands()
 		summands = self.aipw_summands if aipw else self.ipw_summands
 		self._compute_cond_means()
 		# Note: the notation follows Appendix A.2 of 

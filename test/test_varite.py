@@ -47,15 +47,16 @@ class TestVarITE(unittest.TestCase):
 				err_msg=f"Var(ITE) bounds are not consistent, n={n}"
 			)
 
-	def test_continuous_no_error(self):
+	def test_no_error(self):
 		""" This tests if the code runs without error for continuous Y. """
-		data = gen_data.gen_regression_data(
-			n=200, p=10, eps_dist='gaussian', sample_seed=123
-		)
-		vdb = db.varite.VarITEDualBounds(
-			X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
-		)
-		ests, bounds = vdb.compute_dual_bounds(nfolds=3)
+		for eps_dist in ['gaussian', 'bernoulli']:
+			data = gen_data.gen_regression_data(
+				n=200, p=10, eps_dist=eps_dist, sample_seed=123
+			)
+			vdb = db.varite.VarITEDualBounds(
+				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+			)
+			ests, bounds = vdb.compute_dual_bounds(nfolds=3)
 
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev
