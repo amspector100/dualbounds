@@ -61,13 +61,15 @@ def compute_analytical_lee_bound(
 	m=1000,
 ):
 	"""
-	Computes partial ident. bounds on E[Y(1) - Y(0) | S(0) = S(1) = 1]
-	under monotonicity.
+	Computes semi-analytical partial ident. bounds on 
+
+	E[Y(1) - Y(0) | S(0) = S(1) = 1]
+	
+	Ulike dual bounds, this function is not at all
+	robust to model misspecification,
 
 	Parameters
 	----------
-	n : int
-		Number of samples.
 	s0_probs : np.array
 		n-length array where s0_probs[i] = P(S(0) = 1 | Xi)
 	s1_probs : np.array
@@ -178,8 +180,9 @@ class LeeDualBounds(generic.DualBounds):
 
 	E[Y(1) - Y(0) | S(1) = S(0) = 1]
 
-	for binary S(0) and either continuous or discrete Y(1).
-	These bounds assume monotonicity.
+	for an outcome Y and a binary post-treatment
+	selection event S. These bounds assume monotonicity,
+	i.e., S(1) >= S(0) a.s. (see Lee 2009).
 
 	Parameters
 	----------
@@ -197,21 +200,22 @@ class LeeDualBounds(generic.DualBounds):
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to None (inferred from the data).
+	support : np.array
+		Optinal support of y, if known.
+		Defaults to ``None`` (inferred from the data).
 	"""	
 
 	def __init__(
 		self,
 		S,
-		monotonicity='conditional',
 		*args,  
 		**kwargs
 	):
-		self.monotonicity = monotonicity
 		self.S = S
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
 
-	def ensure_feasibility(
+	def _ensure_feasibility(
 		self,
 		i,
 		nu0,
@@ -299,12 +303,14 @@ class LeeDualBounds(generic.DualBounds):
 			OR 
 			list of scipy dists whose shapes add up to n.
 		y1_vals : np.array
-			(n, nvals1)-length array of values y1 can take.
+			Optional (n, nvals1)-length array of values y1 can take.
+			Ignored if ``y1_dists`` is provided.
 		y1_probs : np.array
-			(n, nvals1)-length array where
-			y0_probs[i, j] = P(Y(1) = yvals1[j] | S(1) = 1, Xi)
+			Optional (n, nvals1)-length array where
+			y1_probs[i, j] = P(Y(1) = yvals1[j] | S(1) = 1, Xi).
+			Ignored if ``y1_dists`` is provided.
 		kwargs : dict
-			kwargs for ensure_feasibility method.
+			kwargs for _ensure_feasibility method.
 			Includes ymin, ymax, grid_size.
 		"""
 		# Constants for solver
@@ -323,7 +329,7 @@ class LeeDualBounds(generic.DualBounds):
 			# tolerance parameter
 			alpha = min([np.min(s0_probs/s1_probs), np.min(1 - s0_probs/s1_probs)])
 			# law of Y(1) | S(1) = 1, Xi
-			y1_vals, y1_probs = self.discretize(
+			y1_vals, y1_probs = self._discretize(
 				y1_dists, 
 				nvals=self.nvals1-1, 
 				alpha=alpha/2,
@@ -391,7 +397,7 @@ class LeeDualBounds(generic.DualBounds):
 				)
 				self.objvals[1 - lower, i] = objval
 				if not self.discrete:
-					nu0x, nu1x, dx = self.ensure_feasibility(
+					nu0x, nu1x, dx = self._ensure_feasibility(
 						i=i, nu0=nu0x, nu1=nu1x,
 						lower=lower, ymin=ymin, ymax=ymax,
 						**kwargs,
@@ -438,6 +444,8 @@ class LeeDualBounds(generic.DualBounds):
 		suppress_warning=False,
 	):
 		"""
+		Performs cross-fitting to estimate the outcome and selection models.
+
 		Returns
 		-------
 		s0_probs : np.array
@@ -445,11 +453,11 @@ class LeeDualBounds(generic.DualBounds):
 		s1_probs : np.array
 			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
 		y0_dists : np.array
-			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(0) | S(0) = 1, Xi
+			list of batched scipy distributions whose shapes sum to n.
+			the ith dist. is the conditional law of Yi(0) | S(0) = 1, Xi
 		y1_dists : np.array
-			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
+			list of batched scipy distributions whose shapes sum to n.
+			the ith dist. is the conditional law of Yi(1) | S(1) = 1, Xi
 		suppress_warning : bool
 			If True, suppresses the warning about manual crossfitting.
 		"""
@@ -504,10 +512,9 @@ class LeeDualBounds(generic.DualBounds):
 			Number of folds to use in cross-fitting. 
 			Defaults to 5,
 		alpha : float
-			Nominal coverage level. Defaults to 5.
+			Nominal coverage level. Defaults to 0.05.
 		aipw : bool
-			If true, returns AIPW estimator. We strongly
-			recommend using aipw=True.
+			If true, returns AIPW estimator.
 		s0_probs : np.array
 			Optional n-length array where s0_probs[i] = P(S(0) = 1 | Xi).
 			If not provided, will be estimated from the data.
@@ -523,7 +530,9 @@ class LeeDualBounds(generic.DualBounds):
 			distribution is the conditional law of Yi(1) | S(1) = 1, Xi.
 			If not provided, will be estimated from the data.
 		suppress_warning : bool
-			If True, suppresses the warning about manual crossfitting.
+			If True, suppresses warning about cross-fitting.
+		verbose : bool
+			If True, gives occasional progress reports..
 		solve_kwargs : dict
 			kwargs to self.compute_dual_variables(), 
 			e.g., ``verbose``, ``nvals``, ``grid_size``
@@ -568,7 +577,7 @@ class LeeDualBounds(generic.DualBounds):
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].
 		"""
-		self.compute_ipw_summands()
+		self._compute_ipw_summands()
 		summands = self.aipw_summands if aipw else self.ipw_summands
 		self._compute_cond_means()
 		self.y0s0_cond_means = self.mu0 * self.s0_probs
@@ -598,7 +607,11 @@ class LeeDualBounds(generic.DualBounds):
 			else:
 				bounds.append(hattheta + scale * se)
 
-		self.ests = np.maximum(np.array(ests), 0)
+		self.estimates = np.array(ests)
 		self.ses = np.array(ses)
-		self.bounds = np.maximum(np.array(bounds), 0)
-		return self.ests, self.bounds
+		self.cis = np.array(bounds)
+		return dict(
+			estimates=self.estimates,
+			ses=self.ses,
+			cis=self.cis
+		)

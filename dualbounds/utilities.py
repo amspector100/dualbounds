@@ -157,13 +157,15 @@ def compute_est_bounds(summands, alpha=0.05):
 	-------
 	ests : np.array
 		2-shaped array of lower and upper estimators (sample mean).
+	ses : np.array
+		2-shaped array of standard errors.
 	bounds : np.array
 		2-shaped array of lower/upper confidence bounds.
 	"""
 	ests = summands.mean(axis=1)
 	ses = summands.std(axis=1) / np.sqrt(summands.shape[1])
 	scale = stats.norm.ppf(1-alpha/2)
-	return ests, np.array([
+	return ests, ses, np.array([
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]
 	])
 

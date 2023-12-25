@@ -13,6 +13,13 @@ def compute_analytical_varite_bound(
 	reps=100,
 ):
 	"""
+	Computes semi-analytical bounds on
+
+	Var(Y(0) - Y(1)).
+
+	Unlike dual bounds, this function is not
+	robust to model misspecification, 
+	
 	Parameters
 	----------
 	n : int
@@ -65,11 +72,13 @@ def varite_delta_method_se(
 
 class VarITEDualBounds(DualBounds):
 	"""
-	Computes dual bounsd on Var(Y(1) - Y(0)).
+	Computes dual bounds on 
 
-	The input/output signature of this class is identical
-	to the ``DualBounds`` class. 
-	However, the input ``f`` will be ignored.
+	Var(Y(1) - Y(0)).
+
+	The signature of this class is identical to 
+	the ``generic.DualBounds`` class.  However, 
+	the input ``f`` will be ignored.
 	"""
 
 	def __init__(self, *args, **kwargs):
@@ -82,7 +91,7 @@ class VarITEDualBounds(DualBounds):
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for Var(Y(1) - Y(0)).
 		"""
-		self.compute_ipw_summands()
+		self._compute_ipw_summands()
 		summands = self.aipw_summands if aipw else self.ipw_summands
 		self._compute_cond_means()
 		# Note: the notation follows Appendix A.2 of 
@@ -108,7 +117,11 @@ class VarITEDualBounds(DualBounds):
 			else:
 				bounds.append(hattheta + scale * se)
 
-		self.ests = np.maximum(np.array(ests), 0)
+		self.estimates = np.array(ests)
 		self.ses = np.array(ses)
-		self.bounds = np.maximum(np.array(bounds), 0)
-		return self.ests, self.bounds
+		self.cis = np.array(bounds)
+		return dict(
+			estimates=self.estimates,
+			ses=self.ses,
+			cis=self.cis
+		)

@@ -56,20 +56,25 @@ class DualBounds:
 	Parameters
 	----------
 	f : function
-		Function of three arguments, defines the expectation
-		which is the partially identified estimand.
+		Function which defines the partially identified estimand.
+		Must be a function of three arguments: y0, y1, x 
+		(in that order). E.g.,
+		``f = lambda y0, y1, x : y0 <= y1``
 	X : np.array
 		(n, p)-shaped array of covariates.
 	W : np.array
-		n-length array of treatment indicators.
+		n-length array of binary treatment indicators.
 	Y : np.array
-		n-length array of outcome measurements
+		n-length array of outcome measurements.
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
-		If ``None``, will be estimated from the data itself.
+		If ``None``, will be estimated from the data.
 	discrete : bool
 		If True, treats y as a discrete variable. 
-		Defaults to None (inferred from the data).
+		Defaults to ``None`` (inferred from the data).
+	support : np.array
+		Optinal support of y, if known.
+		Defaults to ``None`` (inferred from the data).
 	"""
 	def __init__(
 		self, 
@@ -101,7 +106,7 @@ class DualBounds:
 		self.y0_dists = None
 		self.y1_dists = None
 
-	def discretize(
+	def _discretize(
 		self, 
 		ydists,
 		nvals,
@@ -112,8 +117,12 @@ class DualBounds:
 		min_yprob=1e-8,
 	):
 		"""
+		Helper method which discretizes Y before solving +
+		interpolating to obtain dual variables.
+		
+		Notes
+		-----
 		For discrete Y: extracts conditional PMF/support points.
-
 		For continuous Y: discretizes ydists along evenly spaced
 		quantiles. Also adds extra points near the edge of the
 		support to ensure numerical stability.
@@ -181,7 +190,7 @@ class DualBounds:
 		yprobs /= yprobs.sum(axis=1).reshape(-1, 1)
 		return yvals, yprobs
 
-	def ensure_feasibility(
+	def _ensure_feasibility(
 		self,
 		i,
 		nu0,
@@ -341,7 +350,7 @@ class DualBounds:
 		y1_dists=None,
 		y1_vals=None,
 		y1_probs=None,
-		verbose=False,
+		verbose=True,
 		alpha=None,
 		ninterp=None,
 		nvals0=100,
@@ -354,6 +363,9 @@ class DualBounds:
 		**kwargs,
 	):
 		"""
+		Uses the estimated outcome model to solve the dual optimal
+		transport problem to obtain optimal dual variables.
+
 		Parameters
 		----------
 		y0_dists : np.array
@@ -373,9 +385,11 @@ class DualBounds:
 			list of scipy dists whose shapes add up to n.
 		y1_vals : np.array
 			(n, nvals1)-length array of values y1 can take.
+			Ignored if ``y1_dists`` is provided.
 		y1_probs : np.array
 			(n, nvals1)-length array where
-			y0_probs[i, j] = P(Y(1) = yvals1[j] | Xi)
+			y0_probs[i, j] = P(Y(1) = yvals1[j] | Xi).
+			Ignored if ``y1_dists`` is provided.
 		nvals0 : int
 			How many values to use to discretize Y(0). 
 			Defaults to 100. Ignored for discrete Y.
@@ -395,8 +409,7 @@ class DualBounds:
 		y1_max : float
 			Maximum support for Y(1). Defaults to self.y.max()
 		kwargs : dict
-			kwargs for ``ensure_feasibility`` method.
-			grid_size.
+			kwargs for ``_ensure_feasibility`` method, e.g., ``grid_size``.
 		"""
 		### Key quantities for optimizer
 		# to ensure numerical stability, we add extra quantiles
@@ -422,14 +435,14 @@ class DualBounds:
 
 		# this discretizes if Y is continuous
 		if y0_vals is None or y0_probs is None:
-			y0_vals, y0_probs = self.discretize(
+			y0_vals, y0_probs = self._discretize(
 				y0_dists, nvals=self.nvals0, alpha=alpha,
 				ymin=y0_min,
 				ymax=y0_max,
 				ninterp=ninterp,
 			)
 		if y1_vals is None or y1_probs is None:
-			y1_vals, y1_probs = self.discretize(
+			y1_vals, y1_probs = self._discretize(
 				y1_dists, nvals=self.nvals1, alpha=alpha,
 				ymin=y1_min,
 				ymax=y1_max,
@@ -470,7 +483,7 @@ class DualBounds:
 				)
 				self.objvals[1 - lower, i] = objval
 				if not self.discrete:
-					nu0x, nu1x, dx = self.ensure_feasibility(
+					nu0x, nu1x, dx = self._ensure_feasibility(
 						i=i, nu0=nu0x, nu1=nu1x, lower=lower, 
 						y0_min=y0_min, y0_max=y0_max,
 						y1_min=y1_min, y1_max=y1_max,
@@ -489,6 +502,10 @@ class DualBounds:
 		self._compute_realized_dual_variables(y=self.y)
 
 	def _compute_realized_dual_variables(self, y=None):
+		"""
+		Helper function which applies interpolation 
+		(for continuous Y) to compute realized dual variables.
+		"""
 		y = self.y if y is None else y
 		### Compute realized hatnu1s/hatnu0s
 		self.hatnu0s = np.zeros((2, self.n))
@@ -511,10 +528,10 @@ class DualBounds:
 					self.hatnu0s[1 - lower, i] = nu0x[j0]
 					self.hatnu1s[1 - lower, i] = nu1x[j1]
 
-	def compute_ipw_summands(self):
+	def _compute_ipw_summands(self):
 		"""
-		Method to compute (A)IPW estimator summands.
-		Must be run AFTER running ``self.compute_dual_variables``
+		Helper method to compute (A)IPW estimator summands.
+		Must be run after running ``self.compute_dual_variables``
 		"""
 		# initialize outputs
 		self.ipw_summands = np.zeros((2, self.n))
@@ -535,21 +552,25 @@ class DualBounds:
 
 	def compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
-		Computes final bounds as a function of the data and IPW summands.
-		Must be run AFTER running ``compute_dual_variables``.
+		Computes final estimators/ses based on the estimated
+		dual variables.
 		"""
-		self.compute_ipw_summands()
-		self.ests, self.bounds = utilities.compute_est_bounds(
+		self._compute_ipw_summands()
+		self.estimates, self.ses, self.cis = utilities.compute_est_bounds(
 			summands=self.aipw_summands if aipw else self.ipw_summands,
 			alpha=alpha
 		)
-		return self.ests, self.bounds
+		return dict(
+			estimates=self.estimates,
+			ses=self.ses,
+			cis=self.cis,
+		)
 
 	def _compute_cond_means(self):
 		"""
-		Computes self.mu0 = E[Y(0) | X], self.mu1 = E[Y(1) | X].
-		Can only be run after self.yk_dists is not None
-		(self.yk_probs, self.yk_vals) are not None, for k in {0,1}
+		Helper function which computes self.mu0 = E[Y(0) | X],
+		self.mu1 = E[Y(1) | X]. Can only be run after the 
+		conditional distributions have been estimated.
 		"""
 		if self.y0_dists is None:
 			self.y0_dists = BatchedCategorical(
@@ -578,6 +599,17 @@ class DualBounds:
 		nfolds=5,
 		suppress_warning=False,
 	):
+		"""Performs cross-fitting to fit the outcome model.
+
+		Returns
+		-------
+		y0_dists : np.array
+			list of batched scipy distributions whose shapes sum to n.
+			the ith distribution is the conditional law of Yi(0) | Xi
+		y1_dists : np.array
+			list of batched scipy distributions whose shapes sum to n.
+			the ith distribution is the conditional law of Yi(1) | Xi
+		"""
 
 		# if pis not supplied: will use cross-fitting
 		if self.pis is None:
@@ -605,25 +637,43 @@ class DualBounds:
 		alpha=0.05,
 		y0_dists=None,
 		y1_dists=None,
+		verbose=True,
 		suppress_warning=False,
 		**solve_kwargs,
 	):
 		"""
+		Main function which computes dual bounds in three steps:
+		(1) cross-fitting, (2) computing optimal dual variables,
+		and (3) computing final dual bounds.
+
 		Parameters
 		----------
+		Y_model : TODO
 		alpha : float
-			Nominal coverage level. Defaults to 5.
+			Nominal coverage level. Defaults to 0.05.
 		aipw : bool
 			If true, returns AIPW estimator.
-		solve_kwargs : dict
-			kwargs to self.compute_dual_variables(), 
-			e.g., ``verbose``, ``nvals0``, ``grid_size``
 		y0_dists : list of scipy dists
 			Optional input in place of model
 		y1_dists : list of scipy dists
 			Optional input in place of model
 		suppress_warning : bool
 			If True, suppresses warning about cross-fitting.
+		verbose : bool
+			If True, gives occasional progress reports.
+			Defaults to True.
+		solve_kwargs : dict
+			Additional (optional) kwargs for the ``compute_dual_variables``
+			method, e.g. ``nvals0``, ``nvals1``, ``grid_size``.
+
+		Returns
+		-------
+		estimates : np.array
+			2-length array, estimates of lower/upper partial ident. bound
+		ses : np.array
+			Standard errors of ests
+		cis : np.array
+			Confidence bounds based on ests and ses. 
 		"""
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
@@ -640,6 +690,7 @@ class DualBounds:
 			y0_max=self.y.max(),
 			y1_min=self.y.min(),
 			y1_max=self.y.max(),
+			verbose=verbose,
 			**solve_kwargs,
 		)
 		# compute dual bounds

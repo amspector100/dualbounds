@@ -37,7 +37,7 @@ class TestVarITE(unittest.TestCase):
 			vdb = db.varite.VarITEDualBounds(
 				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
 			)
-			ests, bounds = vdb.compute_dual_bounds(nfolds=3)
+			ests = vdb.compute_dual_bounds(nfolds=3)['estimates']
 
 			# test accuracy
 			np.testing.assert_array_almost_equal(
@@ -66,7 +66,7 @@ class TestVarITE(unittest.TestCase):
 			vdb = db.varite.VarITEDualBounds(
 				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
 			)
-			ests, bounds = vdb.compute_dual_bounds(nfolds=3)
+			output = vdb.compute_dual_bounds(nfolds=3)
 
 class TestVarCATE(unittest.TestCase):
 
@@ -74,7 +74,7 @@ class TestVarCATE(unittest.TestCase):
 		""" Tests that we correctly estimate the SE. """
 		context._run_se_computation_test(
 			dim=6,
-			f=db.varcate.moments2varcate,
+			f=db.varcate._moments2varcate,
 			arg_names=[
 				'shxy1', 'shxy0', 'shx', 'sy1', 'sy0', 'shx2'
 			],

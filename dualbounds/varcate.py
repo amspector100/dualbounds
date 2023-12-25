@@ -7,7 +7,7 @@ from scipy import stats
 from . import generic
 from .generic import infer_discrete, get_default_model
 
-def moments2varcate(
+def _moments2varcate(
 	hxy1, hxy0, hx, y1, y0, shx2,
 ):
 	"""
@@ -41,13 +41,20 @@ def varcate_delta_method_se(
 		n-length array of AIPW summands for E[Y(1)].
 	shx2 : np.array
 		n-length array of AIPW summands for E[h(X)^2].
+
+	Returns
+	-------
+	estimate : float
+		Plug-in estimate
+	se : float
+		Standard error
 	"""
 	# concatenate and estimate
 	summands = np.stack(
 		[shxy1, shxy0, shx, sy1, sy0, shx2], axis=1
 	)
 	mus = summands.mean(axis=0)
-	hattheta = moments2varcate(
+	hattheta = _moments2varcate(
 		*tuple(list(mus))
 	)
 	hatSigma = np.cov(summands.T)
@@ -64,16 +71,26 @@ def varcate_delta_method_se(
 	return hattheta, se
 
 class VarCATEDualBounds(generic.DualBounds):
+	"""
+	Class for computing lower bounds on 
+	
+	Var(E[Y(1) - Y(0) | X]).
+
+	This class has the same signature as 
+	``generic.DualBounds`` except it only
+	provides lower bounds and the input
+	``f`` will be ignored.
+	"""
 
 	def __init__(self, *args, **kwargs):
 		# Initialize with no f function
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
 
-	def ensure_feasibility(self):
+	def _ensure_feasibility(self):
 		raise NotImplementedError()
 
-	def discretize(self):
+	def _discretize(self):
 		raise NotImplementedError()
 
 	def _solve_single_instance(self):
@@ -83,9 +100,13 @@ class VarCATEDualBounds(generic.DualBounds):
 		raise NotImplementedError()
 
 	def compute_dual_variables(self, *args, **kwargs):
+		""" 
+		In this case, the optimal dual variables are simply 
+		the estimated CATE.
+		"""
 		pass
 
-	def compute_ipw_summands(self):
+	def _compute_ipw_summands(self):
 		pass
 
 	def compute_final_bounds(self, aipw=True, alpha=0.05):
@@ -108,7 +129,7 @@ class VarCATEDualBounds(generic.DualBounds):
 		self.sy0 = self.sy0 / (1 - self.pis) + self.mu0
 		# 6. AIPW terms for h(X)^2
 		self.shx2 = self.cates**2
-		hattheta, se = varcate_delta_method_se(
+		self.estimate, self.se = varcate_delta_method_se(
 			shxy1=self.shxy1, 
 			shxy0=self.shxy0, 
 			shx=self.shx, 
@@ -117,7 +138,9 @@ class VarCATEDualBounds(generic.DualBounds):
 			shx2=self.shx2,
 		)
 		scale = stats.norm.ppf(1-alpha)
+		self.lower_ci = self.estimate - scale * self.se
 		return dict(
-			estimate=hattheta,
-			lower_ci=hattheta - scale * se
+			estimate=self.estimate,
+			se=self.se,
+			lower_ci=self.lower_ci
 		)

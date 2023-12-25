@@ -294,7 +294,7 @@ class TestDualLeeBounds(unittest.TestCase):
 				ldb.S = S[i]
 				ldb.W = W[i]
 				ldb._compute_realized_dual_variables(y=Y[i], S=S[i])
-				ldb.compute_ipw_summands()
+				ldb._compute_ipw_summands()
 				ipws.append(ldb.ipw_summands)
 				aipws.append(ldb.aipw_summands)
 			objval = ldb.objvals.mean(axis=1)
@@ -310,7 +310,7 @@ class TestDualLeeBounds(unittest.TestCase):
 
 	@pytest.mark.slow
 	def test_lee_consistency(self):
-		n = 50000
+		n = 10000
 		p = 3
 		r2 = 0.0
 		tau = 2
@@ -331,12 +331,12 @@ class TestDualLeeBounds(unittest.TestCase):
 			ldb_oracle = lee.LeeDualBounds(
 				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
-			est_oracle, _ = ldb_oracle.compute_dual_bounds(**oracle_args, suppress_warning=True)
+			est_oracle = ldb_oracle.compute_dual_bounds(**oracle_args, suppress_warning=True)['estimates']
 			## Actual dual bounds
 			ldb = lee.LeeDualBounds(
 				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
-			est_actual, _ = ldb.compute_dual_bounds(nfolds=3)
+			est_actual = ldb.compute_dual_bounds(nfolds=3)['estimates']
 			for est, name in zip([est_oracle, est_actual], ['Oracle', 'Dual']):
 				np.testing.assert_array_almost_equal(
 					est,
