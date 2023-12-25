@@ -1,11 +1,11 @@
+import warnings
 import numpy as np
 import cvxpy as cp
 from scipy import stats
 from . import utilities
 from . import dist_reg
 from .utilities import BatchedCategorical
-from . import interpolation
-from .generic import get_default_model,DualBounds
+from . import interpolation, generic
 
 """
 Helper functions
@@ -172,7 +172,7 @@ def lee_delta_method_se(
 	se = np.sqrt(grad @ hatSigma @ grad / len(sbetas))
 	return hattheta, se
 
-class LeeDualBounds(DualBounds):
+class LeeDualBounds(generic.DualBounds):
 	"""
 	Computes dual bounds on
 
@@ -430,11 +430,12 @@ class LeeDualBounds(DualBounds):
 					j = np.argmin(np.abs(self.y1_vals_adj[i][1:] - y[i]))
 					self.hatnu1s[1 - lower, i] = nu1x[j+1]
 
-	def fit_outcome_model(
+	def cross_fit(
 		self,
 		S_model,
 		Y_model,
-		nfolds=2,
+		nfolds=5,
+		suppress_warning=False,
 	):
 		"""
 		Returns
@@ -449,18 +450,31 @@ class LeeDualBounds(DualBounds):
 		y1_dists : np.array
 			batched scipy distribution of shape (n,) where the ith
 			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
+		suppress_warning : bool
+			If True, suppresses the warning about manual crossfitting.
 		"""
-		# estimated selection probs and outcome model 
-		self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
-			W=self.W, X=self.X, Y=self.S, 
-			nfolds=nfolds, model=S_model,
-			probs_only=True,
-			#model_cls=S_model_cls, **model_kwargs,
-		)
-		self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
-			W=self.W, X=self.X, S=self.S, Y=self.y, 
-			nfolds=nfolds, model=Y_model,
-		)
+		# estimate selection probs
+		if self.s0_probs is None or self.s1_probs is None:
+			self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
+				W=self.W, X=self.X, Y=self.S, 
+				nfolds=nfolds, model=S_model,
+				probs_only=True,
+				#model_cls=S_model_cls, **model_kwargs,
+			)
+		elif not suppress_warning:
+			warnings.warn(
+				generic.CROSSFIT_WARNING.replace("y0_", "s0_").replace("y1_", "s1_")
+			)
+
+		# Estimate outcome model
+		if self.y0_dists is None or self.y1_dists is None:
+			self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
+				W=self.W, X=self.X, S=self.S, Y=self.y, 
+				nfolds=nfolds, model=Y_model,
+			)
+		elif not suppress_warning:
+			warnings.warn(generic.CROSSFIT_WARNING)
+
 		# return
 		return self.s0_probs, self.s1_probs, self.y0_dists, self.y1_dists
 
@@ -470,21 +484,54 @@ class LeeDualBounds(DualBounds):
 		Y_model=None,
 		S_model=None,
 		nfolds=5,
-		aipw=True,
 		alpha=0.05,
+		aipw=True,
+		s0_probs=None,
+		s1_probs=None,
+		y0_dists=None,
+		y1_dists=None,
+		suppress_warning=False,
 		**solve_kwargs,
 	):
 		"""
 		Parameters
 		----------
+		Y_model : TODO
+			Defaults to RidgeDistReg for continuous data
+			and a logistic regression for binary data.
+		S_model : TODO
+		nfolds : int
+			Number of folds to use in cross-fitting. 
+			Defaults to 5,
 		alpha : float
 			Nominal coverage level. Defaults to 5.
 		aipw : bool
-			If true, returns AIPW estimator.
+			If true, returns AIPW estimator. We strongly
+			recommend using aipw=True.
+		s0_probs : np.array
+			Optional n-length array where s0_probs[i] = P(S(0) = 1 | Xi).
+			If not provided, will be estimated from the data.
+		s1_probs : np.array
+			Optional n-length array where s1_probs[i] = P(S(1) = 1 | Xi).
+			If not provided, will be estimated from the data.
+		y0_dists : list
+			Optional list of n scipy distributions, where the ith
+			distribution is the conditional law of Yi(0) | S(0) = 1, Xi.
+			If not provided, will be estimated from the data.
+		y1_dists : np.array
+			Optional list of n scipy distributions, where  the ith
+			distribution is the conditional law of Yi(1) | S(1) = 1, Xi.
+			If not provided, will be estimated from the data.
+		suppress_warning : bool
+			If True, suppresses the warning about manual crossfitting.
 		solve_kwargs : dict
 			kwargs to self.compute_dual_variables(), 
-			e.g., ``verbose``, ``nvals0``, ``grid_size``
+			e.g., ``verbose``, ``nvals``, ``grid_size``
 		"""
+		# Save data
+		self.s0_probs, self.s1_probs = s0_probs, s1_probs
+		self.y0_dists, self.y1_dists = y0_dists, y1_dists
+
 		# if pis not supplied: will use cross-fitting
 		if self.pis is None:
 			self.fit_propensity_scores(nfolds=nfolds)
@@ -492,13 +539,14 @@ class LeeDualBounds(DualBounds):
 		if S_model is None:
 			S_model = dist_reg.LogisticCV(monotonicity=True)
 		self.S_model = S_model
-		self.Y_model = get_default_model(
-			discrete=self.discrete, support=self.support, Y_model=Y_model
+		self.Y_model = generic.get_default_model(
+			discrete=self.discrete, support=self.support, Y_model=Y_model,
 		)
-		self.fit_outcome_model(
+		self.cross_fit(
 			S_model=self.S_model,
 			Y_model=self.Y_model,
-			nfolds=nfolds
+			nfolds=nfolds,
+			suppress_warning=suppress_warning,
 		)
 
 		# compute dual variables
@@ -554,29 +602,3 @@ class LeeDualBounds(DualBounds):
 		self.ses = np.array(ses)
 		self.bounds = np.maximum(np.array(bounds), 0)
 		return self.ests, self.bounds
-
-class OracleLeeBounds(LeeDualBounds):
-
-	def compute_oracle_bounds(
-		self,
-		s0_probs,
-		s1_probs,
-		y0_dists,
-		y1_dists,
-		aipw=True,
-		**solve_kwargs,
-	):	
-		# dual variables
-		self.y0_dists = y0_dists
-		self.s0_probs = s0_probs
-		self.compute_dual_variables(
-			s0_probs=s0_probs,
-			s1_probs=s1_probs,
-			y1_dists=y1_dists,
-			ymin=self.y.min(),
-			ymax=self.y.max(),
-			**solve_kwargs,
-		)
-		self.compute_final_bounds()
-		return self.ests, self.bounds
-		

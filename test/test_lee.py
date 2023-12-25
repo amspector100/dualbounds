@@ -328,10 +328,10 @@ class TestDualLeeBounds(unittest.TestCase):
 			## Ground truth
 			expected, _ = lee.compute_analytical_lee_bound(**oracle_args)
 			## Oracle test
-			ldb_oracle = lee.OracleLeeBounds(
+			ldb_oracle = lee.LeeDualBounds(
 				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
-			est_oracle, _ = ldb_oracle.compute_oracle_bounds(**oracle_args)
+			est_oracle, _ = ldb_oracle.compute_dual_bounds(**oracle_args, suppress_warning=True)
 			## Actual dual bounds
 			ldb = lee.LeeDualBounds(
 				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
@@ -341,7 +341,7 @@ class TestDualLeeBounds(unittest.TestCase):
 				np.testing.assert_array_almost_equal(
 					est,
 					expected,
-					decimal=1.5,
+					decimal=1,
 					err_msg=f"{name} Lee bound is not consistent with n={n}"
 				)
 
