@@ -37,8 +37,8 @@ class TestCrossFit(unittest.TestCase):
 		Y = X @ beta + np.random.randn(n)
 		# cross-fitting approach one
 		rdr = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
-		preds0, preds1, _ = dist_reg._cross_fit_predictions(
-			W=W, Y=Y, X=X, nfolds=nfolds, model=rdr,
+		preds0, preds1, _ = dist_reg.cross_fit_predictions(
+			W=W, y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
 		mu0s, sigma0s = convert_norm_dists_to_array(preds0)
 		mu1s, sigma1s = convert_norm_dists_to_array(preds1)
@@ -49,7 +49,7 @@ class TestCrossFit(unittest.TestCase):
 		for start, end in zip(starts, ends):
 			not_in_fold = [i for i in range(n) if i < start or i >= end]
 			model = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
-			model.fit(W=W[not_in_fold], X=X[not_in_fold], Y=Y[not_in_fold])
+			model.fit(W=W[not_in_fold], X=X[not_in_fold], y=Y[not_in_fold])
 			pr0s, pr1s = model.predict(X=X[start:end])
 			p0s.append(pr0s); p1s.append(pr1s)
 		mu0s_exp, sigma0s_exp = convert_norm_dists_to_array(p0s)
@@ -62,7 +62,7 @@ class TestCrossFit(unittest.TestCase):
 			['mu0', 'mu1', 'sigma0', 'sigma1']
 		):
 			np.testing.assert_array_almost_equal(
-				actual, expected, decimal=3, err_msg=f"{name} from _cross_fit_predictions did not match manual method"
+				actual, expected, decimal=3, err_msg=f"{name} from cross_fit_predictions did not match manual method"
 			)
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ class TestVarITE(unittest.TestCase):
 
 			# Compute vdb
 			vdb = db.varite.VarITEDualBounds(
-				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
 			ests = vdb.compute_dual_bounds(nfolds=3)['estimates']
 
@@ -64,7 +64,7 @@ class TestVarITE(unittest.TestCase):
 				n=200, p=10, eps_dist=eps_dist, sample_seed=123
 			)
 			vdb = db.varite.VarITEDualBounds(
-				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
 			output = vdb.compute_dual_bounds(nfolds=3)
 
@@ -91,7 +91,7 @@ class TestVarCATE(unittest.TestCase):
 			n=200, p=5, eps_dist='bernoulli',
 		)
 		vdb = db.varcate.VarCATEDualBounds(
-			X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+			X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 		)
 		vdb.compute_dual_bounds(nfolds=3)
 
@@ -108,7 +108,7 @@ class TestVarCATE(unittest.TestCase):
 			expected = data['cates'].std()**2
 			## Oracle
 			vdb_oracle = db.varcate.VarCATEDualBounds(
-				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
 			est_oracle = vdb_oracle.compute_dual_bounds(
 				y0_dists=data['y0_dists'], y1_dists=data['y1_dists'], 
@@ -116,7 +116,7 @@ class TestVarCATE(unittest.TestCase):
 			)['estimate']
 			## Actual
 			vdb = db.varcate.VarCATEDualBounds(
-				X=data['X'], y=data['Y'], W=data['W'], pis=data['pis'],
+				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
 			est_actual = vdb.compute_dual_bounds(nfolds=3)['estimate']
 			for est, name in zip([est_oracle, est_actual], ['oracle', 'est']):

@@ -12,10 +12,10 @@ def create_folds(n, nfolds):
 	ends = splits[1:]
 	return starts, ends
 
-def _cross_fit_predictions(
+def cross_fit_predictions(
 	W,
 	X,
-	Y,
+	y,
 	S=None,
 	nfolds=2,
 	train_on_selections=False,
@@ -25,29 +25,37 @@ def _cross_fit_predictions(
 	**model_kwargs
 ):
 	"""
+	Performs cross-fitting on a model class inheriting from ``dist_reg.DistReg.``
+
 	Parameters
 	----------
 	model : DistReg
-		instantiation of DistReg class. This will be copied.
+		instantiation of ``dist_reg.DistReg`` class. This will be copied.
+		E.g., ``model=dist_reg.RidgeDistReg(eps_dist="laplace").``
 	model_cls : 
 		Alterantively, give the class name and have it constructed.
+		E.g, ``model_cls=dist_reg.RidgeDistReg``.
 	model_kwargs : dict
 		kwargs to construct model; used only if model_cls is specified.
+		E.g., ``model_kwargs=dict(eps_dist=laplace)``.
 	S : array
-		n-length array of selection indicators. Optional, may not be provided.
+		Optional n-length array of selection indicators.
 	train_on_selections : bool
 		If True, trains model only on data where S[i] == 1.
 	probs_only : bool
 		For binary data, returns P(Y = 1 | X, W) instead of a distribution.
+		Defaults to False.
 
 	Returns
 	-------
-	pred0s : list or array
-		List of test predictions from model_cls on each fold assuming W = 0.
-		Also assumes S = 1 if S is provided.
-	pred1s : list or array
-		List of test predictions from model_cls on each fold assuming W = 1.
-		Also assumes S = 1 if S is provided.
+	y0_dists : list
+		list of batched scipy distributions whose shapes sum to n.
+		the ith distribution is the out-of-sample estimate of
+		the conditional law of Yi(0) | X[i]
+	y1_dists : list
+		list of batched scipy distributions whose shapes sum to n.
+		the ith distribution is the out-of-sample estimate of
+		the conditional law of Yi(1) | X[i]
 	"""
 	# concatenate S to features
 	n = len(X)
@@ -77,7 +85,7 @@ def _cross_fit_predictions(
 			reg_model = copy.copy(model)
 		
 		reg_model.fit(
-			W=W[not_in_fold], X=X[not_in_fold], Y=Y[not_in_fold]
+			W=W[not_in_fold], X=X[not_in_fold], y=y[not_in_fold]
 		)
 
 		# predict and append on this fold
@@ -94,30 +102,56 @@ def _cross_fit_predictions(
 		pred1s = np.concatenate(pred1s, axis=0)
 	return pred0s, pred1s, fit_models
 
-class RidgeDistReg:
-	def __init__(
-		self,
-		eps_dist='gaussian',
-		how_transform='interactions',
-		**model_kwargs,
-		#heterosked=False,
-	):
+class DistReg:
+	"""
+	A generic class for distributional regressions, meant for subclassing.
+
+	Parameters
+	----------
+	how_transform : str
+		Str specifying how to transform the features before fitting
+		the underlying model. One of several options:
+
+		- 'identity': does not transform the features
+		- 'interactions' : interaction terms btwn. the treatment/covariates
+
+		The default option ``interactions``.
+	"""
+
+	def __init__(self, how_transform):
+		self.how_transform = how_transform
+
+
+	def fit(self, W, X, y):
 		"""
+		Fits model on the data.
+
 		Parameters
 		----------
-		eps_dist : str
-			Str specifying the (parametric) distribution of the residuals.
-		model_kwargs : dict
-			kwargs for sklearn.linear_models.RidgeCV() constructor.
+		W : np.array
+			n-length array of binary treatment indicators.
+		X : np.array
+			(n, p)-shaped array of covariates.
+		y : np.array
+			n-length array of outcome measurements.
 		"""
-		self.eps_dist = eps_dist
-		self.model_kwargs = model_kwargs
-		self.how_transform = str(how_transform).lower()
-		#self.heterosked = heterosked
+		raise NotImplementedError()
 
 	def feature_transform(self, W, X):
 		"""
-		In the future, can add splines/basis functions.
+		Transforms the features before feeding them to the base model.
+
+		Parameters
+		----------
+		X : np.array
+			(n, p)-shaped array of covariates.
+		W : np.array
+			n-length array of treatment indicators
+
+		Returns
+		-------
+		features : np.array
+			(n, d)-shaped array of features.
 		"""
 		if self.how_transform in ['none', 'identity']:
 			return np.concatenate([W.reshape(-1, 1), X],axis=1)
@@ -130,24 +164,68 @@ class RidgeDistReg:
 		else:
 			raise ValueError(f"Unrecognized transformation {self.how_transform}")
 
-	def fit(self, W, X, Y):
+	def predict(self, X, W=None):
 		"""
+		Parameters
+		----------
+		X : np.array
+			(n, p)-shaped array of covariates.
+		W : np.array
+			Optional n-length array of binary treatment indicators.
+
+		Returns
+		-------
+		y_dists : stats.rv_continuous / stats.rv_discrete
+			batched scipy distribution of shape (n,) where the ith
+			distribution is the conditional law of Y[i] | X[i], W[i].
+			Only returned if W is provided.
+		(y0_dists, y1_dists) : tuple 
+			If W is not provided, returns a tuple of batched scipy 
+			dists of shape (n,). The ith distribution in yk_dists is
+			the conditional law of Yi(k) | Xi, for k in {0,1}.
 		"""
+		raise NotImplementedError()
+
+class RidgeDistReg(DistReg):
+	"""
+	Cross-validated linear ridge distributional regression.
+
+	Parameters
+	----------
+	how_transform : str
+		Str specifying how to transform the features before fitting
+		a ``RidgeCV`` model. See the base ``DistReg`` class for details.
+	eps_dist : str
+		Str specifying the (parametric) distribution of the residuals.
+		One of ['gaussian', 'laplace', 'expon', 'tdist']. Defaults 
+		to ``gaussian``.
+	model_kwargs : dict
+		kwargs for sklearn.linear_models.RidgeCV() constructor.
+	"""
+	def __init__(
+		self,
+		eps_dist='gaussian',
+		how_transform='interactions',
+		**model_kwargs,
+		#heterosked=False,
+	):
+		self.eps_dist = eps_dist
+		self.model_kwargs = model_kwargs
+		self.how_transform = str(how_transform).lower()
+		#self.heterosked = heterosked
+
+	def fit(self, W, X, y):
 		# fit ridge
 		features = self.feature_transform(W, X)
 		self.model = RidgeCV(**self.model_kwargs)
-		self.model.fit(features, Y)
+		self.model.fit(features, y)
 
 		# fit variance
 		self.hatsigma = np.sqrt(
-			np.power(self.model.predict(features) - Y, 2).mean()
+			np.power(self.model.predict(features) - y, 2).mean()
 		)
 	
 	def predict(self, X, W=None):
-		"""
-		If W is None, returns (y0_dists, y1_dists)
-		Else, returns (y_dists) 
-		"""
 		if W is not None:
 			features = self.feature_transform(W, X=X)
 			mu = self.model.predict(features)
@@ -160,11 +238,20 @@ class RidgeDistReg:
 			W0 = np.zeros(n); W1 = np.ones(n)
 			return self.predict(X, W=W0), self.predict(X, W=W1)
 
-class LogisticCV(RidgeDistReg):
+class LogisticCV(DistReg):
 	"""
+	A wrapper of sklearn.LogisticRegression which inherits from ``DistReg``
+
 	Parameters
 	----------
-	kwargs : dict
+	how_transform : str
+		Str specifying how to transform the features before fitting
+		a ``LogisticCV`` model. See the base ``DistReg`` class for details.
+	monotonicity : bool
+		If true, ensures that the coefficient corresponding to the treatment
+		is nonnegative. This is important when fitting Lee Bounds that assume
+		monotonicity. Defaults to False.
+	model_kwargs : dict
 		kwargs to sklearn 
 	"""
 	def __init__(
@@ -174,17 +261,17 @@ class LogisticCV(RidgeDistReg):
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
 
-	def fit(self, W, X, Y):
-		# check Y is binary
-		if set(np.unique(Y).tolist()) != set([0,1]):
-			raise ValueError(f"Y must be binary; instead np.unique(Y)={np.unique(Y)}")
+	def fit(self, W, X, y):
+		# check y is binary
+		if set(np.unique(y).tolist()) != set([0,1]):
+			raise ValueError(f"y must be binary; instead np.unique(y)={np.unique(y)}")
 		# fit 
 		features = self.feature_transform(W=W, X=X)
 		if not self.monotonicity:
 			self.model = LogisticRegressionCV(**self.model_kwargs)
 		else:
 			self.model = MonotoneLogisticReg(**self.model_kwargs)
-		self.model.fit(features, Y)
+		self.model.fit(features, y)
 
 	def predict_proba(
 		self, X, W=None
@@ -233,18 +320,19 @@ class LogisticCV(RidgeDistReg):
 
 class MonotoneLogisticReg:
 	"""
-	Helpful for Lee Bounds which enforce monotonicity.
+	A logistic regression solver which ensures that beta[0] >= 0.
+	Useful for computing Lee bounds which assume monotonicity.
 	"""
 	def __init__(self):
 		pass
 
-	def fit(self, X, Y, lmda=1):
+	def fit(self, X, y, lmda=1):
 		n, p = X.shape
 		sig1 = X[:, 0].std()
 		zeros = np.zeros(n)
 		beta = cp.Variable(p)
 		X1beta = X @ beta
-		term1 = cp.multiply(Y, X1beta)
+		term1 = cp.multiply(y, X1beta)
 		term2 = cp.log_sum_exp(cp.vstack([zeros, X1beta]), axis=0)
 		term3 = lmda * cp.sum(cp.power(beta, 2))
 		obj = cp.Maximize(cp.sum(term1 - term2) - term3)

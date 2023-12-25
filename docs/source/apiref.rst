@@ -6,11 +6,6 @@ Generic DualBounds
 .. automodule:: dualbounds.generic
   :members:
 
-Distributional regression helpers
----------------------------------
-.. automodule:: dualbounds.dist_reg
-  :members:
-
 Lee Bounds
 ----------
 .. automodule:: dualbounds.lee
@@ -24,6 +19,11 @@ Variance of the CATE
 Variance of the ITE
 -------------------
 .. automodule:: dualbounds.varite
+  :members:
+
+Distributional regression classes
+---------------------------------
+.. automodule:: dualbounds.dist_reg
   :members:
 
 Quickly creating data-generating processes

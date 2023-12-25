@@ -69,6 +69,10 @@ class DualBounds:
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
 		If ``None``, will be estimated from the data.
+	Y_model : dist_reg.DistReg
+		A distributional regression model class inheriting from 
+		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+		defaults to ``Y_model=dist_reg.RidgeDistReg``.	
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
@@ -83,6 +87,7 @@ class DualBounds:
 		W,
 		y,
 		pis=None,
+		Y_model=None,
 		discrete=None,
 		support=None,
 	):
@@ -101,6 +106,7 @@ class DualBounds:
 		self.discrete, self.support = infer_discrete(
 			discrete=discrete, support=support, y=self.y
 		)
+		self.Y_model = Y_model
 
 		# Initialize
 		self.y0_dists = None
@@ -595,20 +601,22 @@ class DualBounds:
 
 	def cross_fit(
 		self,
-		Y_model=None,
 		nfolds=5,
 		suppress_warning=False,
 	):
 		"""Performs cross-fitting to fit the outcome model.
 
+
 		Returns
 		-------
-		y0_dists : np.array
+		y0_dists : list
 			list of batched scipy distributions whose shapes sum to n.
-			the ith distribution is the conditional law of Yi(0) | Xi
-		y1_dists : np.array
+			the ith distribution is the out-of-sample estimate of
+			the conditional law of Yi(0) | X[i]
+		y1_dists : list
 			list of batched scipy distributions whose shapes sum to n.
-			the ith distribution is the conditional law of Yi(1) | Xi
+			the ith distribution is the out-of-sample estimate of
+			the conditional law of Yi(1) | X[i]
 		"""
 
 		# if pis not supplied: will use cross-fitting
@@ -618,20 +626,21 @@ class DualBounds:
 		# Fit model
 		if self.y0_dists is None or self.y1_dists is None:
 			self.Y_model = get_default_model(
-				discrete=self.discrete, support=self.support, Y_model=Y_model
+				discrete=self.discrete, support=self.support, Y_model=self.Y_model
 			)
-			self.y0_dists, self.y1_dists, self.model_fits = dist_reg._cross_fit_predictions(
-				W=self.W, X=self.X, Y=self.y, 
+			self.y0_dists, self.y1_dists, self.model_fits = dist_reg.cross_fit_predictions(
+				W=self.W, X=self.X, y=self.y, 
 				nfolds=nfolds, model=self.Y_model,
 			)
 		elif not suppress_warning:
 			warnings.warn(CROSSFIT_WARNING)
 
+		return self.y0_dists, self.y1_dists
+
 
 
 	def compute_dual_bounds(
 		self,
-		Y_model=None,
 		nfolds=5,
 		aipw=True,
 		alpha=0.05,
@@ -647,16 +656,23 @@ class DualBounds:
 		and (3) computing final dual bounds.
 
 		Parameters
-		----------
-		Y_model : TODO
+		----------	
+		nfolds : int
+			Number of folds to use when cross-fitting. Defaults to 5.
 		alpha : float
 			Nominal coverage level. Defaults to 0.05.
 		aipw : bool
 			If true, returns AIPW estimator.
-		y0_dists : list of scipy dists
-			Optional input in place of model
-		y1_dists : list of scipy dists
-			Optional input in place of model
+		y0_dists : list
+			list of batched scipy distributions whose shapes sum to n.
+			the ith distribution is an out-of-sample estimate of
+			the law of Yi(0) | X[i]. This is an optional input;
+			if provided, ``Y_model`` will be ignored.
+		y1_dists : list
+			list of batched scipy distributions whose shapes sum to n.
+			the ith distribution is an out-of-sample estimate of
+			the law of Yi(1) | X[i]. This is an optional input;
+			if provided, ``Y_model`` will be ignored.
 		suppress_warning : bool
 			If True, suppresses warning about cross-fitting.
 		verbose : bool
@@ -678,8 +694,7 @@ class DualBounds:
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
 		self.cross_fit(
-			Y_model=Y_model, nfolds=nfolds, 
-			suppress_warning=suppress_warning
+			nfolds=nfolds, suppress_warning=suppress_warning
 		)
 
 		# compute dual variables

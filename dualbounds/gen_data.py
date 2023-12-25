@@ -118,7 +118,7 @@ def gen_regression_data(
 	out = dict(
 		X=X,
 		W=W,
-		Y=Y,
+		y=Y,
 		y0_dists=y0_dists,
 		y1_dists=y1_dists,
 		pis=pis,

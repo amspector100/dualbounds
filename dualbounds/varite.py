@@ -24,10 +24,10 @@ def compute_analytical_varite_bound(
 	----------
 	n : int
 		Number of observations.
-	y0_dists : np.array
+	y0_dists : stats.rv_continuous / stats.rv_discrete
 		batched scipy distribution of shape (n,) where the ith
 		distribution is the conditional law of Yi(0) | Xi
-	y1_dists : np.array
+	y1_dists : stats.rv_continuous / stats.rv_discrete
 		batched scipy distribution of shape (n,) where the ith
 		distribution is the conditional law of Yi(1) | Xi
 	reps : int

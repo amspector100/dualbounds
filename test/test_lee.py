@@ -329,12 +329,12 @@ class TestDualLeeBounds(unittest.TestCase):
 			expected, _ = lee.compute_analytical_lee_bound(**oracle_args)
 			## Oracle test
 			ldb_oracle = lee.LeeDualBounds(
-				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
 			est_oracle = ldb_oracle.compute_dual_bounds(**oracle_args, suppress_warning=True)['estimates']
 			## Actual dual bounds
 			ldb = lee.LeeDualBounds(
-				y=data['Y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
 			est_actual = ldb.compute_dual_bounds(nfolds=3)['estimates']
 			for est, name in zip([est_oracle, est_actual], ['Oracle', 'Dual']):

@@ -186,10 +186,10 @@ class LeeDualBounds(generic.DualBounds):
 
 	Parameters
 	----------
-	X : np.array
-		(n, p)-shaped array of covariates.
 	S : np.array
 		n-length array of binary selection indicators
+	X : np.array
+		(n, p)-shaped array of covariates.
 	W : np.array
 		n-length array of treatment indicators.
 	Y : np.array
@@ -197,6 +197,14 @@ class LeeDualBounds(generic.DualBounds):
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
 		If ``None``, will be estimated from the data itself.
+	Y_model : dist_reg.DistReg
+		A distributional regression model class inheriting from 
+		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+		defaults to ``Y_model=dist_reg.RidgeDistReg``.
+	S_model : dist_reg.DistReg
+		A distributional regression model class inheriting from 
+		``dist_reg.DistReg``. Defaults to
+		``S_model=dist_reg.LogisticCV``.
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to None (inferred from the data).
@@ -208,10 +216,12 @@ class LeeDualBounds(generic.DualBounds):
 	def __init__(
 		self,
 		S,
-		*args,  
+		*args, 
+		S_model=None,
 		**kwargs
 	):
 		self.S = S
+		self.S_model = S_model
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
 
@@ -438,8 +448,6 @@ class LeeDualBounds(generic.DualBounds):
 
 	def cross_fit(
 		self,
-		S_model,
-		Y_model,
 		nfolds=5,
 		suppress_warning=False,
 	):
@@ -463,9 +471,11 @@ class LeeDualBounds(generic.DualBounds):
 		"""
 		# estimate selection probs
 		if self.s0_probs is None or self.s1_probs is None:
-			self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg._cross_fit_predictions(
-				W=self.W, X=self.X, Y=self.S, 
-				nfolds=nfolds, model=S_model,
+			if self.S_model is None:
+				self.S_model = dist_reg.LogisticCV(monotonicity=True)
+			self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg.cross_fit_predictions(
+				W=self.W, X=self.X, y=self.S, 
+				nfolds=nfolds, model=self.S_model,
 				probs_only=True,
 				#model_cls=S_model_cls, **model_kwargs,
 			)
@@ -476,9 +486,12 @@ class LeeDualBounds(generic.DualBounds):
 
 		# Estimate outcome model
 		if self.y0_dists is None or self.y1_dists is None:
-			self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg._cross_fit_predictions(
-				W=self.W, X=self.X, S=self.S, Y=self.y, 
-				nfolds=nfolds, model=Y_model,
+			self.Y_model = generic.get_default_model(
+				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
+			)
+			self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg.cross_fit_predictions(
+				W=self.W, X=self.X, S=self.S, y=self.y, 
+				nfolds=nfolds, model=self.Y_model,
 			)
 		elif not suppress_warning:
 			warnings.warn(generic.CROSSFIT_WARNING)
@@ -489,8 +502,6 @@ class LeeDualBounds(generic.DualBounds):
 
 	def compute_dual_bounds(
 		self,
-		Y_model=None,
-		S_model=None,
 		nfolds=5,
 		alpha=0.05,
 		aipw=True,
@@ -504,13 +515,8 @@ class LeeDualBounds(generic.DualBounds):
 		"""
 		Parameters
 		----------
-		Y_model : TODO
-			Defaults to RidgeDistReg for continuous data
-			and a logistic regression for binary data.
-		S_model : TODO
 		nfolds : int
-			Number of folds to use in cross-fitting. 
-			Defaults to 5,
+			Number of folds to use when cross-fitting. Defaults to 5,
 		alpha : float
 			Nominal coverage level. Defaults to 0.05.
 		aipw : bool
@@ -544,18 +550,10 @@ class LeeDualBounds(generic.DualBounds):
 		# if pis not supplied: will use cross-fitting
 		if self.pis is None:
 			self.fit_propensity_scores(nfolds=nfolds)
+
 		# fit outcome models using cross-fitting
-		if S_model is None:
-			S_model = dist_reg.LogisticCV(monotonicity=True)
-		self.S_model = S_model
-		self.Y_model = generic.get_default_model(
-			discrete=self.discrete, support=self.support, Y_model=Y_model,
-		)
 		self.cross_fit(
-			S_model=self.S_model,
-			Y_model=self.Y_model,
-			nfolds=nfolds,
-			suppress_warning=suppress_warning,
+			nfolds=nfolds, suppress_warning=suppress_warning,
 		)
 
 		# compute dual variables
