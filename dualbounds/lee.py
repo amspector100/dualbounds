@@ -200,11 +200,11 @@ class LeeDualBounds(generic.DualBounds):
 	Y_model : dist_reg.DistReg
 		A distributional regression model class inheriting from 
 		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.RidgeDistReg``.
+		defaults to ``Y_model=dist_reg.RidgeDistReg(eps_dist="laplace")``.
 	S_model : dist_reg.DistReg
 		A distributional regression model class inheriting from 
 		``dist_reg.DistReg``. Defaults to
-		``S_model=dist_reg.LogisticCV``.
+		``S_model=dist_reg.LogisticCV(monotonicity=True).``.
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to None (inferred from the data).

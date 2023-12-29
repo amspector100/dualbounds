@@ -72,13 +72,45 @@ class DualBounds:
 	Y_model : dist_reg.DistReg
 		A distributional regression model class inheriting from 
 		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.RidgeDistReg``.	
+		defaults to ``Y_model=dist_reg.RidgeDistReg(eps_dist="gaussian")``.	
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
 	support : np.array
 		Optinal support of y, if known.
 		Defaults to ``None`` (inferred from the data).
+
+	Examples
+	--------
+	Here we fit DualBounds on P(Y(0) < Y(1)) based on
+	synthetic regression data: ::
+		import dualbounds as db
+
+		# Generate synthetic data from a heavy-tailed linear model
+		data = db.gen_data.gen_regression_data(
+			n=900, # Num. datapoints
+			p=30, # Num. covariates
+			r2=0.95, # population R^2
+			tau=3, # average treatment effect
+			interactions=True, # ensures treatment effect is heterogenous
+			eps_dist='laplace', # heavy-tailed residuals
+			sample_seed=123, # random seed
+		)
+
+		# Initialize dual bounds object
+		dbnd = db.generic.DualBounds(
+			f=lambda y0, y1, x: y0 < y1,
+			X=data['X'], # n x p covariate matrix
+			W=data['W'], # n-length treatment vector
+			y=data['y'], # n-length outcome vector
+			pis=data['pis'], # n-length propensity scores (optional)
+			Y_model=db.dist_reg.RidgeDistReg(), # model for Y | X, W
+		)
+
+		# Compute dual bounds and observe output
+		dbnd.compute_dual_bounds(
+			alpha=0.05 # nominal level
+		)
 	"""
 	def __init__(
 		self, 
@@ -97,10 +129,7 @@ class DualBounds:
 		self.y = y
 		self.W = W
 		self.pis = pis
-		# self.discrete = discrete
-		# self.support = support
 		self.n = len(self.y)
-		#self.n, self.p = self.X.shape
 
 		### Check if discrete
 		self.discrete, self.support = infer_discrete(
