@@ -36,7 +36,9 @@ class TestCrossFit(unittest.TestCase):
 		beta = np.random.randn(p)
 		Y = X @ beta + np.random.randn(n)
 		# cross-fitting approach one
-		rdr = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
+		rdr = dist_reg.CtsDistReg(
+			model_type='ridge', cv=cv, how_transform='identity'
+		)
 		preds0, preds1, _ = dist_reg.cross_fit_predictions(
 			W=W, y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
@@ -48,7 +50,9 @@ class TestCrossFit(unittest.TestCase):
 		p0s = []; p1s = []
 		for start, end in zip(starts, ends):
 			not_in_fold = [i for i in range(n) if i < start or i >= end]
-			model = dist_reg.RidgeDistReg(cv=cv, how_transform='identity')
+			model = dist_reg.CtsDistReg(
+				model_type='ridge', cv=cv, how_transform='identity'
+			)
 			model.fit(W=W[not_in_fold], X=X[not_in_fold], y=Y[not_in_fold])
 			pr0s, pr1s = model.predict(X=X[start:end])
 			p0s.append(pr0s); p1s.append(pr1s)

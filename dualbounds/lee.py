@@ -197,14 +197,15 @@ class LeeDualBounds(generic.DualBounds):
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
 		If ``None``, will be estimated from the data itself.
-	Y_model : dist_reg.DistReg
-		A distributional regression model class inheriting from 
-		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.RidgeDistReg(eps_dist="laplace")``.
-	S_model : dist_reg.DistReg
-		A distributional regression model class inheriting from 
-		``dist_reg.DistReg``. Defaults to
-		``S_model=dist_reg.LogisticCV(monotonicity=True).``.
+	Y_model : str or dist_reg.DistReg
+		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
+		Alternatively, a distributional regression class inheriting 
+		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.	
+	S_model : str or dist_reg.DistReg
+		One of ['logistic', 'monotone_logistic', 'randomforest', 'knn'],
+		or a class inheriting from ``dist_reg.DistReg``. Defaults to
+		``monotone_logistic``. 
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to None (inferred from the data).
@@ -472,12 +473,15 @@ class LeeDualBounds(generic.DualBounds):
 		# estimate selection probs
 		if self.s0_probs is None or self.s1_probs is None:
 			if self.S_model is None:
-				self.S_model = dist_reg.LogisticCV(monotonicity=True)
-			self.s0_probs, self.s1_probs, self.fit_S_models = dist_reg.cross_fit_predictions(
+				self.S_model = 'monotone_logistic'
+			self.S_model = generic.get_default_model(
+				Y_model=self.S_model, support=set([0,1]), 
+				discrete=True, monotonicity=True, 
+			)
+			self.s0_probs, self.s1_probs, self.S_model_fits = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.S, 
 				nfolds=nfolds, model=self.S_model,
 				probs_only=True,
-				#model_cls=S_model_cls, **model_kwargs,
 			)
 		elif not suppress_warning:
 			warnings.warn(
@@ -489,7 +493,7 @@ class LeeDualBounds(generic.DualBounds):
 			self.Y_model = generic.get_default_model(
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 			)
-			self.y0_dists, self.y1_dists, self.fit_Y_models = dist_reg.cross_fit_predictions(
+			self.y0_dists, self.y1_dists, self.model_fits = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, S=self.S, y=self.y, 
 				nfolds=nfolds, model=self.Y_model,
 			)

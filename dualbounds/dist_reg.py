@@ -2,9 +2,46 @@ import copy
 import numpy as np
 import cvxpy as cp
 from scipy import stats
-from sklearn.linear_model import RidgeCV, LogisticRegression, LogisticRegressionCV
+import sklearn.linear_model as lm
 from . import utilities
 from .utilities import parse_dist, BatchedCategorical
+
+TOL = 1e-6
+
+def parse_model_type(model_type, discrete):
+	# return non-strings
+	if not isinstance(model_type, str):
+		return model_type
+	# parse
+	model_type = model_type.lower()
+	if not discrete:
+		if model_type == 'ridge':
+			return lm.RidgeCV
+		elif model_type == 'lasso':
+			return lm.LassoCV
+		elif model_type in ['elastic', 'elasticnet']:
+			return lm.ElasticNetCV
+		elif model_type in ['rf', 'randomforest']:
+			import sklearn.ensemble
+			return sklearn.ensemble.RandomForestRegressor
+		elif model_type == 'knn':
+			import sklearn.neighbors
+			return sklearn.neighbors.KNeighborsRegressor
+		else:
+			raise ValueError(f"Unrecognized model_type={model_type}")
+	else:
+		if model_type in ['logistic', 'ridge', 'lasso', 'elastic', 'elasticnet']:
+			return lm.LogisticRegressionCV
+		elif model_type in ['monotone_logistic', 'logistic_monotone']:
+			return MonotoneLogisticReg
+		elif model_type in ['rf', 'randomforest']:
+			import sklearn.ensemble
+			return sklearn.ensemble.RandomForestClassifier
+		elif model_type == 'knn':
+			import sklearn.neighbors
+			return sklearn.neighbors.KNeighborsClassifier
+		else:
+			raise ValueError(f"Unrecognized model_type={model_type}")
 
 def create_folds(n, nfolds):
 	splits = np.linspace(0, n, nfolds+1).astype(int)
@@ -30,11 +67,12 @@ def cross_fit_predictions(
 	Parameters
 	----------
 	model : DistReg
-		instantiation of ``dist_reg.DistReg`` class. This will be copied.
-		E.g., ``model=dist_reg.RidgeDistReg(eps_dist="laplace").``
+		instantiation of ``dist_reg.DistReg`` class. This will
+		be copied. E.g., 
+		``model=dist_reg.CtsDistReg(model_type='ridge', eps_dist="laplace").``
 	model_cls : 
 		Alterantively, give the class name and have it constructed.
-		E.g, ``model_cls=dist_reg.RidgeDistReg``.
+		E.g, ``model_cls=dist_reg.CtsDistReg``.
 	model_kwargs : dict
 		kwargs to construct model; used only if model_cls is specified.
 		E.g., ``model_kwargs=dict(eps_dist=laplace)``.
@@ -186,38 +224,46 @@ class DistReg:
 		"""
 		raise NotImplementedError()
 
-class RidgeDistReg(DistReg):
+class CtsDistReg(DistReg):
 	"""
-	Cross-validated linear ridge distributional regression.
+	Distributional regression for continuous outcomes.
 
 	Parameters
 	----------
+	model_type : str or sklearn class
+		Str specifying a sklearn model class to use; options include
+		'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'. One can
+		also directly pass an sklearn class constructor, e.g., 
+		``model_type=sklearn.ensemble.KNeighborsRegressor``. 
 	how_transform : str
 		Str specifying how to transform the features before fitting
-		a ``RidgeCV`` model. See the base ``DistReg`` class for details.
+		the base sklearn model.
 	eps_dist : str
 		Str specifying the (parametric) distribution of the residuals.
 		One of ['gaussian', 'laplace', 'expon', 'tdist']. Defaults 
 		to ``gaussian``.
 	model_kwargs : dict
-		kwargs for sklearn.linear_models.RidgeCV() constructor.
+		kwargs for sklearn base model constructor. E.g., for ``knn``,
+		model_kwargs could include ``n_neighbors``.
 	"""
 	def __init__(
 		self,
 		eps_dist='gaussian',
+		model_type='ridge',
 		how_transform='interactions',
-		**model_kwargs,
 		#heterosked=False,
+		**model_kwargs,
 	):
 		self.eps_dist = eps_dist
+		self.model_type = parse_model_type(model_type, discrete=False)
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
 		#self.heterosked = heterosked
 
 	def fit(self, W, X, y):
 		# fit ridge
-		features = self.feature_transform(W, X)
-		self.model = RidgeCV(**self.model_kwargs)
+		features = self.feature_transform(W=W, X=X)
+		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
 
 		# fit variance
@@ -238,7 +284,7 @@ class RidgeDistReg(DistReg):
 			W0 = np.zeros(n); W1 = np.ones(n)
 			return self.predict(X, W=W0), self.predict(X, W=W1)
 
-class LogisticCV(DistReg):
+class BinaryDistReg(DistReg):
 	"""
 	A wrapper of sklearn.LogisticRegression which inherits from ``DistReg``
 
@@ -255,8 +301,13 @@ class LogisticCV(DistReg):
 		kwargs to sklearn 
 	"""
 	def __init__(
-		self, monotonicity=False, how_transform='interactions', **model_kwargs
+		self, 
+		model_type='logistic', 
+		monotonicity=False,
+		how_transform='interactions',
+		**model_kwargs
 	):
+		self.model_type = parse_model_type(model_type, discrete=True)
 		self.monotonicity = monotonicity
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
@@ -267,10 +318,7 @@ class LogisticCV(DistReg):
 			raise ValueError(f"y must be binary; instead np.unique(y)={np.unique(y)}")
 		# fit 
 		features = self.feature_transform(W=W, X=X)
-		if not self.monotonicity:
-			self.model = LogisticRegressionCV(**self.model_kwargs)
-		else:
-			self.model = MonotoneLogisticReg(**self.model_kwargs)
+		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
 
 	def predict_proba(
@@ -290,12 +338,14 @@ class LogisticCV(DistReg):
 			n = len(X)
 			W0 = np.zeros(n); W1 = np.ones(n)
 			p0s, p1s = self.predict_proba(X, W=W0), self.predict_proba(X, W=W1)
+			p0s = np.minimum(1-TOL, np.maximum(TOL, p0s))
+			p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
 			# enforce monotonicity
 			if self.monotonicity:
 				flags = p0s > p1s
 				avg = (p0s[flags] + p1s[flags]) / 2
-				p0s[flags] = avg
-				p1s[flags] = np.minimum(1, avg + 1e-5)
+				p0s[flags] = np.maximum(TOL, avg-TOL)
+				p1s[flags] = np.minimum(1-TOL, avg+TOL)
 			return p0s, p1s
 
 	def predict(self, X, W=None):

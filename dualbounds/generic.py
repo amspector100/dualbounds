@@ -17,13 +17,18 @@ this warning, set ``supress_warning=True``.
 ==================================================
 """
 
-def get_default_model(discrete, support, Y_model=None):
-	if Y_model is not None:
+def get_default_model(discrete, support, Y_model=None, **model_kwargs):
+	if isinstance(Y_model, dist_reg.DistReg):
 		return Y_model
-	elif not discrete:
-		return dist_reg.RidgeDistReg(eps_dist='gaussian')
+	Y_model = 'ridge' if Y_model is None else Y_model
+	if not discrete:
+		return dist_reg.CtsDistReg(
+			model_type=Y_model, **model_kwargs
+		)
 	elif discrete and set(support) == set([0, 1]):
-		return dist_reg.LogisticCV()
+		return dist_reg.BinaryDistReg(
+			model_type=Y_model, **model_kwargs
+		)
 	else:
 		raise NotImplementedError("Currently no default for non-binary discrete data")
 
@@ -69,16 +74,20 @@ class DualBounds:
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
 		If ``None``, will be estimated from the data.
-	Y_model : dist_reg.DistReg
-		A distributional regression model class inheriting from 
-		``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.RidgeDistReg(eps_dist="gaussian")``.	
+	Y_model : str or dist_reg.DistReg
+		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
+		Alternatively, a distributional regression class inheriting 
+		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.	
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
 	support : np.array
 		Optinal support of y, if known.
 		Defaults to ``None`` (inferred from the data).
+	**model_kwargs : dict
+		Additional kwargs for an underlying ``DistReg`` model,
+		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
 
 	Examples
 	--------
@@ -104,7 +113,7 @@ class DualBounds:
 			W=data['W'], # n-length treatment vector
 			y=data['y'], # n-length outcome vector
 			pis=data['pis'], # n-length propensity scores (optional)
-			Y_model=db.dist_reg.RidgeDistReg(), # model for Y | X, W
+			Y_model='ridge', # model for Y | X, W
 		)
 
 		# Compute dual bounds and observe output
@@ -122,6 +131,7 @@ class DualBounds:
 		Y_model=None,
 		discrete=None,
 		support=None,
+		**model_kwargs,
 	):
 		### Data
 		self.f = f
@@ -133,9 +143,10 @@ class DualBounds:
 
 		### Check if discrete
 		self.discrete, self.support = infer_discrete(
-			discrete=discrete, support=support, y=self.y
+			discrete=discrete, support=support, y=self.y,
 		)
 		self.Y_model = Y_model
+		self.model_kwargs = model_kwargs
 
 		# Initialize
 		self.y0_dists = None
@@ -654,8 +665,10 @@ class DualBounds:
 
 		# Fit model
 		if self.y0_dists is None or self.y1_dists is None:
+			print("HELLOOO")
 			self.Y_model = get_default_model(
-				discrete=self.discrete, support=self.support, Y_model=self.Y_model
+				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
+				**self.model_kwargs
 			)
 			self.y0_dists, self.y1_dists, self.model_fits = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.y, 

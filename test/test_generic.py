@@ -119,6 +119,48 @@ class TestGenericDualBounds(unittest.TestCase):
 				err_msg=f"For f={f}, dxs are too large."
 			)
 
+	def test_base_models_cts(self):
+		"""
+		Ensure none of the built-in model types error.
+		"""
+		# Generate data
+		data = gen_data.gen_regression_data(n=200, p=20)
+		f = lambda y0, y1, x: y0 <= y1
+		# Model types to test
+		model_types = ['ridge', 'lasso', 'elasticnet', 'rf', 'knn']
+		eps_dists = ['gaussian', 'laplace', 'tdist', 'expon', 'gaussian']
+		model_types.append(db.dist_reg.CtsDistReg(model_type='ridge'))
+		eps_dists.append("this_should_be_ignored_and_not_raise_error") 
+		for model_type, eps_dist in zip(model_types, eps_dists):
+			gdb = db.generic.DualBounds(
+				f=f, 
+				X=data['X'], W=data['W'], 
+				y=data['y'], pis=data['pis'], 
+				Y_model=model_type,
+				eps_dist=eps_dist,
+			)
+			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
+
+	def test_base_models_discrete(self):
+		"""
+		Same as above but for discrete models.
+		"""
+		data = gen_data.gen_regression_data(n=300, p=3, eps_dist='bernoulli', r2=0)
+		f = lambda y0, y1, x: y0 <= y1
+		model_types = ['ridge', 'lasso', 'elasticnet', 'rf', 'knn']
+		model_types.append(db.dist_reg.BinaryDistReg(model_type='ridge'))
+		for model_type in model_types:
+			gdb = db.generic.DualBounds(
+				f=f, 
+				X=data['X'], W=data['W'], 
+				y=data['y'], pis=data['pis'], 
+				Y_model=model_type,
+			)
+			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
+
+
+
+
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev
 	basename = os.path.basename(os.path.abspath(__file__))

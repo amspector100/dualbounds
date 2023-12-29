@@ -6,6 +6,10 @@ import unittest
 import pytest
 import os
 import sys
+import sklearn.linear_model as lm
+import sklearn.ensemble
+import sklearn.neighbors
+
 try:
 	from . import context
 	from .context import dualbounds as db
@@ -307,6 +311,40 @@ class TestDualLeeBounds(unittest.TestCase):
 					decimal=2,
 					err_msg=f"{method} bounds do not agree with analytical bounds",
 				)
+
+	def test_model_type_inputs(self):
+		"""
+		Tests that the various model classes don't error and give
+		the correct underlying model type.
+		"""
+		data = db.gen_data.gen_lee_bound_data(
+			n=500, p=3, r2=0, dgp_seed=1, sample_seed=1,
+		)
+
+		for Y_model, S_model, in zip(
+			['rf', 'ridge', 'knn', 'elastic'],
+			['monotone_logistic', 'knn', 'logistic', 'rf'],
+		):
+			ldb = lee.LeeDualBounds(
+				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+				Y_model=Y_model, S_model=S_model,
+			)
+			ldb.compute_dual_bounds(nfolds=3)
+			# Test y-model is correct
+			Ym = ldb.model_fits[0].model
+			Y_exp = db.dist_reg.parse_model_type(Y_model, discrete=False)
+			self.assertTrue(
+				isinstance(Ym, Y_exp),
+				f"fit model {Ym} with Y_model={Y_model} is not of type {Y_exp}"
+			)
+			# Test s-model is correct
+			Sm = ldb.S_model_fits[0].model
+			S_exp = db.dist_reg.parse_model_type(S_model, discrete=True)
+			self.assertTrue(
+				isinstance(Sm, S_exp),
+				f"fit model {Sm} with S_model={S_model} is not of type {S_exp}"
+			)
+
 
 	@pytest.mark.slow
 	def test_lee_consistency(self):
