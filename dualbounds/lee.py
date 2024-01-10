@@ -206,6 +206,10 @@ class LeeDualBounds(generic.DualBounds):
 		One of ['logistic', 'monotone_logistic', 'randomforest', 'knn'],
 		or a class inheriting from ``dist_reg.DistReg``. Defaults to
 		``monotone_logistic``. 
+	W_model : str or sklearn classifier
+		Specifies how to estimate the propensity scores if ``pis`` is
+		not known.  Either a str identifier as above or an sklearn
+		classifier---see the tutorial for examples.
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to None (inferred from the data).

@@ -120,7 +120,7 @@ def cross_fit_predictions(
 		if model is None:
 			reg_model = model_cls(**model_kwargs)
 		else:
-			reg_model = copy.copy(model)
+			reg_model = copy.deepcopy(model)
 		
 		reg_model.fit(
 			W=W[not_in_fold], X=X[not_in_fold], y=y[not_in_fold]
@@ -153,7 +153,7 @@ class DistReg:
 		- 'identity': does not transform the features
 		- 'interactions' : interaction terms btwn. the treatment/covariates
 
-		The default option ``interactions``.
+		The default is ``interactions``.
 	"""
 
 	def __init__(self, how_transform):
@@ -242,23 +242,27 @@ class CtsDistReg(DistReg):
 		Str specifying the (parametric) distribution of the residuals.
 		One of ['gaussian', 'laplace', 'expon', 'tdist']. Defaults 
 		to ``gaussian``.
+	heterosked : bool
+		If True, estimates Var(Y | X) as a function of X by using
+		the specified model to predict both E[Y^2 | X] and E[Y | X].
+		If False, assumes Var(Y | X) is constant. Defaults to False.
 	model_kwargs : dict
 		kwargs for sklearn base model constructor. E.g., for ``knn``,
 		model_kwargs could include ``n_neighbors``.
 	"""
 	def __init__(
 		self,
-		eps_dist='gaussian',
 		model_type='ridge',
+		eps_dist='gaussian',
 		how_transform='interactions',
-		#heterosked=False,
+		heterosked=False,
 		**model_kwargs,
 	):
 		self.eps_dist = eps_dist
 		self.model_type = parse_model_type(model_type, discrete=False)
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
-		#self.heterosked = heterosked
+		self.heterosked = heterosked
 
 	def fit(self, W, X, y):
 		# fit ridge
@@ -267,6 +271,11 @@ class CtsDistReg(DistReg):
 		self.model.fit(features, y)
 
 		# fit variance
+		if self.heterosked:
+			self.m2_model = self.model_type(**self.model_kwargs)
+			self.m2_model.fit(features, y**2)
+
+		# estimate of E[Var(Y | X)] 
 		self.hatsigma = np.sqrt(
 			np.power(self.model.predict(features) - y, 2).mean()
 		)
@@ -275,9 +284,16 @@ class CtsDistReg(DistReg):
 		if W is not None:
 			features = self.feature_transform(W, X=X)
 			mu = self.model.predict(features)
+			# heteroskedasticity
+			if self.heterosked:
+				scale = self.m2_model.predict(features) - mu**2
+				# ensure positivity
+				scale = np.maximum(scale, 0.1 * self.hatsigma)
+			else:
+				scale = self.hatsigma
 			# return scipy dists
 			return parse_dist(
-				self.eps_dist, loc=mu, scale=self.hatsigma, 
+				self.eps_dist, loc=mu, scale=scale, 
 			)
 		else:
 			n = len(X)

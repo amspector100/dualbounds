@@ -321,13 +321,15 @@ class TestDualLeeBounds(unittest.TestCase):
 			n=500, p=3, r2=0, dgp_seed=1, sample_seed=1,
 		)
 
-		for Y_model, S_model, in zip(
+		for Y_model, S_model, W_model, pis in zip(
 			['rf', 'ridge', 'knn', 'elastic'],
 			['monotone_logistic', 'knn', 'logistic', 'rf'],
+			[None, None, 'knn', 'logistic'],
+			[data['pis'], data['pis'], None, None]
 		):
 			ldb = lee.LeeDualBounds(
-				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
-				Y_model=Y_model, S_model=S_model,
+				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=pis,
+				Y_model=Y_model, S_model=S_model, W_model=W_model,
 			)
 			ldb.compute_dual_bounds(nfolds=3)
 			# Test y-model is correct
@@ -344,6 +346,14 @@ class TestDualLeeBounds(unittest.TestCase):
 				isinstance(Sm, S_exp),
 				f"fit model {Sm} with S_model={S_model} is not of type {S_exp}"
 			)
+			# Test pi model is correct if fit
+			if pis is None:
+				Wm = ldb.W_model_fits[0]
+				W_exp = db.dist_reg.parse_model_type(W_model, discrete=True)
+				self.assertTrue(
+					isinstance(Wm, W_exp),
+					f"fit model {Wm} with S_model={W_model} is not of type {W_exp}"
+				)
 
 
 	@pytest.mark.slow

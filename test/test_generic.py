@@ -6,6 +6,7 @@ import unittest
 import pytest
 import os
 import sys
+import sklearn.ensemble
 try:
 	from . import context
 	from .context import dualbounds as db
@@ -157,6 +158,34 @@ class TestGenericDualBounds(unittest.TestCase):
 				Y_model=model_type,
 			)
 			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
+
+	def test_fit_propensity_scores(self):
+		"""
+		Same as above but for W_model
+		"""
+		data = gen_data.gen_regression_data(n=300, p=3, eps_dist='gaussian', r2=0)
+		f = lambda y0, y1, x : y0 <= y1
+		W_models = ['ridge', 'lasso', 'knn', 'rf']
+		expecteds = [
+			db.dist_reg.parse_model_type(wm, discrete=True) for wm in W_models
+		]
+		W_models.append(sklearn.ensemble.AdaBoostClassifier())
+		expecteds.append(sklearn.ensemble.AdaBoostClassifier)
+		for W_model, expected in zip(W_models, expecteds):
+			gdb = db.generic.DualBounds(
+				f=f,
+				X=data['X'], W=data['W'], y=data['y'],
+				pis=None, # to be estimated 
+				Y_model='ridge',
+				W_model=W_model,
+			)
+			gdb.compute_dual_bounds(nfolds=3)
+			# Check the correct class
+			Wm = gdb.W_model_fits[0]
+			self.assertTrue(
+				isinstance(Wm, expected),
+				f"fit W_model {Wm} with W_model={W_model} is not of type {expected}"
+			)
 
 
 

@@ -1,3 +1,4 @@
+import copy
 import warnings
 import numpy as np
 import ot
@@ -78,7 +79,11 @@ class DualBounds:
 		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
 		Alternatively, a distributional regression class inheriting 
 		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.	
+		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
+	W_model : str or sklearn classifier
+		Specifies how to estimate the propensity scores if ``pis`` is
+		not known.  Either a str identifier as above or an sklearn
+		classifier---see the tutorial for examples.
 	discrete : bool
 		If True, treats y as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
@@ -129,6 +134,7 @@ class DualBounds:
 		y,
 		pis=None,
 		Y_model=None,
+		W_model=None,
 		discrete=None,
 		support=None,
 		**model_kwargs,
@@ -146,6 +152,7 @@ class DualBounds:
 			discrete=discrete, support=support, y=self.y,
 		)
 		self.Y_model = Y_model
+		self.W_model = W_model
 		self.model_kwargs = model_kwargs
 
 		# Initialize
@@ -502,7 +509,6 @@ class DualBounds:
 		del y0_vals, y1_vals, y0_probs, y1_probs
 
 		# Initialize results
-		#self.n = self.y0_vals.shape[0]
 		self.nu0s = np.zeros((2, self.n, self.nvals0)) # first dimension = [lower, upper]
 		self.nu1s = np.zeros((2, self.n, self.nvals1))
 		# estimated cond means of nu0s, nu1s
@@ -639,12 +645,50 @@ class DualBounds:
 		self.mu0 = np.concatenate([x.mean() for x in y0_dists])
 		self.mu1 = np.concatenate([x.mean() for x in y1_dists])
 
+	def fit_propensity_scores(
+		self, nfolds, clip=1e-2,
+	):
+		"""
+		Performs cross-fitting to fit the propensity scores.
+		"""
+		# Parse model
+		if isinstance(self.W_model, str):
+			model_cls = dist_reg.parse_model_type(
+				self.W_model, discrete=True
+			)
+			self.W_model = model_cls()
+		
+		# Loop through
+		starts, ends = dist_reg.create_folds(n=self.n, nfolds=nfolds)
+		# loop through and fit
+		self.W_model_fits = []
+		self.pis = np.zeros(self.n)
+		for start, end in zip(starts, ends):
+			# Pick out data from the other folds
+			not_in_fold = [
+				i for i in np.arange(self.n) if i < start or i >= end
+			]
+			# Fit 
+			model_fit = copy.deepcopy(self.W_model)
+			model_fit.fit(
+				X=self.X[not_in_fold], y=self.W[not_in_fold]
+			)
+			self.W_model_fits.append(model_fit)
+			# Predict out of sample
+			self.pis[start:end] = model_fit.predict_proba(
+				self.X[start:end]
+			)[:, 1]
+
+		# Clip
+		self.pis = np.minimum(np.maximum(self.pis, clip), 1-clip)
+
 	def cross_fit(
 		self,
 		nfolds=5,
 		suppress_warning=False,
 	):
-		"""Performs cross-fitting to fit the outcome model.
+		"""
+		Performs cross-fitting to fit the outcome model.
 
 
 		Returns
@@ -665,7 +709,6 @@ class DualBounds:
 
 		# Fit model
 		if self.y0_dists is None or self.y1_dists is None:
-			print("HELLOOO")
 			self.Y_model = get_default_model(
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 				**self.model_kwargs
