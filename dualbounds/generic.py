@@ -7,7 +7,7 @@ from . import utilities, dist_reg, interpolation
 from .utilities import BatchedCategorical
 
 MIN_NVALS = 7
-DISC_THRESH = 10 # treat vars. with <= 10 observations as discrete
+DISC_THRESH = 2 # treat vars. with <= DISC_THRESH values as discrete
 CROSSFIT_WARNING = """
 ==================================================
 Not fitting a model because y0_dists/y1_dists were

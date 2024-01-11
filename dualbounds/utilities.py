@@ -245,13 +245,27 @@ def _convert_to_cat(bern_dist, n):
 		vals=vals, probs=np.stack([1-probs, probs], axis=1)
 	)
 
-def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
+def parse_dist(
+	dist, loc=0, scale=1, mu=None, sd=None, **kwargs
+):
+	## variant 1 based on mu/sd
+	dist = dist.lower()
+	if mu is not None and sd is not None:
+		if dist == 'bernoulli':
+			raise ValueError("Cannot enforce mean/sd for Bernoulli dist.")
+		# get SD correct
+		temp = parse_dist(dist, loc=0, scale=sd, **kwargs)
+		scale = sd / temp.std()
+		temp = parse_dist(dist, loc=0, scale=sd*scale, **kwargs)
+		shift = mu - temp.mean()
+		return parse_dist(dist, loc=shift, scale=sd*scale, **kwargs)
+
+	## variant 2 based on location/scale
 	# sometimes return a regular dist object
 	if not isinstance(dist, str):
 		return dist
 
 	# Parse
-	dist = dist.lower()
 	if dist == 'constant':
 		return ConstantDist(loc=loc, scale=scale)
 	if dist == 'bernoulli':
@@ -261,8 +275,10 @@ def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
 	if dist in ['gaussian', 'normal']:
 		return stats.norm(loc=loc, scale=scale)
 	if dist == 'invchi2':
+		df = kwargs.pop("df", 4)
 		return stats.chi2(df=df, loc=loc, scale=scale/df)
 	if dist == 't' or dist == 'tdist':
+		df = kwargs.pop("df", 4)
 		return stats.t(loc=loc, scale=scale, df=df)
 	if dist == 'cauchy':
 		return stats.cauchy(loc=loc, scale=scale)
@@ -270,11 +286,6 @@ def parse_dist(dist, df=4, loc=0, scale=1, req_symmetric=False, **kwargs):
 		return stats.laplace(loc=loc, scale=scale)
 	if dist in ['uniform', 'unif']:
 		return stats.uniform(loc=loc-scale/2, scale=scale)
-	# warning for certain cases
-	if req_symmetric:
-		raise ValueError(
-			f"Dist {dist} is not a recognized symmetric distribution."
-		)
 	if dist in ['expo', 'expon', 'exponential']:
 		return stats.expon(loc=loc-scale, scale=scale)
 	if dist == 'gamma':

@@ -293,7 +293,7 @@ class CtsDistReg(DistReg):
 				scale = self.hatsigma
 			# return scipy dists
 			return parse_dist(
-				self.eps_dist, loc=mu, scale=scale, 
+				self.eps_dist, mu=mu, sd=scale, 
 			)
 		else:
 			n = len(X)
