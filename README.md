@@ -12,7 +12,7 @@ Documentation and tutorials are available at https://amspector100.github.io/dual
 
 ## Quickstart
 
-Given a response vector ``y``, binary treatment vector ``W``, covariate matrix ``X``, and an (optional) propensity score vector ``pis``, dualbounds allows analysts to perform inference on partially identified estimands of the form E[f(Y(0), Y(1), X)], for any choice of f. For example, the code below shows how to perform inference in P(Y(0) < Y(1)), the proportion of individuals who benefit from the treatment.
+Given a response vector ``y``, binary treatment vector ``W``, covariate matrix ``X``, and an (optional) propensity score vector ``pis``, dualbounds allows analysts to perform inference on partially identified estimands of the form E[f(Y(0), Y(1), X)], for any choice of f. For example, the code below shows how to perform inference in P(Y(0) < Y(1)), the proportion of individuals who benefit from the treatment. Dual bounds can wrap on top of *any* machine learning model to provide provably valid confidence intervals in randomized experiments.
 
 ```
 	import dualbounds as db
