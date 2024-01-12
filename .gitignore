@@ -3,6 +3,7 @@ TODO.md
 quicktest.ipynb
 data/*
 docs/build/
+docs/dir/
 # Don't save test profiling
 prof/*
 proftest/*
