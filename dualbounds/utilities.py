@@ -291,5 +291,11 @@ def parse_dist(
 	if dist == 'gamma':
 		a = kwargs.pop("a", 5)
 		return stats.gamma(loc=loc-a*scale, scale=scale, a=a)
+	if dist == 'skewnorm':
+		a = kwargs.pop("a", 5)
+		return stats.skewnorm(loc=loc, scale=scale, a=a)
+	if dist == 'powerlaw':
+		a = kwargs.pop("a", 5)
+		return stats.powerlaw(loc=loc, scale=scale, a=a)
 	else:
 		raise ValueError(f"Dist {dist} is unrecognized.")

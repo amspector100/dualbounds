@@ -482,11 +482,12 @@ class LeeDualBounds(generic.DualBounds):
 				Y_model=self.S_model, support=set([0,1]), 
 				discrete=True, monotonicity=True, 
 			)
-			self.s0_probs, self.s1_probs, self.S_model_fits = dist_reg.cross_fit_predictions(
+			sout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.S, 
 				nfolds=nfolds, model=self.S_model,
 				probs_only=True,
 			)
+			self.s0_probs, self.s1_probs, self.S_model_fits, self.S_oos_preds = sout
 		elif not suppress_warning:
 			warnings.warn(
 				generic.CROSSFIT_WARNING.replace("y0_", "s0_").replace("y1_", "s1_")
@@ -497,10 +498,11 @@ class LeeDualBounds(generic.DualBounds):
 			self.Y_model = generic.get_default_model(
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits = dist_reg.cross_fit_predictions(
+			yout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, S=self.S, y=self.y, 
 				nfolds=nfolds, model=self.Y_model,
 			)
+			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = yout
 		elif not suppress_warning:
 			warnings.warn(generic.CROSSFIT_WARNING)
 

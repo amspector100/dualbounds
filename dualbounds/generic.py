@@ -713,15 +713,27 @@ class DualBounds:
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 				**self.model_kwargs
 			)
-			self.y0_dists, self.y1_dists, self.model_fits = dist_reg.cross_fit_predictions(
+			yout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.y, 
 				nfolds=nfolds, model=self.Y_model,
 			)
+			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = yout
 		elif not suppress_warning:
 			warnings.warn(CROSSFIT_WARNING)
 
 		return self.y0_dists, self.y1_dists
 
+	def compute_oos_r2(self):
+		if not isinstance(self.oos_preds, list):
+			raise NotImplementedError("Only implemented for settings where self.oos_preds is a list of dists")
+		starts, ends = dist_reg.create_folds(
+			n=self.n,
+			nfolds=len(self.oos_preds)
+		)
+		self.oos_resids = np.zeros(self.n)
+		for start, end, oos_preds in zip(starts, ends, self.oos_preds):
+			self.oos_resids[start:end] = self.y[start:end] - oos_preds.mean()
+		return 1 - np.mean(self.oos_resids**2) / np.std(self.y)**2
 
 
 	def compute_dual_bounds(

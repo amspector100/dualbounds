@@ -39,7 +39,7 @@ class TestCrossFit(unittest.TestCase):
 		rdr = dist_reg.CtsDistReg(
 			model_type='ridge', cv=cv, how_transform='identity'
 		)
-		preds0, preds1, _ = dist_reg.cross_fit_predictions(
+		preds0, preds1, _, _ = dist_reg.cross_fit_predictions(
 			W=W, y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
 		mu0s, sigma0s = convert_norm_dists_to_array(preds0)
