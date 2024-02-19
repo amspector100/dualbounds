@@ -195,38 +195,59 @@ class DualBounds:
 				yprobs.append(ydist.probs)
 			return np.concatenate(yvals, axis=0), np.concatenate(yprobs, axis=0)
 
-		### Continuous case ###
-		if nvals <= MIN_NVALS:
-			raise ValueError(f"nvals must be larger than {nvals}.")
-		
-		# make sure we get small enough quantiles
-		if alpha is None:
-			alpha = 1 / (2*nvals)
-		alpha = min(1/(2*nvals), max(alpha, 1e-8))
 
-		# num of interp. pts between min/max quantiles
-		# and ymin/ymax, added to ensure feasbility
+		### Continuous case ###
 		if ninterp is None:
 			ninterp = min(max(int(0.1 * (nvals-2)), 1), 5)
-		nvals_adj = nvals - 2 * ninterp - 3
+		# Case 2(a): we already have a discrete distribution
+		if isinstance(ydists[0], utilities.BatchedCategorical):
+			for ii, ydist in enumerate(ydists):
+				if not isinstance(ydist, utilities.BatchedCategorical):
+					raise ValueError(
+						f"ydists[0] is a BatchedCategorical, ydists[{ii}] is not---mixing cts/discrete dists is unsupported."
+					)
+			# Extract and adjust everything to ensure the same support size
+			nvals_adj = nvals - 2 * ninterp
+			dists_adj = [
+				utilities.adjust_support_size(
+					vals=ydist.vals, probs=ydist.probs, new_nvals=nvals_adj, ymin=ymin, ymax=ymax
+				)
+				for ydist in ydists
+			]
+			yvals = np.concatenate([x[0] for x in dists_adj], axis=0)
+			yprobs = np.concatenate([x[1] for x in dists_adj], axis=0)
 
-		### Main discretization based on evenly spaced quantiles
-		# choose endpoints of bins for disc. approx
-		endpoints = np.sort(np.concatenate(
-			[[0, alpha],
-			np.linspace(1/nvals_adj, (nvals_adj-1)/nvals_adj, nvals_adj),
-			[1-alpha, 1]],
-		))
-		qs = (endpoints[1:] + endpoints[0:-1])/2
-		# loop through batches and concatenate
-		yvals = []
-		for dists in ydists:
-			yvals.append(dists.ppf(qs.reshape(-1, 1)).T)
-		yvals = np.concatenate(yvals, axis=0)
-		n = len(yvals)
-		# concatenate y probs
-		yprobs = endpoints[1:] - endpoints[0:-1]
-		yprobs = np.stack([yprobs for _ in range(n)], axis=0)
+		# Case 2(b): we have a continuous distribution
+		else:
+			if nvals <= MIN_NVALS:
+				raise ValueError(f"nvals must be larger than {nvals}.")
+			
+			# make sure we get small enough quantiles
+			if alpha is None:
+				alpha = 1 / (2*nvals)
+			alpha = min(1/(2*nvals), max(alpha, 1e-8))
+
+			# num of interp. pts between min/max quantiles
+			# and ymin/ymax, added to ensure feasbility
+			nvals_adj = nvals - 2 * ninterp - 3
+
+			### Main discretization based on evenly spaced quantiles
+			# choose endpoints of bins for disc. approx
+			endpoints = np.sort(np.concatenate(
+				[[0, alpha],
+				np.linspace(1/nvals_adj, (nvals_adj-1)/nvals_adj, nvals_adj),
+				[1-alpha, 1]],
+			))
+			qs = (endpoints[1:] + endpoints[0:-1])/2
+			# loop through batches and concatenate
+			yvals = []
+			for dists in ydists:
+				yvals.append(dists.ppf(qs.reshape(-1, 1)).T)
+			yvals = np.concatenate(yvals, axis=0)
+			n = len(yvals)
+			# concatenate y probs
+			yprobs = endpoints[1:] - endpoints[0:-1]
+			yprobs = np.stack([yprobs for _ in range(n)], axis=0)
 
 		### Insert additional support points with zero prob
 		if ninterp > 0:
@@ -518,6 +539,8 @@ class DualBounds:
 		self.objvals = np.zeros((2, self.n))
 		self.dxs = np.zeros((2, self.n))
 		# loop through
+		if verbose:
+			print("Estimating optimal dual variables.")
 		for i in utilities.vrange(self.n, verbose=verbose):
 			# set parameter values
 			fx = lambda y0, y1: self.f(y0=y0, y1=y1, x=self.X[i])
@@ -686,6 +709,7 @@ class DualBounds:
 		self,
 		nfolds=5,
 		suppress_warning=False,
+		verbose=True,
 	):
 		"""
 		Performs cross-fitting to fit the outcome model.
@@ -713,11 +737,15 @@ class DualBounds:
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 				**self.model_kwargs
 			)
-			yout = dist_reg.cross_fit_predictions(
+			if verbose:
+				print("Cross-fitting the outcome model.")
+			y_out = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.y, 
-				nfolds=nfolds, model=self.Y_model,
+				nfolds=nfolds, 
+				model=self.Y_model,
+				verbose=verbose,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = yout
+			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = y_out
 		elif not suppress_warning:
 			warnings.warn(CROSSFIT_WARNING)
 
@@ -791,7 +819,7 @@ class DualBounds:
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
 		self.cross_fit(
-			nfolds=nfolds, suppress_warning=suppress_warning
+			nfolds=nfolds, suppress_warning=suppress_warning, verbose=verbose,
 		)
 
 		# compute dual variables

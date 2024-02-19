@@ -4,9 +4,10 @@ import cvxpy as cp
 from scipy import stats
 import sklearn.linear_model as lm
 from . import utilities
-from .utilities import parse_dist, BatchedCategorical
+from .utilities import parse_dist, BatchedCategorical, vrange
 
 TOL = 1e-6
+DEFAULT_ALPHAS = np.log(np.logspace(0.0001, 100, base=np.e, num=10))
 
 def parse_model_type(model_type, discrete):
 	# return non-strings
@@ -49,6 +50,33 @@ def create_folds(n, nfolds):
 	ends = splits[1:]
 	return starts, ends
 
+def ridge_loo_resids(
+	features, y, ridge_cv_model
+):
+	# Ensure we add an intercept which is unregularized
+	n, p = features.shape
+	if ridge_cv_model.fit_intercept:
+		# This is not *exact* if we fit an intercept
+		# because it assumes the intercept doesn't change
+		# but it's realistically pretty close
+		X_offset = features.mean(axis=0)
+		y_offset = y.mean(axis=0)
+		y = y - y_offset; features = features - X_offset
+	# Regularization strength
+	try:
+		alpha = ridge_cv_model.alpha_
+	except:
+		alpha = ridge_cv_model.alpha
+	# Predictions
+	Q = features.T @ features + alpha * np.eye(p)
+	Qinv = np.linalg.inv(Q)
+	hatbeta = Qinv @ features.T @ y
+	preds = features @ hatbeta
+	# Leave one out residuals
+	scales = np.sum((features @ Qinv) * features, axis=1)
+	loo_resids = (y - preds) / (1 - scales)
+	return loo_resids
+
 def cross_fit_predictions(
 	W,
 	X,
@@ -59,6 +87,7 @@ def cross_fit_predictions(
 	model=None,
 	model_cls=None, 
 	probs_only=False,
+	verbose=False,
 	**model_kwargs
 ):
 	"""
@@ -107,7 +136,8 @@ def cross_fit_predictions(
 	pred0s = []; pred1s = [] # results for W = 0, W = 1
 	oos_preds = [] # results for true W
 	fit_models = []
-	for start, end in zip(starts, ends):
+	for ii in vrange(len(starts), verbose=verbose):
+		start = starts[ii]; end = ends[ii]
 		# Pick out data from the other folds
 		not_in_fold = [i for i in np.arange(n) if i < start or i >= end]
 		if train_on_selections:
@@ -244,8 +274,8 @@ class CtsDistReg(DistReg):
 		the base sklearn model.
 	eps_dist : str
 		Str specifying the (parametric) distribution of the residuals.
-		One of ['gaussian', 'laplace', 'expon', 'tdist']. Defaults 
-		to ``gaussian``.
+		One of ['gaussian', 'laplace', 'expon', 'tdist', 'skewnorm'']. 
+		Defaults to ``gaussian``.
 	heterosked : bool
 		If True, estimates Var(Y | X) as a function of X by using
 		the specified model to predict both E[Y^2 | X] and E[Y | X].
@@ -271,9 +301,12 @@ class CtsDistReg(DistReg):
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
 		self.heterosked = heterosked
+		# Default kwargs
+		if isinstance(self.model_type, lm.RidgeCV):
+			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 
 	def fit(self, W, X, y):
-		# fit ridge
+		# fit model
 		features = self.feature_transform(W=W, X=X)
 		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
@@ -283,10 +316,26 @@ class CtsDistReg(DistReg):
 			self.m2_model = self.model_type(**self.model_kwargs)
 			self.m2_model.fit(features, y**2)
 
-		# estimate of E[Var(Y | X)] 
-		self.hatsigma = np.sqrt(
-			np.power(self.model.predict(features) - y, 2).mean()
-		)
+		## estimate E[Var(Y | X)] using residuals
+		# Use cheap out-of-sample estimates for ridge 
+		if isinstance(self.model, lm.RidgeCV):
+			self.resids = ridge_loo_resids(features, y=y, ridge_cv_model=self.model)
+			if self.heterosked:
+				m2_loo_resids = ridge_loo_resids(features, y=y**2, ridge_cv_model=self.m2_model)
+				m2_preds = y**2 - m2_loo_resids
+		# Otherwise use in-sample estimates
+		else:
+			self.resids = y - self.model.predict(features)
+			if self.heterosked:
+				m2_preds = self.m2_model.predict(features)
+
+		self.hatsigma = np.sqrt(np.power(self.resids, 2).mean())
+		if self.heterosked:
+			self.hatsigma_preds = np.maximum(
+				np.sqrt(np.maximum(m2_preds - (y - self.resids)**2, 0)), 0.1 * self.hatsigma
+			)
+		else:
+			self.hatsigma_preds = self.hatsigma
 	
 	def predict(self, X, W=None):
 		if W is not None:
@@ -299,9 +348,112 @@ class CtsDistReg(DistReg):
 				scale = np.maximum(scale, 0.1 * self.hatsigma)
 			else:
 				scale = self.hatsigma
-			# return scipy dists
-			return parse_dist(
-				self.eps_dist, mu=mu, sd=scale, **self.eps_kwargs,
+			# Option 1: nonparametric law of eps
+			if self.eps_dist == 'empirical':
+				# law of normalized residuals
+				vals = self.resids / self.hatsigma_preds
+				vals = vals.reshape(1, -1) * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
+				probs = np.ones((len(mu), len(vals))) / len(vals)
+				return utilities.BatchedCategorical(
+					vals=vals, probs=probs
+				)
+			# Option 2: parametric law of eps, return scipy dists
+			else:
+				return parse_dist(
+					self.eps_dist, mu=mu, sd=scale, **self.eps_kwargs,
+				)
+		else:
+			n = len(X)
+			W0 = np.zeros(n); W1 = np.ones(n)
+			return self.predict(X, W=W0), self.predict(X, W=W1)
+
+class QuantileDistReg(DistReg):
+	"""
+	A continuous distributional regression based on quantile regression.
+	"""
+	def __init__(self, how_transform='interactions', nquantiles=50, alphas=[0, 0.01, 0.05, 0.1, 1000]):
+		self.nq = nquantiles
+		self.how_transform = how_transform
+		self.quantiles = np.around(np.linspace(0, 1, self.nq), 8)
+		self.probs = self.quantiles[1:] - self.quantiles[0:-1]
+		self.alphas = alphas
+
+	def fit(self, W, X, y):
+		# Pick regularization by using CV lasso reg. strength
+		features = self.feature_transform(W=W, X=X)
+		if len(self.alphas) > 0:
+			from sklearn.metrics import d2_pinball_score, make_scorer
+			from sklearn.model_selection import cross_validate
+		# Fit many quantiles
+		self.model = {}
+		self.scores = {}
+		self.ymin = y.min()
+		self.ymax = y.max()
+		for quantile in self.quantiles:
+			if quantile not in [0,1]:
+				if len(self.alphas) == 1:
+					qr = lm.QuantileRegressor(
+						alpha=self.alphas[0], quantile=quantile
+					)
+					qr.fit(features, y)
+					self.model[quantile] = qr
+				# Cross-validate the quantile regression
+				else:
+					scores = []
+					for alpha in self.alphas:
+						qrcand = lm.QuantileRegressor(
+							alpha=alpha, quantile=quantile
+						)
+						score = cross_validate(
+							qrcand, X, y, cv=3,
+							scoring=make_scorer(d2_pinball_score, alpha=quantile),
+						)
+						scores.append(score['test_score'].mean())
+					qr = lm.QuantileRegressor(
+						alpha=self.alphas[np.argmax(scores)], quantile=quantile
+					)
+					qr.fit(features, y)
+					self.model[quantile] = qr
+			else:
+				self.model[quantile] = None
+				self.scores[quantile] = None
+			
+	def predict(self, X, W=None):
+		"""
+		"""
+		if W is not None:
+			features = self.feature_transform(W, X=X)
+			all_preds = [] 
+			for quantile in self.quantiles:
+				if quantile == 0:
+					preds = np.zeros(len(features)) + self.ymin
+				elif quantile == 1:
+					preds = np.zeros(len(features)) + self.ymax
+				else:
+					preds = self.model[quantile].predict(features)
+				all_preds.append(preds)
+
+			all_preds = np.stack(all_preds, axis=1) # n x self.nq
+			# sort to ensure coherence
+			all_preds = np.sort(all_preds, axis=1)
+			# take centers and return
+			yvals = (all_preds[:, 1:] + all_preds[:, 0:-1]) / 2
+			probs = np.stack([self.probs for _ in range(len(X))], axis=0)
+			# # Concatenate ymin/ymax onto the edge
+			# yvals = np.concatenate(
+			# 	[
+			# 		self.ymin * np.ones((len(features), 1)), 
+			# 		yvals, 
+			# 		self.ymax * np.ones((len(features), 1))
+			# 	], axis=1
+			# )
+			# probs = np.concatenate(
+			# 	[TOL * np.ones((len(features), 1)), probs, TOL * np.ones((len(features), 1))],
+			# 	axis=1,
+			# )
+			# probs = probs / probs.sum(axis=1).reshape(-1, 1)
+			return utilities.BatchedCategorical(
+				vals=yvals, probs=probs
 			)
 		else:
 			n = len(X)
@@ -310,7 +462,7 @@ class CtsDistReg(DistReg):
 
 class BinaryDistReg(DistReg):
 	"""
-	A wrapper of sklearn.LogisticRegression which inherits from ``DistReg``
+	Binary regression which inherits from ``DistReg``
 
 	Parameters
 	----------

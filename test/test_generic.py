@@ -131,7 +131,8 @@ class TestGenericDualBounds(unittest.TestCase):
 		model_types = ['ridge', 'lasso', 'elasticnet', 'rf', 'knn']
 		eps_dists = ['gaussian', 'laplace', 'tdist', 'expon', 'gaussian']
 		model_types.append(db.dist_reg.CtsDistReg(model_type='ridge'))
-		eps_dists.append("this_should_be_ignored_and_not_raise_error") 
+		model_types.append(db.dist_reg.QuantileDistReg(nquantiles=10, alphas=[0, 0.1]))
+		eps_dists.extend(['these_args', 'should_be_ignored_and_not_raise_error'])
 		for model_type, eps_dist in zip(model_types, eps_dists):
 			gdb = db.generic.DualBounds(
 				f=f, 
