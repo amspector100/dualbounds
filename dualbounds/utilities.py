@@ -246,87 +246,89 @@ def _convert_to_cat(bern_dist, n):
 	)
 
 def _adjust_support_size_unbatched(
-    vals, probs, new_nvals, ymin, ymax
+	vals, probs, new_nvals, ymin, ymax
 ):
-    """
-    Adjust categorical distribution to have a support of size new_nvals.
-    
-    Parameters
-    ----------
-    vals : np.array
-        nvals-length array of support. must be sorted.
-    probs : np.array
-        nvals-length array of probabilities
-    new_nvals : int
-        Desired size of support.
-    ymin : float
-        Minimum value for support
-    ymax : float
-        Maximum value for support
-    """
-    nvals = len(vals)
-    if np.any(vals != np.sort(vals)):
-        raise ValueError("vals must be sorted")
-    # Case 0: no changes
-    if nvals == new_nvals:
-        return vals, probs
-    # Case 1: just add padding
-    elif nvals < new_nvals:
-        pad = np.random.uniform(
-            ymin, ymax, size=new_nvals - nvals
-        )
-        vals = np.concatenate([vals, pad], axis=0)
-        probs = np.concatenate([probs, np.zeros(new_nvals - nvals)], axis=0)
-        return vals, probs
-    # Case 2: greedily merge support points
-    else:
-        while len(vals) > new_nvals:
-            # Probability of equaling the left merge
-            mixtures = probs[:-1] / (probs[:-1] + probs[1:])
-            # candidate values for the post-merge support point
-            candvals = vals[1:] * (1 - mixtures) + vals[:-1] * mixtures
-            # E[|X - Y|] under best coupling
-            costs = np.abs(candvals - vals[1:]) * (1 - mixtures) 
-            costs += np.abs(candvals - vals[:-1]) * mixtures
-            # pick the best variant
-            istar = np.argmin(costs)
-            vals[istar] = np.nan
-            vals[istar + 1] = candvals[istar]
-            probs[istar + 1] += probs[istar]
-            probs[istar] = np.nan
-            # drop na vals
-            vals = vals[~np.isnan(vals)]
-            probs = probs[~np.isnan(probs)]
-        return vals, probs
-    
+	"""
+	Adjust categorical distribution to have a support of size new_nvals.
+	
+	Parameters
+	----------
+	vals : np.array
+		nvals-length array of support. must be sorted.
+	probs : np.array
+		nvals-length array of probabilities
+	new_nvals : int
+		Desired size of support.
+	ymin : float
+		Minimum value for support
+	ymax : float
+		Maximum value for support
+	"""
+	nvals = len(vals)
+	vals = vals.copy(); probs = probs.copy()
+	if np.any(vals != np.sort(vals)):
+		raise ValueError("vals must be sorted")
+	# Case 0: no changes
+	if nvals == new_nvals:
+		return vals, probs
+	# Case 1: just add padding
+	elif nvals < new_nvals:
+		pad = np.random.uniform(
+			ymin, ymax, size=new_nvals - nvals
+		)
+		vals = np.concatenate([vals, pad], axis=0)
+		probs = np.concatenate([probs, np.zeros(new_nvals - nvals)], axis=0)
+		return vals, probs
+	# Case 2: greedily merge support points
+	else:
+		probs = np.maximum(probs, 1e-8)
+		probs /= probs.sum()
+		while len(vals) > new_nvals:
+			# Probability of equaling the left merge
+			mixtures = probs[:-1] / (probs[:-1] + probs[1:])
+			# candidate values for the post-merge support point
+			candvals = vals[1:] * (1 - mixtures) + vals[:-1] * mixtures
+			# E[|X - Y|] under best coupling
+			costs = np.abs(candvals - vals[1:]) * (1 - mixtures) 
+			costs += np.abs(candvals - vals[:-1]) * mixtures
+			# pick the best variant
+			istar = np.argmin(costs)
+			vals[istar] = np.nan
+			vals[istar + 1] = candvals[istar]
+			probs[istar + 1] += probs[istar]
+			probs[istar] = np.nan
+			# drop na vals
+			vals = vals[~np.isnan(vals)]
+			probs = probs[~np.isnan(probs)]
+		return vals, probs
+	
 def adjust_support_size(
-    vals, probs, new_nvals, ymin, ymax
+	vals, probs, new_nvals, ymin, ymax
 ):
-    """
-    Adjust categorical distribution to have a support of size new_nvals.
-    
-    Parameters
-    ----------
-    vals : np.array
-        (n, nvals)-length array of support. vals[i] must be sorted for each i.
-    probs : np.array
-        (n, nvals)-length array of probabilities
-    new_nvals : int
-        Desired size of support.
-    ymin : float
-        Minimum value for support
-    ymax : float
-        Maximum value for support
-    """
-    n, nvals = vals.shape
-    new_vals = np.zeros((n, new_nvals))
-    new_probs = np.zeros((n, new_nvals))
-    vals = vals.copy(); probs = probs.copy()
-    for i in range(n):
-        new_vals[i], new_probs[i] = _adjust_support_size_unbatched(
-            vals[i], probs[i], new_nvals, ymin=ymin, ymax=ymax,
-        )
-    return new_vals, new_probs
+	"""
+	Adjust categorical distribution to have a support of size new_nvals.
+	
+	Parameters
+	----------
+	vals : np.array
+		(n, nvals)-length array of support. vals[i] must be sorted for each i.
+	probs : np.array
+		(n, nvals)-length array of probabilities
+	new_nvals : int
+		Desired size of support.
+	ymin : float
+		Minimum value for support
+	ymax : float
+		Maximum value for support
+	"""
+	n, nvals = vals.shape
+	new_vals = np.zeros((n, new_nvals))
+	new_probs = np.zeros((n, new_nvals))
+	for i in range(n):
+		new_vals[i], new_probs[i] = _adjust_support_size_unbatched(
+			vals[i], probs[i], new_nvals, ymin=ymin, ymax=ymax,
+		)
+	return new_vals, new_probs
 
 def parse_dist(
 	dist, loc=0, scale=1, mu=None, sd=None, **kwargs

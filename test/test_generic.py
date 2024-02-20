@@ -129,7 +129,7 @@ class TestGenericDualBounds(unittest.TestCase):
 		f = lambda y0, y1, x: y0 <= y1
 		# Model types to test
 		model_types = ['ridge', 'lasso', 'elasticnet', 'rf', 'knn']
-		eps_dists = ['gaussian', 'laplace', 'tdist', 'expon', 'gaussian']
+		eps_dists = ['empirical', 'laplace', 'empirical', 'expon', 'tdist']
 		model_types.append(db.dist_reg.CtsDistReg(model_type='ridge'))
 		model_types.append(db.dist_reg.QuantileDistReg(nquantiles=10, alphas=[0, 0.1]))
 		eps_dists.extend(['these_args', 'should_be_ignored_and_not_raise_error'])

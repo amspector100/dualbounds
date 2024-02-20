@@ -55,6 +55,7 @@ def infer_discrete(discrete, support, y):
 		support = None
 	return discrete, support
 
+
 class DualBounds:
 	"""
 	Computes dual bounds on E[f(Y(0),Y(1), X)].
@@ -835,3 +836,64 @@ class DualBounds:
 		)
 		# compute dual bounds
 		return self.compute_final_bounds(aipw=aipw, alpha=alpha)
+
+def plug_in_no_covariates(y, W, f, B=0, verbose=True, alpha=0.1):
+	"""
+	Parameters
+	----------
+	y : np.array
+		n-length array of outcomes
+	W : np.array
+		n-length array of treatments. Assumed
+		to be i.i.d. Bernoulli(0.5) r.v.s.
+	f : function
+		f(y0, y1, x) defines the objective.
+	B : int
+		Number of bootstrap replications
+	verbose : bool
+		Show progress bar while bootstrapping if verbose=True.
+	alpha : float
+		nominal Type I error level.
+	"""
+	n = len(y)
+	if B == 0:
+		# Dists
+		y1_vals = np.sort(y[W == 1])
+		y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+		y0_vals = np.sort(y[W == 0])
+		y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
+		# Fvals
+		fvals = f(y0_vals.reshape(-1, 1), y1_vals.reshape(1, -1), x=0)
+		# lower and upper
+		lower = ot.lp.emd2(
+			a=y0_probs,
+			b=y1_probs,
+			M=fvals,
+		)
+		upper = -ot.lp.emd2(
+			a=y0_probs,
+			b=y1_probs,
+			M=-fvals,
+		)
+		return np.array([lower, upper])
+	else:
+		# Estimates
+		ests = plug_in_no_covariates(y=y, W=W, f=f, B=0)
+		# Bootstrap
+		bs_ests = np.zeros((B, 2))
+		for b in utilities.vrange(B, verbose=verbose):
+			inds = np.random.choice(np.arange(n), size=n, replace=True)
+			bs_ests[b] = plug_in_no_covariates(
+				y=y[inds], W=W[inds], f=f, B=0
+			)
+		# Bias
+		bias = bs_ests.mean(axis=0) - ests
+		ses = bs_ests.std(axis=0)
+		cis = ests - bias
+		cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
+		cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
+		return dict(
+			estimates=ests,
+			ses=ses,
+			cis=cis,
+		)

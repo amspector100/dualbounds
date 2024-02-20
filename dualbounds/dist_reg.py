@@ -306,6 +306,7 @@ class CtsDistReg(DistReg):
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 
 	def fit(self, W, X, y):
+		self.Wtrain = W
 		# fit model
 		features = self.feature_transform(W=W, X=X)
 		self.model = self.model_type(**self.model_kwargs)
@@ -336,7 +337,25 @@ class CtsDistReg(DistReg):
 			)
 		else:
 			self.hatsigma_preds = self.hatsigma
-	
+
+		# If eps_dist == empirical, fit empirical law
+		if self.eps_dist == 'empirical':
+			norm_resids = self.resids / self.hatsigma_preds
+			self.rvals0 = np.sort(norm_resids[W == 0])
+			self.rprobs0 = np.ones(len(self.rvals0)) / len(self.rvals0)
+			self.rvals1 = np.sort(norm_resids[W == 1])
+			self.rprobs1 = np.ones(len(self.rvals1)) / len(self.rvals1)
+			# adjust support size for computational reasons
+			adj_kwargs = dict(
+				new_nvals=self.eps_kwargs.get("nvals", 90), ymin=y.min(), ymax=y.max()
+			)
+			self.rvals0, self.rprobs0 = utilities._adjust_support_size_unbatched(
+				self.rvals0, self.rprobs0, **adj_kwargs
+			)
+			self.rvals1, self.rprobs1 = utilities._adjust_support_size_unbatched(
+				self.rvals1, self.rprobs1, **adj_kwargs
+			)
+
 	def predict(self, X, W=None):
 		if W is not None:
 			features = self.feature_transform(W, X=X)
@@ -351,9 +370,16 @@ class CtsDistReg(DistReg):
 			# Option 1: nonparametric law of eps
 			if self.eps_dist == 'empirical':
 				# law of normalized residuals
-				vals = self.resids / self.hatsigma_preds
-				vals = vals.reshape(1, -1) * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
-				probs = np.ones((len(mu), len(vals))) / len(vals)
+				# only use empirical residuals from the same treatment/control group
+				vals = np.stack(
+					[self.rvals0 if Wi == 0 else self.rvals1 for Wi in W],
+					axis=0
+				)
+				vals = vals * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
+				probs = np.stack(
+					[self.rprobs0 if Wi == 0 else self.rprobs1 for Wi in W], 
+					axis=0
+				)
 				return utilities.BatchedCategorical(
 					vals=vals, probs=probs
 				)
