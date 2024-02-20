@@ -38,20 +38,22 @@ class TestUtils(unittest.TestCase):
 			)
 
 		# Test results where we don't know the answer
+		n = 10
 		new_nvals = 5
-		for nvals in [new_nvals - 1, new_nvals, 100]:
-			vals = np.sort(np.random.randn(nvals))
-			probs = np.ones(len(vals)) / len(vals)
-			newvals, newprobs = utilities._adjust_support_size_unbatched(
+		for nvals in [new_nvals - 1, new_nvals, new_nvals + 20]:
+			vals = np.sort(np.random.randn(n, nvals), axis=1)
+			probs = np.random.uniform(size=(n, nvals))
+			probs /= probs.sum(axis=1).reshape(-1, 1)
+			newvals, newprobs = utilities.adjust_support_size(
 				vals, probs, new_nvals=new_nvals, ymin=-1, ymax=1
 			)
 			self.assertTrue(
-				len(newvals) == 5,
-				"Adjusted distribution has wrong support size"
+				newvals.shape == (n, new_nvals),
+				f"Adjusted dist has wrong shape: expected n={n}, nvals={new_nvals}"
 			)
 			np.testing.assert_array_almost_equal(
-				vals @ probs,
-				newvals @ newprobs,
+				np.sum(vals * probs, axis=1),
+				np.sum(newvals * newprobs, axis=1),
 				decimal=6,
 				err_msg="Mean of original/adjusted distributions are different"
 			)
