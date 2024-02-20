@@ -476,13 +476,17 @@ class DualBounds:
 			signature as ``interpolation.linear_interpolate``,
 			which is the default. Ignored for discrete Y.
 		y0_min : float
-			Minimum support for Y(0). Defaults to self.y.min()
+			Minimum support for Y(0).
+			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())
 		y1_min : float
-			Minimum support for Y(1). Defaults to self.y.min()
+			Minimum support for Y(1). 
+			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())
 		y0_max : float
-			Maximum support for Y(0). Defaults to self.y.max()
+			Maximum support for Y(0). 
+			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())
 		y1_max : float
-			Maximum support for Y(1). Defaults to self.y.max()
+			Maximum support for Y(1). 
+			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())
 		kwargs : dict
 			kwargs for ``_ensure_feasibility`` method, e.g., ``grid_size``.
 		"""
@@ -500,13 +504,13 @@ class DualBounds:
 
 		## Parse defaults
 		if y0_min is None:
-			y0_min = self.y.min()
+			y0_min = 1.5 * self.y.min() - self.y.max() / 2
 		if y1_min is None:
-			y1_min = self.y.min()
+			y1_min = 1.5 * self.y.min() - self.y.max() / 2
 		if y0_max is None:
-			y0_max = self.y.max()
+			y0_max = 1.5 * self.y.max() - self.y.min() / 2
 		if y1_max is None:
-			y1_max = self.y.max()
+			y1_max = 1.5 * self.y.max() - self.y.min() / 2
 
 		# this discretizes if Y is continuous
 		if y0_vals is None or y0_probs is None:
@@ -827,10 +831,6 @@ class DualBounds:
 		self.compute_dual_variables(
 			y0_dists=self.y0_dists,
 			y1_dists=self.y1_dists,
-			y0_min=self.y.min(),
-			y0_max=self.y.max(),
-			y1_min=self.y.min(),
-			y1_max=self.y.max(),
 			verbose=verbose,
 			**solve_kwargs,
 		)

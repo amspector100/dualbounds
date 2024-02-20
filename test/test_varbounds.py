@@ -117,6 +117,7 @@ class TestVarCATE(unittest.TestCase):
 			## Actual
 			vdb = db.varcate.VarCATEDualBounds(
 				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
+				Y_model=db.dist_reg.CtsDistReg(eps_dist='gaussian')
 			)
 			est_actual = vdb.compute_dual_bounds(nfolds=3)['estimate']
 			for est, name in zip([est_oracle, est_actual], ['oracle', 'est']):

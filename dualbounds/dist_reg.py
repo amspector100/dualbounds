@@ -127,8 +127,11 @@ def cross_fit_predictions(
 	# concatenate S to features
 	n = len(X)
 	if S is None:
+		S_flag = False
 		S = np.ones(n)
-	X = np.concatenate([S.reshape(n, 1), X], axis=1)
+	else:
+		S_flag = True
+		X = np.concatenate([S.reshape(n, 1), X], axis=1)
 
 	# create folds
 	starts, ends = create_folds(n=n, nfolds=nfolds)
@@ -158,7 +161,9 @@ def cross_fit_predictions(
 		)
 
 		# predict and append on this fold
-		subX = X[start:end].copy(); subX[:, 0] = 1 # set selection = 1 for predictions
+		subX = X[start:end].copy(); 
+		if S_flag:
+			subX[:, 0] = 1 # set selection = 1 for predictions
 		if not probs_only:
 			pred0, pred1 = reg_model.predict(subX)
 			oos_pred = reg_model.predict(subX, W[start:end])
@@ -273,13 +278,18 @@ class CtsDistReg(DistReg):
 		Str specifying how to transform the features before fitting
 		the base sklearn model.
 	eps_dist : str
-		Str specifying the (parametric) distribution of the residuals.
-		One of ['gaussian', 'laplace', 'expon', 'tdist', 'skewnorm'']. 
-		Defaults to ``gaussian``.
+		Str specifying the distribution of the residuals. One of
+		One of 
+		['empirical', gaussian', 'laplace', 'expon', 'tdist', 'skewnorm]. 
+		Defaults to ``empirical``, which uses the empirical law of the
+		residuals of the training data.
 	heterosked : bool
 		If True, estimates Var(Y | X) as a function of X by using
 		the specified model to predict both E[Y^2 | X] and E[Y | X].
 		If False, assumes Var(Y | X) is constant. Defaults to False.
+	use_ridge_loo_resids : bool
+		If True and Y_model='ridge', uses cheap LOO residuals instead
+		of the fit residuals to estimate the residual variance.
 	eps_kwargs : dict
 		kwargs for ``utilities.parse_dist`` for the residual dist.
 	model_kwargs : dict
@@ -289,10 +299,11 @@ class CtsDistReg(DistReg):
 	def __init__(
 		self,
 		model_type='ridge',
-		eps_dist='gaussian',
+		eps_dist='empirical',
 		eps_kwargs=None,
 		how_transform='interactions',
 		heterosked=False,
+		use_ridge_loo_resids=True,
 		**model_kwargs,
 	):
 		self.eps_dist = eps_dist
@@ -301,6 +312,7 @@ class CtsDistReg(DistReg):
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
 		self.heterosked = heterosked
+		self.use_loo = use_ridge_loo_resids
 		# Default kwargs
 		if isinstance(self.model_type, lm.RidgeCV):
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
@@ -319,7 +331,7 @@ class CtsDistReg(DistReg):
 
 		## estimate E[Var(Y | X)] using residuals
 		# Use cheap out-of-sample estimates for ridge 
-		if isinstance(self.model, lm.RidgeCV):
+		if isinstance(self.model, lm.RidgeCV) and self.use_loo:
 			self.resids = ridge_loo_resids(features, y=y, ridge_cv_model=self.model)
 			if self.heterosked:
 				m2_loo_resids = ridge_loo_resids(features, y=y**2, ridge_cv_model=self.m2_model)
@@ -342,8 +354,13 @@ class CtsDistReg(DistReg):
 		if self.eps_dist == 'empirical':
 			norm_resids = self.resids / self.hatsigma_preds
 			self.rvals0 = np.sort(norm_resids[W == 0])
+			# Center to ensure we don't scale a small mean by a large amount
+			# when heterosked=True.
+			self.rvals0 -= self.rvals0.mean()
 			self.rprobs0 = np.ones(len(self.rvals0)) / len(self.rvals0)
+			# Repeat for treatment
 			self.rvals1 = np.sort(norm_resids[W == 1])
+			self.rvals1 -= self.rvals1.mean()
 			self.rprobs1 = np.ones(len(self.rvals1)) / len(self.rvals1)
 			# adjust support size for computational reasons
 			adj_kwargs = dict(
@@ -376,6 +393,7 @@ class CtsDistReg(DistReg):
 					axis=0
 				)
 				vals = vals * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
+				# Create probs and return
 				probs = np.stack(
 					[self.rprobs0 if Wi == 0 else self.rprobs1 for Wi in W], 
 					axis=0
@@ -419,7 +437,7 @@ class QuantileDistReg(DistReg):
 			if quantile not in [0,1]:
 				if len(self.alphas) == 1:
 					qr = lm.QuantileRegressor(
-						alpha=self.alphas[0], quantile=quantile
+						alpha=self.alphas[0], quantile=quantile, 
 					)
 					qr.fit(features, y)
 					self.model[quantile] = qr
@@ -428,7 +446,7 @@ class QuantileDistReg(DistReg):
 					scores = []
 					for alpha in self.alphas:
 						qrcand = lm.QuantileRegressor(
-							alpha=alpha, quantile=quantile
+							alpha=alpha, quantile=quantile,
 						)
 						score = cross_validate(
 							qrcand, X, y, cv=3,
@@ -436,7 +454,7 @@ class QuantileDistReg(DistReg):
 						)
 						scores.append(score['test_score'].mean())
 					qr = lm.QuantileRegressor(
-						alpha=self.alphas[np.argmax(scores)], quantile=quantile
+						alpha=self.alphas[np.argmax(scores)], quantile=quantile, 
 					)
 					qr.fit(features, y)
 					self.model[quantile] = qr
@@ -509,10 +527,24 @@ class BinaryDistReg(DistReg):
 		how_transform='interactions',
 		**model_kwargs
 	):
+		self.mtype_raw = model_type
 		self.model_type = parse_model_type(model_type, discrete=True)
 		self.monotonicity = monotonicity
-		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
+		self.model_kwargs = model_kwargs
+
+		## Default kwargs
+		if self.mtype_raw == 'lasso':
+			self.model_kwargs['penalty'] = 'l1'
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
+		elif self.mtype_raw in ['ridge', 'logistic']:
+			self.model_kwargs['penalty'] = 'l2'
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
+		elif self.mtype_raw in ['elasticnet', 'elastic']:
+			self.model_kwargs['penalty'] = 'elasticnet'
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'saga')
+			self.model_kwargs['l1_ratios'] = np.array([0, 0.5, 1])
+
 
 	def fit(self, W, X, y):
 		# check y is binary
