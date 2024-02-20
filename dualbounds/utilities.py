@@ -289,8 +289,8 @@ def _adjust_support_size_unbatched(
 			# candidate values for the post-merge support point
 			candvals = vals[1:] * (1 - mixtures) + vals[:-1] * mixtures
 			# E[|X - Y|] under best coupling
-			costs = np.abs(candvals - vals[1:]) * (1 - mixtures) 
-			costs += np.abs(candvals - vals[:-1]) * mixtures
+			costs = (candvals - vals[1:])**2 * probs[1:] 
+			costs += (candvals - vals[:-1])**2 * probs[:-1]
 			# pick the best variant
 			istar = np.argmin(costs)
 			vals[istar] = np.nan

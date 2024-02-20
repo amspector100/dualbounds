@@ -36,8 +36,8 @@ setuptools.setup(
     python_requires='>=3.9',
     install_requires=[
         "numpy>=1.17.4",
-        "scipy",
-        "scikit-learn",
+        "scipy>=1.12.0",
+        "scikit-learn>=1.4.1",
         "POT",
         "cvxpy",
         "tqdm",
