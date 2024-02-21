@@ -76,7 +76,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				err_msg=f"LP bounds for {dist0, dist1} do not agree with analytical bounds on Var(ITE)",
 			)
 
-	def test_dx_size(self):
+	def test_gridsearch_loss(self):
 		# Create fake heavy-tailed data
 		np.random.seed(123)
 		n = 300; nvals = 50; grid_size = 3 * nvals
@@ -98,7 +98,7 @@ class TestGenericDualBounds(unittest.TestCase):
 			lambda y0, y1, x: y0 <= y1,
 			lambda y0, y1, x: (y0 <= 0) * (y1 <= 0),
 		]
-		# Test the size of dxs is small on average
+		# Test the size of objdiffs is small on average
 		for f in fs:
 			gdb = db.generic.DualBounds(
 				f=f,
@@ -114,10 +114,10 @@ class TestGenericDualBounds(unittest.TestCase):
 				nvals1=nvals,
 			)
 			np.testing.assert_array_almost_equal(
-				gdb.dxs.mean(axis=1),
+				gdb.objdiffs.mean(axis=1),
 				np.zeros(2),
 				decimal=1.5,
-				err_msg=f"For f={f}, dxs are too large."
+				err_msg=f"For f={f}, objdiffs are too large."
 			)
 
 	def test_base_models_cts(self):

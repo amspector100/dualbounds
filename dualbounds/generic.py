@@ -309,25 +309,29 @@ class DualBounds:
 		new_nu1 : np.array
 			``nvals1`` length array of new dual vars. for Y(1)
 		dx : float
-			Constant which can be subtracted off to obtain valid 
-			dual variables. I.e., new_nk = nuk - dx/2.
+			Maximum numerical error induced by interpolation
+			process.
+		objval_diff : np.array
+			The change in estimated objective value
+			for the new dual variables.
 		"""
-		# interpolate to compute new dual variables
-		new_y0vals = np.linspace(y0_min, y0_max, grid_size)
-		new_y1vals = np.linspace(y1_min, y1_max, grid_size)
-		interp_nu0 = self.interp_fn(
-			x=self.y0_vals[i], y=nu0, newx=new_y0vals,
-		)
-		interp_nu1 = self.interp_fn(
-			x=self.y1_vals[i], y=nu1, newx=new_y1vals,
-		)
-		# compute required bounds
-		fx = lambda y0, y1: self.f(y0, y1, self.X[i])
-		fvals = fx(
-			new_y0vals.reshape(-1, 1), new_y1vals.reshape(1, -1)
-		)
-		## Step 1: adjust elementwise (as opposed to a constant subtraction)
-		for ii in range(10):
+		obj_orig = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
+		if grid_size > 0:
+			# interpolate to compute new dual variables
+			new_y0vals = np.linspace(y0_min, y0_max, grid_size)
+			new_y1vals = np.linspace(y1_min, y1_max, grid_size)
+			interp_nu0 = self.interp_fn(
+				x=self.y0_vals[i], y=nu0, newx=new_y0vals,
+			)
+			interp_nu1 = self.interp_fn(
+				x=self.y1_vals[i], y=nu1, newx=new_y1vals,
+			)
+			# compute required bounds
+			fx = lambda y0, y1: self.f(y0, y1, self.X[i])
+			fvals = fx(
+				new_y0vals.reshape(-1, 1), new_y1vals.reshape(1, -1)
+			)
+			## Adjust elementwise (as opposed to a constant subtraction)
 			# Calculate how far we are from feasibility
 			deltas = interp_nu0.reshape(-1, 1) + interp_nu1.reshape(1, -1)
 			deltas = deltas - fvals
@@ -335,23 +339,15 @@ class DualBounds:
 				deltas0 = np.maximum(deltas.max(axis=1), 0)
 				deltas1 = np.maximum(deltas.max(axis=0), 0)
 				dx = np.max(deltas0)
-				if ii == 0:
-					init_axis = 1 if np.mean(deltas1) <= np.mean(deltas0) else 0
+				init_axis = 1 if np.mean(deltas1) <= np.mean(deltas0) else 0
 			else:
 				deltas0 = np.minimum(deltas.min(axis=1), 0)
 				deltas1 = np.minimum(deltas.min(axis=0), 0)
 				dx = np.min(deltas0)
-				if ii == 0:
-					init_axis = 1 if np.mean(deltas1) >= np.mean(deltas0) else 0
-			# Stopping condition
-			#obj = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
-			#print(f"At iter={ii}, obj={obj}, dx={dx}")
-			if lower and dx <= tol:
-				break
-			if not lower and dx >= - tol:
-				break
+				init_axis = 1 if np.mean(deltas1) >= np.mean(deltas0) else 0
+
 			# Adjust and recompute interp_nu0/interp_nu1
-			if ii % 2 == init_axis:
+			if init_axis == 0:
 				to_sub = self.interp_fn(
 					x=new_y0vals, y=deltas0, newx=self.y0_vals[i]
 				)
@@ -368,25 +364,23 @@ class DualBounds:
 					x=self.y1_vals[i], y=nu1, newx=new_y1vals,
 				)
 
-		## Step 2: subtract global constant to ensure feasibility
-		deltas = interp_nu0.reshape(-1, 1) + interp_nu1.reshape(1, -1) - fvals
-		if lower:
-			dx = np.max(deltas)
-		else:
-			dx = np.min(deltas)
+			## Step 2: Track max numerical error due to interpolation
+			deltas = interp_nu0.reshape(-1, 1) + interp_nu1.reshape(1, -1) - fvals
+			if lower:
+				dx = np.max(deltas)
+			else:
+				dx = np.min(deltas)
 
-		## For debugging only, delete later
-		self.new_y0vals = new_y0vals
-		self.new_y1vals = new_y1vals
-		self.interp_nu0 = interp_nu0
-		self.interp_nu1 = interp_nu1
-		self.orig_nu0 = nu0
-		self.orig_nu1 = nu1
-		self.deltas = deltas
-		self.fvals_debug = fvals
+			## Step 3: Track change in objective
+			new_objval = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
+			objval_diff = obj_orig - new_objval
+
+		else:
+			dx = 0
+			objval_diff = 0
 
 		# return
-		return nu0 - dx/2, nu1 - dx/2, dx
+		return nu0, nu1, dx, objval_diff
 
 	def _solve_single_instance(
 		self, 
@@ -543,6 +537,7 @@ class DualBounds:
 		# objective values
 		self.objvals = np.zeros((2, self.n))
 		self.dxs = np.zeros((2, self.n))
+		self.objdiffs = np.zeros((2, self.n))
 		# loop through
 		if verbose:
 			print("Estimating optimal dual variables.")
@@ -563,7 +558,7 @@ class DualBounds:
 				)
 				self.objvals[1 - lower, i] = objval
 				if not self.discrete:
-					nu0x, nu1x, dx = self._ensure_feasibility(
+					nu0x, nu1x, dx, objval_diff = self._ensure_feasibility(
 						i=i, nu0=nu0x, nu1=nu1x, lower=lower, 
 						y0_min=y0_min, y0_max=y0_max,
 						y1_min=y1_min, y1_max=y1_max,
@@ -571,12 +566,14 @@ class DualBounds:
 					)
 				else:
 					dx = 0
+					objval_diff = 0
 				# Save solutions
 				self.nu0s[1 - lower, i] = nu0x
 				self.nu1s[1 - lower, i] = nu1x
 				self.c0s[1 - lower, i] = nu0x @ self.y0_probs[i]
 				self.c1s[1 - lower, i] = nu1x @ self.y1_probs[i]
 				self.dxs[1 - lower, i] = dx
+				self.objdiffs[1 - lower, i] = objval_diff
 
 		# Compute realized dual variables
 		self._compute_realized_dual_variables(y=self.y)
@@ -680,6 +677,8 @@ class DualBounds:
 		Performs cross-fitting to fit the propensity scores.
 		"""
 		# Parse model
+		if self.W_model is None:
+			self.W_model = 'ridge'
 		if isinstance(self.W_model, str):
 			model_cls = dist_reg.parse_model_type(
 				self.W_model, discrete=True
@@ -738,8 +737,12 @@ class DualBounds:
 
 		# Fit model
 		if self.y0_dists is None or self.y1_dists is None:
+			# Note: this returns the existing model
+			# if an existing model is provided
 			self.Y_model = get_default_model(
-				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
+				discrete=self.discrete, 
+				support=self.support,
+				Y_model=self.Y_model,
 				**self.model_kwargs
 			)
 			if verbose:
