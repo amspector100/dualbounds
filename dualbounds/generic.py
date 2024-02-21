@@ -55,6 +55,25 @@ def infer_discrete(discrete, support, y):
 		support = None
 	return discrete, support
 
+def _default_ylims(
+	y, 
+	y0_min=None,
+	y1_min=None,
+	y0_max=None,
+	y1_max=None,
+	**kwargs # ignored
+):
+	# Computes default bounds on y
+	if y0_min is None:
+		y0_min = 1.5 * y.min() - y.max() / 2
+	if y1_min is None:
+		y1_min = 1.5 * y.min() - y.max() / 2
+	if y0_max is None:
+		y0_max = 1.5 * y.max() - y.min() / 2
+	if y1_max is None:
+		y1_max = 1.5 * y.max() - y.min() / 2
+	return y0_min, y1_min, y0_max, y1_max
+
 
 class DualBounds:
 	"""
@@ -304,83 +323,87 @@ class DualBounds:
 
 		Returns
 		-------
+		new_y0_vals : np.array
+			``nvals0 + grid_size`` length array of new y0_vals.
+			*Exact size may change to avoid duplicate values
 		new_nu0 : np.array
-			``nvals0`` length array of new dual vars. for Y(0)
+			``nvals0 + grid_size`` length array of interpolated
+			and feasible dual vars. for Y(0).
+		new_y1_vals : np.array
+			``nvals1 + grid_size`` length array of new y1_vals
 		new_nu1 : np.array
-			``nvals1`` length array of new dual vars. for Y(1)
+			``nvals1 + grid_size`` length array of interpolated
+			and feasible dual vars. for Y(1).
+			*Exact size may change to avoid duplicate values.
 		dx : float
 			Maximum numerical error induced by interpolation
 			process.
 		objval_diff : np.array
-			The change in estimated objective value
-			for the new dual variables.
+			The estimated objective value change for the new
+			dual variables.
 		"""
 		obj_orig = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
 		if grid_size > 0:
 			# interpolate to compute new dual variables
-			new_y0vals = np.linspace(y0_min, y0_max, grid_size)
-			new_y1vals = np.linspace(y1_min, y1_max, grid_size)
-			interp_nu0 = self.interp_fn(
-				x=self.y0_vals[i], y=nu0, newx=new_y0vals,
+			new_y0_vals = np.unique(np.sort(np.concatenate([
+				np.linspace(y0_min, y0_max, grid_size), self.y0_vals[i]
+			])))
+			new_y1_vals = np.unique(np.sort(np.concatenate([
+				np.linspace(y1_min, y1_max, grid_size), self.y1_vals[i]
+			])))
+			new_nu0 = self.interp_fn(
+				x=self.y0_vals[i], y=nu0, newx=new_y0_vals,
 			)
-			interp_nu1 = self.interp_fn(
-				x=self.y1_vals[i], y=nu1, newx=new_y1vals,
+			new_nu1 = self.interp_fn(
+				x=self.y1_vals[i], y=nu1, newx=new_y1_vals,
 			)
 			# compute required bounds
 			fx = lambda y0, y1: self.f(y0, y1, self.X[i])
 			fvals = fx(
-				new_y0vals.reshape(-1, 1), new_y1vals.reshape(1, -1)
+				new_y0_vals.reshape(-1, 1), new_y1_vals.reshape(1, -1)
 			)
 			## Adjust elementwise (as opposed to a constant subtraction)
 			# Calculate how far we are from feasibility
-			deltas = interp_nu0.reshape(-1, 1) + interp_nu1.reshape(1, -1)
+			deltas = new_nu0.reshape(-1, 1) + new_nu1.reshape(1, -1)
 			deltas = deltas - fvals
 			if lower:
-				deltas0 = np.maximum(deltas.max(axis=1), 0)
-				deltas1 = np.maximum(deltas.max(axis=0), 0)
-				dx = np.max(deltas0)
-				init_axis = 1 if np.mean(deltas1) <= np.mean(deltas0) else 0
+				deltas0 = deltas.max(axis=1)
+				dx0 = np.mean(np.maximum(deltas0, 0))
+				deltas1 = deltas.max(axis=0)
+				dx1 = np.mean(np.maximum(deltas1, 0))
+				adj_axis = 1 if dx1 <= dx0 else 0
 			else:
-				deltas0 = np.minimum(deltas.min(axis=1), 0)
-				deltas1 = np.minimum(deltas.min(axis=0), 0)
-				dx = np.min(deltas0)
-				init_axis = 1 if np.mean(deltas1) >= np.mean(deltas0) else 0
+				deltas0 = deltas.min(axis=1)
+				dx0 = np.mean(np.minimum(deltas0, 0))
+				deltas1 = deltas.min(axis=0)
+				dx1 = np.mean(np.minimum(deltas1, 0))
+				adj_axis = 1 if dx1 >= dx0 else 0
 
 			# Adjust and recompute interp_nu0/interp_nu1
-			if init_axis == 0:
-				to_sub = self.interp_fn(
-					x=new_y0vals, y=deltas0, newx=self.y0_vals[i]
-				)
-				nu0 = nu0 - to_sub
-				interp_nu0 = self.interp_fn(
-					x=self.y0_vals[i], y=nu0, newx=new_y0vals,
+			if adj_axis == 0:
+				new_nu0 -= deltas0
+				nu0 = self.interp_fn(
+					x=new_y0_vals, y=new_nu0, newx=self.y0_vals[i],
 				)
 			else:
-				to_sub = self.interp_fn(
-					x=new_y1vals, y=deltas1, newx=self.y1_vals[i]
-				)
-				nu1 = nu1 - to_sub
-				interp_nu1 = self.interp_fn(
-					x=self.y1_vals[i], y=nu1, newx=new_y1vals,
+				new_nu1 -= deltas1
+				nu1 = self.interp_fn(
+					x=new_y1_vals, y=new_nu1, newx=self.y1_vals[i],
 				)
 
-			## Step 2: Track max numerical error due to interpolation
-			deltas = interp_nu0.reshape(-1, 1) + interp_nu1.reshape(1, -1) - fvals
-			if lower:
-				dx = np.max(deltas)
-			else:
-				dx = np.min(deltas)
-
-			## Step 3: Track change in objective
+			## Track change in objective
 			new_objval = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
 			objval_diff = obj_orig - new_objval
 
 		else:
-			dx = 0
+			new_y0_vals = self.y0_vals[i]
+			new_nu0 = nu0
+			new_y1_vals = self.y1_vals[i]
+			new_nu1 = nu1
 			objval_diff = 0
 
 		# return
-		return nu0, nu1, dx, objval_diff
+		return new_y0_vals, new_nu0, new_y1_vals, new_nu1, objval_diff
 
 	def _solve_single_instance(
 		self, 
@@ -424,7 +447,7 @@ class DualBounds:
 		ninterp=None,
 		nvals0=100,
 		nvals1=100,
-		interp_fn=interpolation.linear_interpolate,
+		interp_fn=interpolation.adaptive_interpolate,
 		y0_min=None,
 		y0_max=None,
 		y1_min=None,
@@ -496,15 +519,10 @@ class DualBounds:
 			self.nvals1 = nvals1
 		self.interp_fn = interp_fn
 
-		## Parse defaults
-		if y0_min is None:
-			y0_min = 1.5 * self.y.min() - self.y.max() / 2
-		if y1_min is None:
-			y1_min = 1.5 * self.y.min() - self.y.max() / 2
-		if y0_max is None:
-			y0_max = 1.5 * self.y.max() - self.y.min() / 2
-		if y1_max is None:
-			y1_max = 1.5 * self.y.max() - self.y.min() / 2
+		# max/min yvals
+		y0_min, y1_min, y0_max, y1_max = _default_ylims(
+			self.y, y0_min, y1_min, y0_max=y0_max, y1_max=y1_max
+		)
 
 		# this discretizes if Y is continuous
 		if y0_vals is None or y0_probs is None:
@@ -536,7 +554,7 @@ class DualBounds:
 		self.c1s = np.zeros((2, self.n))
 		# objective values
 		self.objvals = np.zeros((2, self.n))
-		self.dxs = np.zeros((2, self.n))
+		self.dxs = np.zeros((2, self.n)) # ignored, only for backward compatability
 		self.objdiffs = np.zeros((2, self.n))
 		# loop through
 		if verbose:
@@ -557,33 +575,37 @@ class DualBounds:
 					lower=lower,
 				)
 				self.objvals[1 - lower, i] = objval
-				if not self.discrete:
-					nu0x, nu1x, dx, objval_diff = self._ensure_feasibility(
-						i=i, nu0=nu0x, nu1=nu1x, lower=lower, 
-						y0_min=y0_min, y0_max=y0_max,
-						y1_min=y1_min, y1_max=y1_max,
-						**kwargs,
-					)
-				else:
-					dx = 0
-					objval_diff = 0
 				# Save solutions
 				self.nu0s[1 - lower, i] = nu0x
 				self.nu1s[1 - lower, i] = nu1x
 				self.c0s[1 - lower, i] = nu0x @ self.y0_probs[i]
 				self.c1s[1 - lower, i] = nu1x @ self.y1_probs[i]
-				self.dxs[1 - lower, i] = dx
-				self.objdiffs[1 - lower, i] = objval_diff
 
 		# Compute realized dual variables
-		self._compute_realized_dual_variables(y=self.y)
+		self._compute_realized_dual_variables(
+			y=self.y, 
+			y0_min=y0_min, 
+			y0_max=y0_max,
+			y1_min=y1_min,
+			y1_max=y1_max,
+			**kwargs
+		)
 
-	def _compute_realized_dual_variables(self, y=None):
+	def _compute_realized_dual_variables(self, y=None, **kwargs):
 		"""
 		Helper function which applies interpolation 
 		(for continuous Y) to compute realized dual variables.
+		It also ensure feasibility through a 2D gridsearch.
 		"""
 		y = self.y if y is None else y
+
+		# Create ylims
+		y0_min, y1_min, y0_max, y1_max = _default_ylims(y=y, **kwargs)
+		kwargs['y0_min'] = y0_min
+		kwargs['y1_min'] = y1_min
+		kwargs['y0_max'] = y0_max
+		kwargs['y1_max'] = y1_max
+
 		### Compute realized hatnu1s/hatnu0s
 		self.hatnu0s = np.zeros((2, self.n))
 		self.hatnu1s = np.zeros((2, self.n))
@@ -592,12 +614,17 @@ class DualBounds:
 				nu0x = self.nu0s[1-lower, i]
 				nu1x = self.nu1s[1-lower, i]
 				if not self.discrete:
-					# interpolate to find realized values for cts case
+					# Ensure feasibility
+					y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(
+						i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs
+					)
+					self.objdiffs[1-lower, i] = odx
+					# interpolate to find realized values 
 					self.hatnu0s[1 - lower, i] = self.interp_fn(
-						x=self.y0_vals[i], y=nu0x, newx=y[i],
+						x=y0v, y=nu0adj, newx=y[i],
 					)[0]
 					self.hatnu1s[1 - lower, i] = self.interp_fn(
-						x=self.y1_vals[i], y=nu1x, newx=y[i],
+						x=y1v, y=nu1adj, newx=y[i],
 					)[0]
 				else:
 					j0 = np.where(self.y0_vals[i] == y[i])[0][0]

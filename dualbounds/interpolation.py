@@ -7,8 +7,13 @@ import numpy as np
 import scipy as sp
 from . import utilities
 
-def linear_interpolate(x, y, newx):
+def adaptive_interpolate(x, y, newx):
 	"""
+	Adaptively chooses between linear and nearest-neighbor
+	interpolation.
+
+	Parameters
+	----------
 	x : np.array
 		n-length array of inputs. Must be sorted, although
 		this is not explicitly enforced to save time.
@@ -16,6 +21,66 @@ def linear_interpolate(x, y, newx):
 		n-length array of outputs
 	newx : np.array
 		m-length array of new inputs
+
+	Returns
+	-------
+	newy : np.array
+		m-length array of interpolated outputs
+	"""
+	if len(np.unique(y)) <= 2 and len(y) > 2:
+		return nn_interpolate(x, y, newx)
+	else:
+		return linear_interpolate(x, y, newx)
+
+
+def nn_interpolate(x, y, newx):
+	"""
+	nearest-neighbor interpolation.
+
+	Parameters
+	----------
+	x : np.array
+		n-length array of inputs. Must be sorted, although
+		this is not explicitly enforced to save time.
+	y : np.array
+		n-length array of outputs
+	newx : np.array
+		m-length array of new inputs
+
+	Returns
+	-------
+	newy : np.array
+		m-length array of interpolated outputs
+	"""
+	# Find nearest neighbors
+	if not utilities.haslength(newx):
+		newx = np.array([newx])
+	n = len(x)
+	rinds = np.minimum(np.searchsorted(x, newx, side='left'), n-1)
+	linds = np.maximum(rinds-1, 0)
+	inds = np.stack([linds, rinds], axis=1)
+	dists = np.abs(x[inds] - newx.reshape(-1, 1))
+	nbrs = inds[(np.arange(len(newx)), np.argmin(dists, axis=1))]
+	# Return
+	return y[nbrs]
+
+
+def linear_interpolate(x, y, newx):
+	"""
+	Parameters
+	----------
+	x : np.array
+		n-length array of inputs. Must be sorted, although
+		this is not explicitly enforced to save time.
+	y : np.array
+		n-length array of outputs
+	newx : np.array
+		m-length array of new inputs
+
+	Returns
+	-------
+	newy : np.array
+		m-length array of interpolated outputs
 	"""
 	if not utilities.haslength(newx):
 		newx = np.array([newx])
