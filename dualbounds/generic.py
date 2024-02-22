@@ -549,6 +549,9 @@ class DualBounds:
 		# Initialize results
 		self.nu0s = np.zeros((2, self.n, self.nvals0)) # first dimension = [lower, upper]
 		self.nu1s = np.zeros((2, self.n, self.nvals1))
+		# Realized dual variables
+		self.hatnu0s = np.zeros((2, self.n))
+		self.hatnu1s = np.zeros((2, self.n))
 		# estimated cond means of nu0s, nu1s
 		self.c0s = np.zeros((2, self.n))
 		self.c1s = np.zeros((2, self.n))
@@ -580,22 +583,67 @@ class DualBounds:
 				self.nu1s[1 - lower, i] = nu1x
 				self.c0s[1 - lower, i] = nu0x @ self.y0_probs[i]
 				self.c1s[1 - lower, i] = nu1x @ self.y1_probs[i]
+				# Compute realized dual variables
+				self._interpolate_and_ensure_feas(
+					yi=self.y[i], 
+					i=i,
+					lower=lower, 
+					y0_min=y0_min, 
+					y0_max=y0_max,
+					y1_min=y1_min,
+					y1_max=y1_max,
+					**kwargs
+				)
 
-		# Compute realized dual variables
-		self._compute_realized_dual_variables(
-			y=self.y, 
-			y0_min=y0_min, 
-			y0_max=y0_max,
-			y1_min=y1_min,
-			y1_max=y1_max,
-			**kwargs
-		)
+		# # Compute realized dual variables
+		# self._compute_realized_dual_variables(
+		# 	y=self.y, 
+		# 	y0_min=y0_min, 
+		# 	y0_max=y0_max,
+		# 	y1_min=y1_min,
+		# 	y1_max=y1_max,
+		# 	**kwargs
+		# )
+
+	def _interpolate_and_ensure_feas(
+		self, yi, lower, i, y0_min, y1_min, y0_max, y1_max, **kwargs
+	):	
+		"""
+		This is used in two places:
+		1. _compute_realized_dual_variables
+		2. Main loop of compute_dual_variables
+		"""
+		nu0x = self.nu0s[1-lower, i]
+		nu1x = self.nu1s[1-lower, i]
+		# Ensure feasibility
+		if not self.discrete:
+			y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(
+				i=i, nu0=nu0x, nu1=nu1x, lower=lower, 
+				y0_min=y0_min, y0_max=y0_max,
+				y1_min=y1_min, y1_max=y1_max, 
+				**kwargs
+			)
+			self.objdiffs[1-lower, i] = odx
+			# interpolate to find realized values 
+			self.hatnu0s[1 - lower, i] = self.interp_fn(
+				x=y0v, y=nu0adj, newx=yi,
+			)[0]
+			self.hatnu1s[1 - lower, i] = self.interp_fn(
+				x=y1v, y=nu1adj, newx=yi,
+			)[0]
+		else:
+			j0 = np.where(self.y0_vals[i] == yi)[0][0]
+			j1 = np.where(self.y1_vals[i] == yi)[0][0]
+			self.hatnu0s[1 - lower, i] = nu0x[j0]
+			self.hatnu1s[1 - lower, i] = nu1x[j1]	
+
+
 
 	def _compute_realized_dual_variables(self, y=None, **kwargs):
 		"""
 		Helper function which applies interpolation 
 		(for continuous Y) to compute realized dual variables.
-		It also ensure feasibility through a 2D gridsearch.
+		It also ensures feasibility through a 2D gridsearch.
 		"""
 		y = self.y if y is None else y
 
@@ -607,30 +655,38 @@ class DualBounds:
 		kwargs['y1_max'] = y1_max
 
 		### Compute realized hatnu1s/hatnu0s
-		self.hatnu0s = np.zeros((2, self.n))
-		self.hatnu1s = np.zeros((2, self.n))
 		for i in range(self.n):
 			for lower in [0, 1]:
-				nu0x = self.nu0s[1-lower, i]
-				nu1x = self.nu1s[1-lower, i]
-				if not self.discrete:
-					# Ensure feasibility
-					y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(
-						i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs
-					)
-					self.objdiffs[1-lower, i] = odx
-					# interpolate to find realized values 
-					self.hatnu0s[1 - lower, i] = self.interp_fn(
-						x=y0v, y=nu0adj, newx=y[i],
-					)[0]
-					self.hatnu1s[1 - lower, i] = self.interp_fn(
-						x=y1v, y=nu1adj, newx=y[i],
-					)[0]
-				else:
-					j0 = np.where(self.y0_vals[i] == y[i])[0][0]
-					j1 = np.where(self.y1_vals[i] == y[i])[0][0]
-					self.hatnu0s[1 - lower, i] = nu0x[j0]
-					self.hatnu1s[1 - lower, i] = nu1x[j1]
+				self._interpolate_and_ensure_feas(
+					i=i,
+					yi=y[i],
+					lower=lower, 
+					y0_min=y0_min, 
+					y0_max=y0_max,
+					y1_min=y1_min,
+					y1_max=y1_max,
+					**kwargs
+				)
+				# nu0x = self.nu0s[1-lower, i]
+				# nu1x = self.nu1s[1-lower, i]
+				# if not self.discrete:
+				# 	# Ensure feasibility
+				# 	y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(
+				# 		i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs
+				# 	)
+				# 	self.objdiffs[1-lower, i] = odx
+				# 	# interpolate to find realized values 
+				# 	self.hatnu0s[1 - lower, i] = self.interp_fn(
+				# 		x=y0v, y=nu0adj, newx=y[i],
+				# 	)[0]
+				# 	self.hatnu1s[1 - lower, i] = self.interp_fn(
+				# 		x=y1v, y=nu1adj, newx=y[i],
+				# 	)[0]
+				# else:
+				# 	j0 = np.where(self.y0_vals[i] == y[i])[0][0]
+				# 	j1 = np.where(self.y1_vals[i] == y[i])[0][0]
+				# 	self.hatnu0s[1 - lower, i] = nu0x[j0]
+				# 	self.hatnu1s[1 - lower, i] = nu1x[j1]
 
 	def _compute_ipw_summands(self):
 		"""
@@ -763,7 +819,7 @@ class DualBounds:
 
 		# if pis not supplied: will use cross-fitting
 		if self.pis is None:
-			self.fit_propensity_scores(nfolds=nfolds)
+			self.fit_propensity_scores(nfolds=nfolds, verbose=verbose)
 
 		# Fit model
 		if self.y0_dists is None or self.y1_dists is None:

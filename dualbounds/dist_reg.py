@@ -315,7 +315,7 @@ class CtsDistReg(DistReg):
 		self.heterosked = heterosked
 		self.use_loo = use_ridge_loo_resids
 		# Default kwargs
-		if isinstance(self.model_type, lm.RidgeCV):
+		if model_type == 'ridge':
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 
 	def fit(self, W, X, y):
@@ -537,7 +537,7 @@ class BinaryDistReg(DistReg):
 		## Default kwargs
 		if self.mtype_raw == 'lasso':
 			self.model_kwargs['penalty'] = 'l1'
-			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'lbfgs')
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'saga')
 		elif self.mtype_raw in ['ridge']:
 			self.model_kwargs['penalty'] = 'l2'
 			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'lbfgs')
