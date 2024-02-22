@@ -870,7 +870,8 @@ class DualBounds:
 		# compute dual bounds
 		return self.compute_final_bounds(aipw=aipw, alpha=alpha)
 
-def plug_in_no_covariates(y, W, f, B=0, verbose=True, alpha=0.1):
+def plug_in_no_covariates(
+	y, W, f, B=0, verbose=True, alpha=0.1, max_nvals=1000):
 	"""
 	Parameters
 	----------
@@ -887,14 +888,23 @@ def plug_in_no_covariates(y, W, f, B=0, verbose=True, alpha=0.1):
 		Show progress bar while bootstrapping if verbose=True.
 	alpha : float
 		nominal Type I error level.
+	max_nvals : int
+		Maximum dimension of OT problem.
 	"""
 	n = len(y)
 	if B == 0:
 		# Dists
-		y1_vals = np.sort(y[W == 1])
-		y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
 		y0_vals = np.sort(y[W == 0])
+		y1_vals = np.sort(y[W == 1])
+		# Reduce dimension to prevent memory errors for huge datasets
+		qs = np.linspace(1/(max_nvals+1), max_nvals/(max_nvals+1), max_nvals)
+		if len(y0_vals) > max_nvals:
+			y0_vals = np.quantile(y0_vals, qs)
+		if len(y1_vals) > max_nvals:
+			y1_vals = np.quantile(y1_vals, qs)
+		# Probs
 		y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
+		y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
 		# Fvals
 		fvals = f(y0_vals.reshape(-1, 1), y1_vals.reshape(1, -1), x=0)
 		# lower and upper
