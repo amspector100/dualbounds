@@ -14,11 +14,11 @@ except ImportError:
 	import context
 	from context import dualbounds as db
 
-from dualbounds import bootstrap, utilities
+from dualbounds import bootstrap, utilities, gen_data
 
 class TestMultiplierBootstrap(unittest.TestCase):
 	"""
-	tests parse_dist
+	tests multiplier bootstrap methods
 	"""
 	def test_multiplier_bootstrap_simple(self):
 		# Parameters
@@ -32,18 +32,44 @@ class TestMultiplierBootstrap(unittest.TestCase):
 			mu = np.random.randn(d)
 			sigmas = np.random.uniform(size=d)
 			# Loop through and compute
-			cis = np.zeros(reps)
+			cis_upper = np.zeros(reps)
+			cis_lower = np.zeros(reps)
 			for r in range(reps):
 				samples = utilities.parse_dist(
 					eps_dist, mu=mu, sd=sigmas,
 				).rvs(size=(n,d))
-				_, ci = bootstrap.multiplier_bootstrap(
-					samples=samples, alpha=alpha, B=200
+				_, ciu = bootstrap.multiplier_bootstrap(
+					samples=samples, alpha=alpha, B=100
 				)
-				cis[r] = ci
+				cis_upper[r] = ciu
+				_, cil = bootstrap.multiplier_bootstrap(
+					samples=samples, alpha=alpha, B=100, param='min'
+				)
+				cis_lower[r] = cil
 
-			error = np.mean(cis > np.max(mu))
-			self.assertTrue(
-				error <= alpha + 3 * np.sqrt(alpha * (1-alpha) / reps),
-				f"Multiplier bootstrap error={error} > alpha={alpha} for d={d}."
+
+			error_upper = np.mean(cis_upper > np.max(mu))
+			error_lower = np.mean(cis_lower < np.min(mu))
+			for error, name in zip([error_lower, error_upper], ['lower', 'upper']):
+				self.assertTrue(
+					error <= alpha + 3 * np.sqrt(alpha * (1-alpha) / reps),
+					f"Multiplier bootstrap error={error} > alpha={alpha} for {name} CI with d={d}."
+				)
+
+	def test_multiplier_bootstrap_db_no_error(self):
+		# Fit two dualbounds objects
+		data = db.gen_data.gen_regression_data(n=200, p=5)
+		db_objects = []
+		for Y_model in ['ridge', 'knn']:
+			gdb = db.generic.DualBounds(
+				y=data['y'], X=data['X'], W=data['W'], pis=data['pis'],
+				Y_model=Y_model,
+				f=lambda y0, y1, x: (y1 < y0).astype(float) 
 			)
+			gdb.compute_dual_bounds(nfolds=2)
+			db_objects.append(gdb)
+
+		# Run mult bootstrap
+		bootstrap.dualbound_multiplier_bootstrap(
+			db_objects, alpha=0.1, B=100
+		)
