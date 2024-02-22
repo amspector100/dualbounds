@@ -537,7 +537,7 @@ class BinaryDistReg(DistReg):
 		if self.mtype_raw == 'lasso':
 			self.model_kwargs['penalty'] = 'l1'
 			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
-		elif self.mtype_raw in ['ridge', 'logistic']:
+		elif self.mtype_raw in ['ridge']:
 			self.model_kwargs['penalty'] = 'l2'
 			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
 		elif self.mtype_raw in ['elasticnet', 'elastic']:

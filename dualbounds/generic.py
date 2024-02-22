@@ -698,7 +698,7 @@ class DualBounds:
 		self.mu1 = np.concatenate([x.mean() for x in y1_dists])
 
 	def fit_propensity_scores(
-		self, nfolds, clip=1e-2,
+		self, nfolds, clip=1e-2, verbose=True,
 	):
 		"""
 		Performs cross-fitting to fit the propensity scores.
@@ -713,11 +713,14 @@ class DualBounds:
 			self.W_model = model_cls()
 		
 		# Loop through
+		if verbose:
+			print("Fitting propensity scores.")
 		starts, ends = dist_reg.create_folds(n=self.n, nfolds=nfolds)
 		# loop through and fit
 		self.W_model_fits = []
 		self.pis = np.zeros(self.n)
-		for start, end in zip(starts, ends):
+		for ii in utilities.vrange(len(starts), verbose=verbose):
+			start, end = starts[ii], ends[ii]
 			# Pick out data from the other folds
 			not_in_fold = [
 				i for i in np.arange(self.n) if i < start or i >= end
