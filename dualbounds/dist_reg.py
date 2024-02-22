@@ -8,6 +8,7 @@ from .utilities import parse_dist, BatchedCategorical, vrange
 
 TOL = 1e-6
 DEFAULT_ALPHAS = np.log(np.logspace(0.0001, 100, base=np.e, num=10))
+DEFAULT_ALPHAS = np.concatenate([DEFAULT_ALPHAS, np.array([1000, 10000])])
 
 def parse_model_type(model_type, discrete):
 	# return non-strings
@@ -536,10 +537,10 @@ class BinaryDistReg(DistReg):
 		## Default kwargs
 		if self.mtype_raw == 'lasso':
 			self.model_kwargs['penalty'] = 'l1'
-			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'saga')
 		elif self.mtype_raw in ['ridge', 'logistic']:
 			self.model_kwargs['penalty'] = 'l2'
-			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'liblinear')
+			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'lbfgs')
 		elif self.mtype_raw in ['elasticnet', 'elastic']:
 			self.model_kwargs['penalty'] = 'elasticnet'
 			self.model_kwargs['solver'] = self.model_kwargs.get('solver', 'saga')
