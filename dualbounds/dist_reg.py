@@ -303,20 +303,29 @@ class CtsDistReg(DistReg):
 		eps_dist='empirical',
 		eps_kwargs=None,
 		how_transform='interactions',
-		heterosked=False,
-		use_ridge_loo_resids=True,
+		heterosked_model_type='none',
+		heterosked_model_kwargs=None,
 		**model_kwargs,
 	):
+		# Distribution of residuals
 		self.eps_dist = eps_dist
-		self.model_type = parse_model_type(model_type, discrete=False)
 		self.eps_kwargs = {} if eps_kwargs is None else eps_kwargs
+		self.use_loo = self.eps_kwargs.pop("use_loo", False)
+		# Main predictive model
+		self.model_type = parse_model_type(model_type, discrete=False)
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
-		self.heterosked = heterosked
-		self.use_loo = use_ridge_loo_resids
+		# Heteroskedasticity
+		self.heterosked = heterosked_model_type != 'none'
+		if self.heterosked:
+			self.m2_model_type = parse_model_type(heterosked_model_type, discrete=False)
+			self.m2_model_kwargs = heterosked_model_kwargs
+			if self.m2_model_kwargs is None:
+				self.m2_model_kwargs = {}
 		# Default kwargs
 		if model_type == 'ridge':
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
+		
 
 	def fit(self, W, X, y):
 		self.Wtrain = W
@@ -327,7 +336,7 @@ class CtsDistReg(DistReg):
 
 		# fit variance
 		if self.heterosked:
-			self.m2_model = self.model_type(**self.model_kwargs)
+			self.m2_model = self.m2_model_type(**self.m2_model_kwargs)
 			self.m2_model.fit(features, y**2)
 
 		## estimate E[Var(Y | X)] using residuals
