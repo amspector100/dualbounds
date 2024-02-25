@@ -50,15 +50,28 @@ def multiplier_bootstrap(
 		)
 		return -estimate, -ci
 
-	n, d = samples.shape
 	hatmu = samples.mean(axis=0)
 	hatsigma = samples.std(axis=0)
+	# This is important: if hatsigma \approx 0,
+	# treat it as zero to ensure numerical stability when dividing.
+	# Otherwise this should have zero effect.
+	hatsigma = np.around(hatsigma, 10) 
+	if np.all(hatsigma == 0):
+		return np.max(hatmu), np.max(hatmu)
 	if np.any(hatsigma == 0):
-		raise NotImplementedError()
+		# use noise-free columns as a deterministic lower bound
+		min_val = np.max(hatmu[hatsigma == 0])
+		samples = samples[:, hatsigma != 0]
+		hatmu = hatmu[hatsigma != 0]
+		hatsigma = hatsigma[hatsigma != 0]
+	else:
+		min_val = - np.inf
+
 	# Centered statistics
 	Tbs = []
 
 	# Determine batch size
+	n, d = samples.shape
 	batchsize = min(B, max(1, int(maxarrsize / (n * d))))
 	n_batches = int(np.ceil(B / batchsize))
 	# Loop and compute bootstrap
@@ -72,8 +85,11 @@ def multiplier_bootstrap(
 	Tbs = np.concatenate(Tbs)
 	# Compute quantile and upper CI
 	quantile = np.quantile(Tbs, 1-alpha)
-	estimate = np.max(hatmu)
-	ci = np.max(hatmu - quantile * hatsigma / np.sqrt(n))
+	estimate = max(np.max(hatmu), min_val)
+	ci = max(
+		np.max(hatmu - quantile * hatsigma / np.sqrt(n)), 
+		min_val
+	)
 	return estimate, ci
 
 def dualbound_multiplier_bootstrap(
