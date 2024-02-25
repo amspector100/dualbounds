@@ -96,3 +96,35 @@ class TestUtils(unittest.TestCase):
 			decimal=3,
 			err_msg=f"parse_dist returns wrong support for uniform with mu=0, sd={sd}"
 		)
+
+
+	def test_weighted_quantile(self):
+		np.random.seed(123)
+		n = 101
+		# Data and desired quantiles
+		x = np.random.randn(n)
+		probs = np.ones(n) / n
+		qs = np.linspace(0, 1, n-1)
+		# Check that weighted_quantile agrees with np.quantile
+		out = utilities.weighted_quantile(x, probs, qs)
+		expected = np.quantile(x, qs)
+		np.testing.assert_array_almost_equal(
+			out,
+			expected,
+			decimal=5,
+			err_msg=f"weighted_quantile with equal weights differs from np.quantile"
+		)
+		# Check weighted variant
+		n = 1001
+		x = np.linspace(0, 1, n)
+		probs = x**2 / np.sum(x**2)
+		out = utilities.weighted_quantile(x, probs, 0.5)
+		expected = np.median(
+			np.random.choice(x, p=probs, size=100000, replace=True)
+		)
+		np.testing.assert_array_almost_equal(
+			out,
+			expected,
+			decimal=2,
+			err_msg=f"weighted_quantile median from sampling approach"
+		)

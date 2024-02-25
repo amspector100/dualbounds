@@ -38,6 +38,11 @@ class TestMultiplierBootstrap(unittest.TestCase):
 				samples = utilities.parse_dist(
 					eps_dist, mu=mu, sd=sigmas,
 				).rvs(size=(n,d))
+				# Test the ability to handle zero-variance columns
+				if d > 1:
+					samples[:, -1] = mu[-1]
+
+				# Compute bounds
 				_, ciu = bootstrap.multiplier_bootstrap(
 					samples=samples, alpha=alpha, B=100
 				)

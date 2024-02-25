@@ -329,6 +329,35 @@ def adjust_support_size(
 			vals[i], probs[i], new_nvals, ymin=ymin, ymax=ymax,
 		)
 	return new_vals, new_probs
+def weighted_quantile(values, weights, quantiles, old_style=True):
+	"""
+	Very close to numpy.percentile, but supports weights.
+
+	Parameters
+	----------
+	values : np.array
+		n-length array of data
+	weights : np.array
+		n-length array of sample weights
+	quantiles : array-like
+		desired quantiles
+	"""
+	if np.any(quantiles < 0) or np.any(quantiles > 1):
+		raise ValueError("Quantiles must be in [0,1]")
+
+	# Sort values
+	sorter = np.argsort(values)
+	values = values[sorter]
+	weights = weights[sorter]
+	# Compute quantiles
+	cdf = np.cumsum(weights) - 0.5 * weights
+	if old_style:
+		cdf -= cdf[0]
+		cdf /= cdf[-1]
+	else:
+		cdf /= np.sum(weights)
+	# Interp + return
+	return np.interp(quantiles, cdf, values)
 
 def parse_dist(
 	dist, loc=0, scale=1, mu=None, sd=None, **kwargs
