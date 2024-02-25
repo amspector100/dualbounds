@@ -19,6 +19,8 @@ def parse_model_type(model_type, discrete):
 	if not discrete:
 		if model_type == 'ridge':
 			return lm.RidgeCV
+		elif model_type == 'ols':
+			return lm.LinearRegression
 		elif model_type == 'lasso':
 			return lm.LassoCV
 		elif model_type in ['elastic', 'elasticnet']:
@@ -303,8 +305,8 @@ class CtsDistReg(DistReg):
 		eps_dist='empirical',
 		eps_kwargs=None,
 		how_transform='interactions',
-		heterosked_model_type='none',
-		heterosked_model_kwargs=None,
+		heterosked_model='none',
+		heterosked_kwargs=None,
 		**model_kwargs,
 	):
 		# Distribution of residuals
@@ -315,11 +317,18 @@ class CtsDistReg(DistReg):
 		self.model_type = parse_model_type(model_type, discrete=False)
 		self.model_kwargs = model_kwargs
 		self.how_transform = str(how_transform).lower()
-		# Heteroskedasticity
-		self.heterosked = heterosked_model_type != 'none'
+		## Heteroskedasticity
+		# Parse if we want to fit a model for heteroskedasticity
+		if heterosked_model is not None:
+			if isinstance(heterosked_model, str):
+				heterosked_model = heterosked_model.lower()
+			self.heterosked = heterosked_model != 'none'
+		else:
+			self.heterosked = False
+		# If so, parse the model type
 		if self.heterosked:
-			self.m2_model_type = parse_model_type(heterosked_model_type, discrete=False)
-			self.m2_model_kwargs = heterosked_model_kwargs
+			self.m2_model_type = parse_model_type(heterosked_model, discrete=False)
+			self.m2_model_kwargs = heterosked_kwargs
 			if self.m2_model_kwargs is None:
 				self.m2_model_kwargs = {}
 		# Default kwargs

@@ -927,17 +927,19 @@ class DualBounds:
 		return self.compute_final_bounds(aipw=aipw, alpha=alpha)
 
 def plug_in_no_covariates(
-	y, W, f, B=0, verbose=True, alpha=0.1, max_nvals=1000):
+	y, W, f, pis=None, B=0, verbose=True, alpha=0.1, max_nvals=1000):
 	"""
 	Parameters
 	----------
 	y : np.array
 		n-length array of outcomes
 	W : np.array
-		n-length array of treatments. Assumed
-		to be i.i.d. Bernoulli(0.5) r.v.s.
+		n-length array of treatments.
 	f : function
 		f(y0, y1, x) defines the objective.
+	pis : np.array
+		n-length array of propensity scores.
+		Default: all equal to 1/2.
 	B : int
 		Number of bootstrap replications
 	verbose : bool
@@ -948,19 +950,23 @@ def plug_in_no_covariates(
 		Maximum dimension of OT problem.
 	"""
 	n = len(y)
+	if pis is None:
+		pis = np.ones(n) / 2
 	if B == 0:
 		# Dists
-		y0_vals = np.sort(y[W == 0])
-		y1_vals = np.sort(y[W == 1])
+		y0_vals = y[W == 0]
+		y0_probs = 1 / (1-pis[W==0]); y0_probs /= y0_probs.sum()
+		y1_vals = y[W == 1]
+		y1_probs = 1 / (pis[W==1]); y1_probs /= y1_probs.sum()
 		# Reduce dimension to prevent memory errors for huge datasets
 		qs = np.linspace(1/(max_nvals+1), max_nvals/(max_nvals+1), max_nvals)
 		if len(y0_vals) > max_nvals:
-			y0_vals = np.quantile(y0_vals, qs)
+			y0_vals = utilities.weighted_quantile(y0_vals, y0_probs, quantiles=qs)
+			y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
 		if len(y1_vals) > max_nvals:
-			y1_vals = np.quantile(y1_vals, qs)
-		# Probs
-		y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
-		y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+			y1_vals = utilities.weighted_quantile(y1_vals, y1_probs, quantiles=qs)
+			y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+
 		# Fvals
 		fvals = f(y0_vals.reshape(-1, 1), y1_vals.reshape(1, -1), x=0)
 		# lower and upper
