@@ -93,10 +93,11 @@ def multiplier_bootstrap(
 	return estimate, ci
 
 def dualbound_multiplier_bootstrap(
-	db_objects, aipw=True, **kwargs	
+	db_objects, aipw=True, alpha=0.1, **kwargs	
 ):
 	"""
-	Combines evidence across multiple DualBounds classes.
+	Combines evidence across multiple DualBounds classes
+	using the multiplier bootstrap.
 
 	Parameters
 	----------
@@ -105,8 +106,20 @@ def dualbound_multiplier_bootstrap(
 	aipw : bool
 		If True, uses AIPW estimators to reduce variance
 		(highly recommended).
+	alpha : float
+		Nominal level, between 0 and 1.
 	kwargs : dict
-		kwargs for dualbounds.bootstrap.multiplier_bootstrap
+		kwargs for dualbounds.bootstrap.multiplier_bootstrap.
+	Returns
+	-------
+	Returns a dictionary with the following attributes:
+
+	estimates : np.array
+		array of lower and upper estimates. These in 
+		general may be biased.
+	cis : np.array
+		1 - alpha confidence lower/upper bounds on 
+		the partial identification bounds.
 	"""
 	# Fetch summands
 	if aipw:
@@ -122,11 +135,13 @@ def dualbound_multiplier_bootstrap(
 	lower_est, lower_ci = multiplier_bootstrap(
 		samples=lower_summands,
 		param='max',
+		alpha=alpha/2,
 		**kwargs
 	)
 	upper_est, upper_ci = multiplier_bootstrap(
 		samples=upper_summands,
 		param='min',
+		alpha=alpha/2,
 		**kwargs
 	)
 	# Return

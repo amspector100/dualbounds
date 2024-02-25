@@ -99,7 +99,10 @@ class DualBounds:
 		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
 		Alternatively, a distributional regression class inheriting 
 		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
+		defaults to
+		``Y_model=dist_reg.CtsDistReg(
+			model_type='ridge', heterosked_model=None
+		)``.
 	W_model : str or sklearn classifier
 		Specifies how to estimate the propensity scores if ``pis`` is
 		not known.  Either a str identifier as above or an sklearn
@@ -314,6 +317,7 @@ class DualBounds:
 			nvals1-length array of dual variables
 			associated with Y(1)
 		lower : bool
+			Specifies lower vs. upper bound.
 		ymin : float
 			Minimum value of y
 		ymax : float
@@ -892,11 +896,11 @@ class DualBounds:
 			the ith distribution is an out-of-sample estimate of
 			the law of Yi(1) | X[i]. This is an optional input;
 			if provided, ``Y_model`` will be ignored.
-		suppress_warning : bool
-			If True, suppresses warning about cross-fitting.
 		verbose : bool
 			If True, gives occasional progress reports.
 			Defaults to True.
+		suppress_warning : bool
+			If True, suppresses a warning about cross-fitting.
 		solve_kwargs : dict
 			Additional (optional) kwargs for the ``compute_dual_variables``
 			method, e.g. ``nvals0``, ``nvals1``, ``grid_size``.
@@ -929,6 +933,8 @@ class DualBounds:
 def plug_in_no_covariates(
 	y, W, f, pis=None, B=0, verbose=True, alpha=0.1, max_nvals=1000):
 	"""
+	Computes plug-in bounds on E[f(Y(0),Y(1))] without using covariates.
+
 	Parameters
 	----------
 	y : np.array
@@ -941,7 +947,8 @@ def plug_in_no_covariates(
 		n-length array of propensity scores.
 		Default: all equal to 1/2.
 	B : int
-		Number of bootstrap replications
+		Number of bootstrap replications to compute standard errors.
+		Defaults to 0 (no standard errors).
 	verbose : bool
 		Show progress bar while bootstrapping if verbose=True.
 	alpha : float

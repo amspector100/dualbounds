@@ -455,6 +455,7 @@ class LeeDualBounds(generic.DualBounds):
 		self,
 		nfolds=5,
 		suppress_warning=False,
+		verbose=True,
 	):
 		"""
 		Performs cross-fitting to estimate the outcome and selection models.
@@ -482,9 +483,13 @@ class LeeDualBounds(generic.DualBounds):
 				Y_model=self.S_model, support=set([0,1]), 
 				discrete=True, monotonicity=True, 
 			)
+			if verbose:
+				print("Cross-fitting the selection model.")
 			sout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.S, 
-				nfolds=nfolds, model=self.S_model,
+				nfolds=nfolds, 
+				model=self.S_model,
+				verbose=verbose,
 				probs_only=True,
 			)
 			self.s0_probs, self.s1_probs, self.S_model_fits, self.S_oos_preds = sout
@@ -498,9 +503,13 @@ class LeeDualBounds(generic.DualBounds):
 			self.Y_model = generic.get_default_model(
 				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
 			)
+			if verbose:
+				print("Cross-fitting the outcome model.")
 			yout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, S=self.S, y=self.y, 
-				nfolds=nfolds, model=self.Y_model,
+				nfolds=nfolds, 
+				model=self.Y_model,
+				verbose=verbose,
 			)
 			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = yout
 		elif not suppress_warning:
@@ -520,6 +529,7 @@ class LeeDualBounds(generic.DualBounds):
 		y0_dists=None,
 		y1_dists=None,
 		suppress_warning=False,
+		verbose=True,
 		**solve_kwargs,
 	):
 		"""
@@ -559,11 +569,11 @@ class LeeDualBounds(generic.DualBounds):
 
 		# if pis not supplied: will use cross-fitting
 		if self.pis is None:
-			self.fit_propensity_scores(nfolds=nfolds)
+			self.fit_propensity_scores(verbose=verbose, nfolds=nfolds)
 
 		# fit outcome models using cross-fitting
 		self.cross_fit(
-			nfolds=nfolds, suppress_warning=suppress_warning,
+			verbose=verbose, nfolds=nfolds, suppress_warning=suppress_warning,
 		)
 
 		# compute dual variables
@@ -573,6 +583,7 @@ class LeeDualBounds(generic.DualBounds):
 			y1_dists=self.y1_dists,
 			ymin=self.y.min(),
 			ymax=self.y.max(),
+			verbose=verbose,
 			**solve_kwargs,
 		)
 

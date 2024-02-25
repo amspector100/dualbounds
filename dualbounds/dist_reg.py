@@ -101,13 +101,13 @@ def cross_fit_predictions(
 	model : DistReg
 		instantiation of ``dist_reg.DistReg`` class. This will
 		be copied. E.g., 
-		``model=dist_reg.CtsDistReg(model_type='ridge', eps_dist="laplace").``
+		``model=dist_reg.CtsDistReg(model_type='ridge', eps_dist="empirical").``
 	model_cls : 
 		Alterantively, give the class name and have it constructed.
 		E.g, ``model_cls=dist_reg.CtsDistReg``.
 	model_kwargs : dict
 		kwargs to construct model; used only if model_cls is specified.
-		E.g., ``model_kwargs=dict(eps_dist=laplace)``.
+		E.g., ``model_kwargs=dict(eps_dist=empirical)``.
 	S : array
 		Optional n-length array of selection indicators.
 	train_on_selections : bool
@@ -275,36 +275,74 @@ class CtsDistReg(DistReg):
 	model_type : str or sklearn class
 		Str specifying a sklearn model class to use; options include
 		'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'. One can
-		also directly pass an sklearn class constructor, e.g., 
+		also directly pass an sklearn class, e.g., 
 		``model_type=sklearn.ensemble.KNeighborsRegressor``. 
 	how_transform : str
 		Str specifying how to transform the features before fitting
-		the base sklearn model.
+		the underlying model. One of several options:
+
+		- 'identity': does not transform the features
+		- 'interactions' : interaction terms btwn. the treatment/covariates
+
+		The default is ``interactions``.
 	eps_dist : str
-		Str specifying the distribution of the residuals. One of
-		One of 
-		['empirical', gaussian', 'laplace', 'expon', 'tdist', 'skewnorm]. 
+		Str specifying the distribution of the residuals. Options include
+		['empirical', gaussian', 'laplace', 'expon', 'tdist', 'skewnorm']. 
 		Defaults to ``empirical``, which uses the empirical law of the
 		residuals of the training data.
-	heterosked : bool
-		If True, estimates Var(Y | X) as a function of X by using
-		the specified model to predict both E[Y^2 | X] and E[Y | X].
-		If False, assumes Var(Y | X) is constant. Defaults to False.
-	use_ridge_loo_resids : bool
-		If True and Y_model='ridge', uses cheap LOO residuals instead
-		of the fit residuals to estimate the residual variance.
 	eps_kwargs : dict
 		kwargs for ``utilities.parse_dist`` for the residual dist.
-	model_kwargs : dict
-		kwargs for sklearn base model constructor. E.g., for ``knn``,
+	heterosked_model : str or sklearn class
+		Str specifying a sklearn model class to use to estimate 
+		Var(Y | X) as a function of X. Options are the same as 
+		``model_type.`` Defaults to heterosked_model=None, in which
+		case homoskedasticity is assumed (although the final bounds
+		will still be valid in the presence of heteroskedasticity).
+	heterosked_kwargs : dict
+		kwargs for the heterosked model. E.g., for ``knn``,
+		heterosked_kwargs could include ``n_neighbors``.
+	**model_kwargs : dict
+		kwargs for sklearn base model. E.g., for ``knn``,
 		model_kwargs could include ``n_neighbors``.
+
+	Examples
+	--------
+		import numpy as np
+		import dualbounds
+		import sklearn.linear_model
+
+		# Instantiate dist_reg
+		cdreg = dualbounds.dist_reg.CtsDistReg(
+			# Arguments for main model
+			model_type=sklearn.linear_model.RidgeCV,
+			fit_intercept=True,
+			gcv_mode='auto',
+			# How to estimate the law of the residuals
+			eps_dist='gaussian',
+			# How to estimate Var(Y | X)
+			heterosked_model=sklearn.linear_model.LassoCV,
+			heterosked_kwargs=dict(cv=5),
+		)
+
+		# Fit
+		n, p = 300, 20
+		W = np.random.binomial(1, 0.5, n)
+		X = np.random.randn(n, p)
+		y = np.random.randn(n)
+		cdreg.fit(W=W, X=X, y=y)
+
+		# Predict on new X with or without W
+		m = 10
+		Xnew = np.random.randn(m, p)
+		y0_dists, y1_dists = cdreg.predict(X=Xnew)
+		y0_dists = cdreg.predict(X=Xnew, W=np.zeros(m))
 	"""
 	def __init__(
 		self,
 		model_type='ridge',
+		how_transform='interactions',
 		eps_dist='empirical',
 		eps_kwargs=None,
-		how_transform='interactions',
 		heterosked_model='none',
 		heterosked_kwargs=None,
 		**model_kwargs,
@@ -327,10 +365,10 @@ class CtsDistReg(DistReg):
 			self.heterosked = False
 		# If so, parse the model type
 		if self.heterosked:
-			self.m2_model_type = parse_model_type(heterosked_model, discrete=False)
-			self.m2_model_kwargs = heterosked_kwargs
-			if self.m2_model_kwargs is None:
-				self.m2_model_kwargs = {}
+			self.sigma2_model_type = parse_model_type(heterosked_model, discrete=False)
+			self.sigma2_model_kwargs = heterosked_kwargs
+			if self.sigma2_model_kwargs is None:
+				self.sigma2_model_kwargs = {}
 		# Default kwargs
 		if model_type == 'ridge':
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
@@ -343,29 +381,22 @@ class CtsDistReg(DistReg):
 		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
 
-		# fit variance
-		if self.heterosked:
-			self.m2_model = self.m2_model_type(**self.m2_model_kwargs)
-			self.m2_model.fit(features, y**2)
-
-		## estimate E[Var(Y | X)] using residuals
-		# Use cheap out-of-sample estimates for ridge 
+		# compute residuals. Use Cheap LOO resids for ridge
 		if isinstance(self.model, lm.RidgeCV) and self.use_loo:
 			self.resids = ridge_loo_resids(features, y=y, ridge_cv_model=self.model)
-			if self.heterosked:
-				m2_loo_resids = ridge_loo_resids(features, y=y**2, ridge_cv_model=self.m2_model)
-				m2_preds = y**2 - m2_loo_resids
-		# Otherwise use in-sample estimates
 		else:
 			self.resids = y - self.model.predict(features)
-			if self.heterosked:
-				m2_preds = self.m2_model.predict(features)
 
-		self.hatsigma = np.sqrt(np.power(self.resids, 2).mean())
+		# Estimate E[Var(Y | X)] using residuals.
+		self.hatsigma = np.sqrt(np.mean(self.resids**2))
 		if self.heterosked:
-			self.hatsigma_preds = np.maximum(
-				np.sqrt(np.maximum(m2_preds - (y - self.resids)**2, 0)), 0.1 * self.hatsigma
-			)
+			self.sigma2_model = self.sigma2_model_type(**self.sigma2_model_kwargs)
+			self.sigma2_model.fit(features, self.resids**2)
+			self.hatsigma_preds = np.sqrt(np.clip(
+				self.sigma2_model.predict(features),
+				0.01 * self.hatsigma**2, 
+				np.inf
+			))
 		else:
 			self.hatsigma_preds = self.hatsigma
 
@@ -398,9 +429,11 @@ class CtsDistReg(DistReg):
 			mu = self.model.predict(features)
 			# heteroskedasticity
 			if self.heterosked:
-				scale = np.sqrt(np.maximum(self.m2_model.predict(features) - mu**2, 0))
-				# ensure positivity
-				scale = np.maximum(scale, 0.1 * self.hatsigma)
+				scale = np.sqrt(np.clip(
+					self.sigma2_model.predict(features),
+					0.01 * self.hatsigma**2,
+					np.inf,
+				))
 			else:
 				scale = self.hatsigma
 			# Option 1: nonparametric law of eps
@@ -433,8 +466,35 @@ class CtsDistReg(DistReg):
 class QuantileDistReg(DistReg):
 	"""
 	A continuous distributional regression based on quantile regression.
+
+	Parameters
+	----------
+	nquantiles : int
+		The number of quantiles to fit quantile regressions for.
+		Quantiles are evenly spaced between 0 and 1.
+	alphas : list or np.array
+		List of l1 regularization strengths to use in the quantile
+		regression; the final strength is determined by cross-validation.  
+		Default is alphas=[0] (no regularization).
+	how_transform : str
+		Str specifying how to transform the features before fitting
+		the underlying model. One of several options:
+
+		- 'identity': does not transform the features
+		- 'interactions' : interaction terms btwn. the treatment/covariates
+
+		The default is ``interactions``.
+
+	Notes
+	-----
+	This method is computationally expensive for large datasets.
 	"""
-	def __init__(self, how_transform='interactions', nquantiles=50, alphas=[0, 0.01, 0.05, 0.1, 1000]):
+	def __init__(
+		self, 
+		nquantiles=50,
+		alphas=[0],
+		how_transform='interactions',
+	):
 		self.nq = nquantiles
 		self.how_transform = how_transform
 		self.quantiles = np.around(np.linspace(0, 1, self.nq), 8)
@@ -502,19 +562,6 @@ class QuantileDistReg(DistReg):
 			# take centers and return
 			yvals = (all_preds[:, 1:] + all_preds[:, 0:-1]) / 2
 			probs = np.stack([self.probs for _ in range(len(X))], axis=0)
-			# # Concatenate ymin/ymax onto the edge
-			# yvals = np.concatenate(
-			# 	[
-			# 		self.ymin * np.ones((len(features), 1)), 
-			# 		yvals, 
-			# 		self.ymax * np.ones((len(features), 1))
-			# 	], axis=1
-			# )
-			# probs = np.concatenate(
-			# 	[TOL * np.ones((len(features), 1)), probs, TOL * np.ones((len(features), 1))],
-			# 	axis=1,
-			# )
-			# probs = probs / probs.sum(axis=1).reshape(-1, 1)
 			return utilities.BatchedCategorical(
 				vals=yvals, probs=probs
 			)
@@ -529,15 +576,25 @@ class BinaryDistReg(DistReg):
 
 	Parameters
 	----------
+	model_type : str or sklearn class.
+		Str specifying a sklearn model class to use; options include
+		'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'. One can
+		also directly pass an sklearn class, e.g., 
+		``model_type=sklearn.linear_model.LogisticRegressionCV``.
 	how_transform : str
 		Str specifying how to transform the features before fitting
-		a ``LogisticCV`` model. See the base ``DistReg`` class for details.
+		the underlying model. One of several options:
+
+		- 'identity': does not transform the features
+		- 'interactions' : interaction terms btwn. the treatment/covariates
+
+		The default is ``interactions``.
 	monotonicity : bool
 		If true, ensures that the coefficient corresponding to the treatment
 		is nonnegative. This is important when fitting Lee Bounds that assume
 		monotonicity. Defaults to False.
 	model_kwargs : dict
-		kwargs to sklearn 
+		kwargs to sklearn model class.
 	"""
 	def __init__(
 		self, 

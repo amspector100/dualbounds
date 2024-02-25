@@ -6,8 +6,7 @@ from scipy import stats
 from multiprocessing import Pool
 from functools import partial
 from itertools import product
-from tqdm import tqdm
-
+from tqdm.auto import tqdm
 
 def elapsed(t0):
 	return np.around(time.time() - t0, 2)
