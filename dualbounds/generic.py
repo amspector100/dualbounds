@@ -603,16 +603,6 @@ class DualBounds:
 					**kwargs
 				)
 
-		# # Compute realized dual variables
-		# self._compute_realized_dual_variables(
-		# 	y=self.y, 
-		# 	y0_min=y0_min, 
-		# 	y0_max=y0_max,
-		# 	y1_min=y1_min,
-		# 	y1_max=y1_max,
-		# 	**kwargs
-		# )
-
 	def _interpolate_and_ensure_feas(
 		self, yi, lower, i, y0_min, y1_min, y0_max, y1_max, **kwargs
 	):	
@@ -675,26 +665,6 @@ class DualBounds:
 					y1_max=y1_max,
 					**kwargs
 				)
-				# nu0x = self.nu0s[1-lower, i]
-				# nu1x = self.nu1s[1-lower, i]
-				# if not self.discrete:
-				# 	# Ensure feasibility
-				# 	y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(
-				# 		i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs
-				# 	)
-				# 	self.objdiffs[1-lower, i] = odx
-				# 	# interpolate to find realized values 
-				# 	self.hatnu0s[1 - lower, i] = self.interp_fn(
-				# 		x=y0v, y=nu0adj, newx=y[i],
-				# 	)[0]
-				# 	self.hatnu1s[1 - lower, i] = self.interp_fn(
-				# 		x=y1v, y=nu1adj, newx=y[i],
-				# 	)[0]
-				# else:
-				# 	j0 = np.where(self.y0_vals[i] == y[i])[0][0]
-				# 	j1 = np.where(self.y1_vals[i] == y[i])[0][0]
-				# 	self.hatnu0s[1 - lower, i] = nu0x[j0]
-				# 	self.hatnu1s[1 - lower, i] = nu1x[j1]
 
 	def _compute_ipw_summands(self):
 		"""

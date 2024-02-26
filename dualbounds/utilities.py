@@ -234,6 +234,19 @@ class BatchedCategorical:
 			qvals[:, i] = self.vals[i][np.argmax(flags, axis=0)]
 		return qvals
 
+	def rvs(self):
+		"""
+		Returns
+		-------
+		y : array
+			n-length array of a single RV drawn from each categorical.
+		"""
+		u = np.random.uniform(size=(self.n, 1))
+		inds = (u < self.cumprobs).argmax(axis=1)
+		return self.vals[(np.arange(self.n), inds)]
+
+
+
 def _convert_to_cat(bern_dist, n):
 	"""
 	Convert bernoulli dist. object to BatchedCategorical
