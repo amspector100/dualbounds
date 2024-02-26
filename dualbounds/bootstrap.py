@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import stats
 from .utilities import vrange
+from .generic import DualBounds
 
 def multiplier_bootstrap(
 	samples, 
@@ -93,8 +94,11 @@ def multiplier_bootstrap(
 	return estimate, ci
 
 def dualbound_multiplier_bootstrap(
-	db_objects, aipw=True, alpha=0.1, **kwargs	
-):
+	db_objects: list[DualBounds], 
+	aipw: bool=True,
+	alpha: float=0.1,
+	**kwargs,
+) -> dict:
 	"""
 	Combines evidence across multiple DualBounds classes
 	using the multiplier bootstrap.

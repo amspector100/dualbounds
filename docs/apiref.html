@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Reference &mdash; dualbounds 0.1.0 documentation</title>
+  <title>API Reference &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
@@ -16,7 +16,7 @@
   
         <script src="_static/jquery.js?v=5d32c60e"></script>
         <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=01f34227"></script>
+        <script src="_static/documentation_options.js?v=938c9ccc"></script>
         <script src="_static/doctools.js?v=888ff710"></script>
         <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -38,7 +38,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -63,6 +63,12 @@
 <li class="toctree-l4"><a class="reference internal" href="#dualbounds.generic.DualBounds.fit_propensity_scores"><code class="docutils literal notranslate"><span class="pre">DualBounds.fit_propensity_scores()</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.generic.plug_in_no_covariates"><code class="docutils literal notranslate"><span class="pre">plug_in_no_covariates()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.bootstrap">Bootstrap methods</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.bootstrap.dualbound_multiplier_bootstrap"><code class="docutils literal notranslate"><span class="pre">dualbound_multiplier_bootstrap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.bootstrap.multiplier_bootstrap"><code class="docutils literal notranslate"><span class="pre">multiplier_bootstrap()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.lee">Lee Bounds</a><ul>
@@ -113,15 +119,27 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.dist_reg.MonotoneLogisticReg"><code class="docutils literal notranslate"><span class="pre">MonotoneLogisticReg</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.dist_reg.QuantileDistReg"><code class="docutils literal notranslate"><span class="pre">QuantileDistReg</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dualbounds.dist_reg.QuantileDistReg.fit"><code class="docutils literal notranslate"><span class="pre">QuantileDistReg.fit()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dualbounds.dist_reg.QuantileDistReg.predict"><code class="docutils literal notranslate"><span class="pre">QuantileDistReg.predict()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.dist_reg.cross_fit_predictions"><code class="docutils literal notranslate"><span class="pre">cross_fit_predictions()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.gen_data">Quickly creating data-generating processes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.gen_data">Generate synthetic datasets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.gen_data.gen_regression_data"><code class="docutils literal notranslate"><span class="pre">gen_regression_data()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.utilities">Utility functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.utilities.adjust_support_size"><code class="docutils literal notranslate"><span class="pre">adjust_support_size()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.utilities.apply_pool"><code class="docutils literal notranslate"><span class="pre">apply_pool()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.utilities.apply_pool_factorial"><code class="docutils literal notranslate"><span class="pre">apply_pool_factorial()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.utilities.compute_est_bounds"><code class="docutils literal notranslate"><span class="pre">compute_est_bounds()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.utilities.weighted_quantile"><code class="docutils literal notranslate"><span class="pre">weighted_quantile()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.interpolation.adaptive_interpolate"><code class="docutils literal notranslate"><span class="pre">adaptive_interpolate()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.interpolation.linear_interpolate"><code class="docutils literal notranslate"><span class="pre">linear_interpolate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.interpolation.nn_interpolate"><code class="docutils literal notranslate"><span class="pre">nn_interpolate()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -158,11 +176,11 @@
 <span id="generic-dualbounds"></span><h2>Generic DualBounds<a class="headerlink" href="#module-dualbounds.generic" title="Link to this heading"></a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="dualbounds.generic.DualBounds">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.generic.</span></span><span class="sig-name descname"><span class="pre">DualBounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">discrete</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">support</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.generic.</span></span><span class="sig-name descname"><span class="pre">DualBounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Y_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#dualbounds.dist_reg.DistReg" title="dualbounds.dist_reg.DistReg"><span class="pre">DistReg</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ridge'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BaseEstimator</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ridge'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">discrete</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">support</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds" title="Link to this definition"></a></dt>
 <dd><p>Computes dual bounds on E[f(Y(0),Y(1), X)].</p>
-<dl class="field-list simple">
+<dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
+<dd class="field-odd"><dl>
 <dt><strong>f</strong><span class="classifier">function</span></dt><dd><p>Function which defines the partially identified estimand.
 Must be a function of three arguments: y0, y1, x 
 (in that order). E.g.,
@@ -180,7 +198,12 @@ If <code class="docutils literal notranslate"><span class="pre">None</span></cod
 <dt><strong>Y_model</strong><span class="classifier">str or dist_reg.DistReg</span></dt><dd><p>One of [‘ridge’, ‘lasso’, ‘elasticnet’, ‘randomforest’, ‘knn’].
 Alternatively, a distributional regression class inheriting 
 from <code class="docutils literal notranslate"><span class="pre">dist_reg.DistReg</span></code>. E.g., when <code class="docutils literal notranslate"><span class="pre">y</span></code> is continuous,
-defaults to <code class="docutils literal notranslate"><span class="pre">Y_model=dist_reg.CtsDistReg(model_type='ridge')</span></code>.</p>
+defaults to
+<a href="#id1"><span class="problematic" id="id2">``</span></a>Y_model=dist_reg.CtsDistReg(</p>
+<blockquote>
+<div><p>model_type=’ridge’, heterosked_model=None</p>
+</div></blockquote>
+<p>)``.</p>
 </dd>
 <dt><strong>W_model</strong><span class="classifier">str or sklearn classifier</span></dt><dd><p>Specifies how to estimate the propensity scores if <code class="docutils literal notranslate"><span class="pre">pis</span></code> is
 not known.  Either a str identifier as above or an sklearn
@@ -192,7 +215,7 @@ Defaults to <code class="docutils literal notranslate"><span class="pre">None</s
 <dt><strong>support</strong><span class="classifier">np.array</span></dt><dd><p>Optinal support of y, if known.
 Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (inferred from the data).</p>
 </dd>
-<dt><strong>**model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>Additional kwargs for an underlying <code class="docutils literal notranslate"><span class="pre">DistReg</span></code> model,
+<dt><strong>**model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>Additional kwargs for the <code class="docutils literal notranslate"><span class="pre">DistReg</span></code> outcome model,
 e.g., <code class="docutils literal notranslate"><span class="pre">eps_dist</span></code> (for cts. y) or <code class="docutils literal notranslate"><span class="pre">feature_transform</span></code>.</p>
 </dd>
 </dl>
@@ -242,17 +265,24 @@ synthetic regression data:</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.generic.DualBounds.compute_final_bounds" title="dualbounds.generic.DualBounds.compute_final_bounds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_final_bounds</span></code></a>([aipw, alpha])</p></td>
 <td><p>Computes final estimators/ses based on the estimated dual variables.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#dualbounds.generic.DualBounds.cross_fit" title="dualbounds.generic.DualBounds.cross_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code></a>([nfolds, suppress_warning])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#dualbounds.generic.DualBounds.cross_fit" title="dualbounds.generic.DualBounds.cross_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code></a>([nfolds, suppress_warning, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the outcome model.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.generic.DualBounds.fit_propensity_scores" title="dualbounds.generic.DualBounds.fit_propensity_scores"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code></a>(nfolds[, clip])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.generic.DualBounds.fit_propensity_scores" title="dualbounds.generic.DualBounds.fit_propensity_scores"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code></a>(nfolds[, clip, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the propensity scores.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>compute_oos_r2</strong></p></td>
+<td></td>
 </tr>
 </tbody>
 </table>
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.generic.DualBounds.compute_dual_bounds">
-<span class="sig-name descname"><span class="pre">compute_dual_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">solve_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.compute_dual_bounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.compute_dual_bounds" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">compute_dual_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_dists</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">rv_generic</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">rv_generic</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">solve_kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.compute_dual_bounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.compute_dual_bounds" title="Link to this definition"></a></dt>
 <dd><p>Main function which computes dual bounds in three steps:
 (1) cross-fitting, (2) computing optimal dual variables,
 and (3) computing final dual bounds.</p>
@@ -275,10 +305,10 @@ the ith distribution is an out-of-sample estimate of
 the law of Yi(1) | X[i]. This is an optional input;
 if provided, <code class="docutils literal notranslate"><span class="pre">Y_model</span></code> will be ignored.</p>
 </dd>
-<dt><strong>suppress_warning</strong><span class="classifier">bool</span></dt><dd><p>If True, suppresses warning about cross-fitting.</p>
-</dd>
 <dt><strong>verbose</strong><span class="classifier">bool</span></dt><dd><p>If True, gives occasional progress reports.
 Defaults to True.</p>
+</dd>
+<dt><strong>suppress_warning</strong><span class="classifier">bool</span></dt><dd><p>If True, suppresses a warning about cross-fitting.</p>
 </dd>
 <dt><strong>solve_kwargs</strong><span class="classifier">dict</span></dt><dd><p>Additional (optional) kwargs for the <code class="docutils literal notranslate"><span class="pre">compute_dual_variables</span></code>
 method, e.g. <code class="docutils literal notranslate"><span class="pre">nvals0</span></code>, <code class="docutils literal notranslate"><span class="pre">nvals1</span></code>, <code class="docutils literal notranslate"><span class="pre">grid_size</span></code>.</p>
@@ -300,7 +330,7 @@ method, e.g. <code class="docutils literal notranslate"><span class="pre">nvals0
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.generic.DualBounds.compute_dual_variables">
-<span class="sig-name descname"><span class="pre">compute_dual_variables</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y0_dists=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_vals=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_probs=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_vals=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_probs=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninterp=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nvals0=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nvals1=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_fn=&lt;function</span> <span class="pre">linear_interpolate&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_min=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_max=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_min=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_max=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.compute_dual_variables"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.compute_dual_variables" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">compute_dual_variables</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y0_dists=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_vals=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_probs=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_vals=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_probs=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ninterp=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nvals0=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nvals1=100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interp_fn=&lt;function</span> <span class="pre">adaptive_interpolate&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_min=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_max=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_min=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_max=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.compute_dual_variables"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.compute_dual_variables" title="Link to this definition"></a></dt>
 <dd><p>Uses the estimated outcome model to solve the dual optimal
 transport problem to obtain optimal dual variables.</p>
 <dl class="field-list simple">
@@ -338,13 +368,17 @@ Defaults to 100. Ignored for discrete Y.</p>
 signature as <code class="docutils literal notranslate"><span class="pre">interpolation.linear_interpolate</span></code>,
 which is the default. Ignored for discrete Y.</p>
 </dd>
-<dt><strong>y0_min</strong><span class="classifier">float</span></dt><dd><p>Minimum support for Y(0). Defaults to self.y.min()</p>
+<dt><strong>y0_min</strong><span class="classifier">float</span></dt><dd><p>Minimum support for Y(0).
+Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())</p>
 </dd>
-<dt><strong>y1_min</strong><span class="classifier">float</span></dt><dd><p>Minimum support for Y(1). Defaults to self.y.min()</p>
+<dt><strong>y1_min</strong><span class="classifier">float</span></dt><dd><p>Minimum support for Y(1). 
+Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())</p>
 </dd>
-<dt><strong>y0_max</strong><span class="classifier">float</span></dt><dd><p>Maximum support for Y(0). Defaults to self.y.max()</p>
+<dt><strong>y0_max</strong><span class="classifier">float</span></dt><dd><p>Maximum support for Y(0). 
+Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())</p>
 </dd>
-<dt><strong>y1_max</strong><span class="classifier">float</span></dt><dd><p>Maximum support for Y(1). Defaults to self.y.max()</p>
+<dt><strong>y1_max</strong><span class="classifier">float</span></dt><dd><p>Maximum support for Y(1). 
+Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())</p>
 </dd>
 <dt><strong>kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for <code class="docutils literal notranslate"><span class="pre">_ensure_feasibility</span></code> method, e.g., <code class="docutils literal notranslate"><span class="pre">grid_size</span></code>.</p>
 </dd>
@@ -362,7 +396,7 @@ dual variables.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.generic.DualBounds.cross_fit">
-<span class="sig-name descname"><span class="pre">cross_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.cross_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.cross_fit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">cross_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.cross_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.cross_fit" title="Link to this definition"></a></dt>
 <dd><p>Performs cross-fitting to fit the outcome model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -382,10 +416,111 @@ the conditional law of Yi(1) | X[i]</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.generic.DualBounds.fit_propensity_scores">
-<span class="sig-name descname"><span class="pre">fit_propensity_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.fit_propensity_scores"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.fit_propensity_scores" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">fit_propensity_scores</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#DualBounds.fit_propensity_scores"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.DualBounds.fit_propensity_scores" title="Link to this definition"></a></dt>
 <dd><p>Performs cross-fitting to fit the propensity scores.</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.generic.plug_in_no_covariates">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.generic.</span></span><span class="sig-name descname"><span class="pre">plug_in_no_covariates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_nvals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/generic.html#plug_in_no_covariates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.generic.plug_in_no_covariates" title="Link to this definition"></a></dt>
+<dd><p>Computes plug-in bounds on E[f(Y(0),Y(1))] without using covariates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outcomes</p>
+</dd>
+<dt><strong>W</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of treatments.</p>
+</dd>
+<dt><strong>f</strong><span class="classifier">function</span></dt><dd><p>f(y0, y1, x) defines the objective.</p>
+</dd>
+<dt><strong>pis</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of propensity scores.
+Default: all equal to 1/2.</p>
+</dd>
+<dt><strong>B</strong><span class="classifier">int</span></dt><dd><p>Number of bootstrap replications to compute standard errors.
+Defaults to 0 (no standard errors).</p>
+</dd>
+<dt><strong>verbose</strong><span class="classifier">bool</span></dt><dd><p>Show progress bar while bootstrapping if verbose=True.</p>
+</dd>
+<dt><strong>alpha</strong><span class="classifier">float</span></dt><dd><p>nominal Type I error level.</p>
+</dd>
+<dt><strong>max_nvals</strong><span class="classifier">int</span></dt><dd><p>Maximum dimension of OT problem.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-dualbounds.bootstrap">
+<span id="bootstrap-methods"></span><h2>Bootstrap methods<a class="headerlink" href="#module-dualbounds.bootstrap" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.bootstrap.dualbound_multiplier_bootstrap">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.bootstrap.</span></span><span class="sig-name descname"><span class="pre">dualbound_multiplier_bootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">db_objects</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dualbounds.generic.DualBounds" title="dualbounds.generic.DualBounds"><span class="pre">DualBounds</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/dualbounds/bootstrap.html#dualbound_multiplier_bootstrap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.bootstrap.dualbound_multiplier_bootstrap" title="Link to this definition"></a></dt>
+<dd><p>Combines evidence across multiple DualBounds classes
+using the multiplier bootstrap.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>db_objects</strong><span class="classifier">list</span></dt><dd><p>A list of fit DualBounds classes.</p>
+</dd>
+<dt><strong>aipw</strong><span class="classifier">bool</span></dt><dd><p>If True, uses AIPW estimators to reduce variance
+(highly recommended).</p>
+</dd>
+<dt><strong>alpha</strong><span class="classifier">float</span></dt><dd><p>Nominal level, between 0 and 1.</p>
+</dd>
+<dt><strong>kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for dualbounds.bootstrap.multiplier_bootstrap.</p>
+</dd>
+<dt><strong>Returns</strong></dt><dd></dd>
+<dt><strong>——-</strong></dt><dd></dd>
+<dt><strong>Returns a dictionary with the following attributes:</strong></dt><dd></dd>
+<dt><strong>estimates</strong><span class="classifier">np.array</span></dt><dd><p>array of lower and upper estimates. These in 
+general may be biased.</p>
+</dd>
+<dt><strong>cis</strong><span class="classifier">np.array</span></dt><dd><p>1 - alpha confidence lower/upper bounds on 
+the partial identification bounds.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.bootstrap.multiplier_bootstrap">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.bootstrap.</span></span><span class="sig-name descname"><span class="pre">multiplier_bootstrap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxarrsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10000000000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'max'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/bootstrap.html#multiplier_bootstrap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.bootstrap.multiplier_bootstrap" title="Link to this definition"></a></dt>
+<dd><p>Computes a lower confidence bound on the max(mu),
+where mu is the vector of means of <code class="docutils literal notranslate"><span class="pre">samples</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>samples</strong><span class="classifier">np.array</span></dt><dd><p>(n,d)-shaped array where samples[i]
+is i.i.d. with mean mui.</p>
+</dd>
+<dt><strong>alpha</strong><span class="classifier">float</span></dt><dd><p>Nominal error control level.</p>
+</dd>
+<dt><strong>B</strong><span class="classifier">int</span></dt><dd><p>Number of bootstrap replications</p>
+</dd>
+<dt><strong>maxarrsize</strong><span class="classifier">float</span></dt><dd><p>Maximum size of an array; used to
+save memory.</p>
+</dd>
+<dt><strong>param</strong><span class="classifier">str</span></dt><dd><p>If param=’max’, computes a lower CB on max(mu).
+Else, computes an upper CB on min(mu).</p>
+</dd>
+<dt><strong>verbose</strong><span class="classifier">bool</span></dt><dd><p>If True, shows a progress bar. Only useful
+if <code class="docutils literal notranslate"><span class="pre">samples</span></code> is a very large matrix.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>estimate</strong><span class="classifier">float</span></dt><dd><p>Estimate of max(mu1, …, mud).</p>
+</dd>
+<dt><strong>ci</strong><span class="classifier">float</span></dt><dd><p>Lower confidence bound on max(mu1, …, mud).</p>
+</dd>
+</dl>
+</dd>
+</dl>
 </dd></dl>
 
 </section>
@@ -455,17 +590,24 @@ Defaults to <code class="docutils literal notranslate"><span class="pre">None</s
 <tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.lee.LeeDualBounds.compute_final_bounds" title="dualbounds.lee.LeeDualBounds.compute_final_bounds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_final_bounds</span></code></a>([aipw, alpha])</p></td>
 <td><p>Computes final bounds based in (A)IPW summands, using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#dualbounds.lee.LeeDualBounds.cross_fit" title="dualbounds.lee.LeeDualBounds.cross_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code></a>([nfolds, suppress_warning])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#dualbounds.lee.LeeDualBounds.cross_fit" title="dualbounds.lee.LeeDualBounds.cross_fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code></a>([nfolds, suppress_warning, verbose])</p></td>
 <td><p>Performs cross-fitting to estimate the outcome and selection models.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip])</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the propensity scores.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>compute_oos_r2</strong></p></td>
+<td></td>
 </tr>
 </tbody>
 </table>
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.lee.LeeDualBounds.compute_dual_bounds">
-<span class="sig-name descname"><span class="pre">compute_dual_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s0_probs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s1_probs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">solve_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/lee.html#LeeDualBounds.compute_dual_bounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.lee.LeeDualBounds.compute_dual_bounds" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">compute_dual_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s0_probs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s1_probs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y0_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y1_dists</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">solve_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/lee.html#LeeDualBounds.compute_dual_bounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.lee.LeeDualBounds.compute_dual_bounds" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
@@ -540,7 +682,7 @@ using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.lee.LeeDualBounds.cross_fit">
-<span class="sig-name descname"><span class="pre">cross_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/lee.html#LeeDualBounds.cross_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.lee.LeeDualBounds.cross_fit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">cross_fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warning</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/lee.html#LeeDualBounds.cross_fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.lee.LeeDualBounds.cross_fit" title="Link to this definition"></a></dt>
 <dd><p>Performs cross-fitting to estimate the outcome and selection models.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
@@ -666,11 +808,18 @@ provides lower bounds and the input
 <tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.varcate.VarCATEDualBounds.compute_final_bounds" title="dualbounds.varcate.VarCATEDualBounds.compute_final_bounds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_final_bounds</span></code></a>([aipw, alpha])</p></td>
 <td><p>Computes final estimators/ses based on the estimated dual variables.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code>([nfolds, suppress_warning])</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code>([nfolds, suppress_warning, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the outcome model.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip])</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the propensity scores.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>compute_oos_r2</strong></p></td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -748,11 +897,18 @@ the input <code class="docutils literal notranslate"><span class="pre">f</span><
 <tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.varite.VarITEDualBounds.compute_final_bounds" title="dualbounds.varite.VarITEDualBounds.compute_final_bounds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_final_bounds</span></code></a>([aipw, alpha])</p></td>
 <td><p>Computes final bounds based in (A)IPW summands, using the delta method for Var(Y(1) - Y(0)).</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code>([nfolds, suppress_warning])</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code>([nfolds, suppress_warning, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the outcome model.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip])</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip, verbose])</p></td>
 <td><p>Performs cross-fitting to fit the propensity scores.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>compute_oos_r2</strong></p></td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -803,19 +959,29 @@ distribution is the conditional law of Yi(1) | Xi</p>
 <span id="distributional-regression-classes"></span><h2>Distributional regression classes<a class="headerlink" href="#module-dualbounds.dist_reg" title="Link to this heading"></a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.BinaryDistReg">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">BinaryDistReg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'logistic'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monotonicity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">how_transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'interactions'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg" title="Link to this definition"></a></dt>
-<dd><p>A wrapper of sklearn.LogisticRegression which inherits from <code class="docutils literal notranslate"><span class="pre">DistReg</span></code></p>
-<dl class="field-list simple">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">BinaryDistReg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BaseEstimator</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'logistic'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">monotonicity</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">how_transform</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'interactions'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg" title="Link to this definition"></a></dt>
+<dd><p>Binary regression which inherits from <code class="docutils literal notranslate"><span class="pre">DistReg</span></code></p>
+<dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
+<dd class="field-odd"><dl>
+<dt><strong>model_type</strong><span class="classifier">str or sklearn class.</span></dt><dd><p>Str specifying a sklearn model class to use; options include
+‘ridge’, ‘lasso’, ‘elasticnet’, ‘randomforest’, ‘knn’. One can
+also directly pass an sklearn class, e.g., 
+<code class="docutils literal notranslate"><span class="pre">model_type=sklearn.linear_model.LogisticRegressionCV</span></code>.</p>
+</dd>
 <dt><strong>how_transform</strong><span class="classifier">str</span></dt><dd><p>Str specifying how to transform the features before fitting
-a <code class="docutils literal notranslate"><span class="pre">LogisticCV</span></code> model. See the base <code class="docutils literal notranslate"><span class="pre">DistReg</span></code> class for details.</p>
+the underlying model. One of several options:</p>
+<ul class="simple">
+<li><p>‘identity’: does not transform the features</p></li>
+<li><p>‘interactions’ : interaction terms btwn. the treatment/covariates</p></li>
+</ul>
+<p>The default is <code class="docutils literal notranslate"><span class="pre">interactions</span></code>.</p>
 </dd>
 <dt><strong>monotonicity</strong><span class="classifier">bool</span></dt><dd><p>If true, ensures that the coefficient corresponding to the treatment
 is nonnegative. This is important when fitting Lee Bounds that assume
 monotonicity. Defaults to False.</p>
 </dd>
-<dt><strong>model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs to sklearn</p>
+<dt><strong>model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs to sklearn model class.</p>
 </dd>
 </dl>
 </dd>
@@ -839,7 +1005,7 @@ monotonicity. Defaults to False.</p>
 </table>
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.BinaryDistReg.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.fit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.fit" title="Link to this definition"></a></dt>
 <dd><p>Fits model on the data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -857,14 +1023,14 @@ monotonicity. Defaults to False.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.BinaryDistReg.predict">
-<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.predict" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.predict" title="Link to this definition"></a></dt>
 <dd><p>If W is None, returns (y0_dists, y1_dists)
 Else, returns (y_dists)</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.BinaryDistReg.predict_proba">
-<span class="sig-name descname"><span class="pre">predict_proba</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.predict_proba"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.predict_proba" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">predict_proba</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#BinaryDistReg.predict_proba"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.BinaryDistReg.predict_proba" title="Link to this definition"></a></dt>
 <dd><p>If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
 Else, returns P(Y = 1 | W , X)</p>
 </dd></dl>
@@ -873,33 +1039,75 @@ Else, returns P(Y = 1 | W , X)</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.CtsDistReg">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">CtsDistReg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ridge'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'gaussian'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">how_transform</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'interactions'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterosked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg" title="Link to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">CtsDistReg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BaseEstimator</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'ridge'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">how_transform</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'interactions'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_dist</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'empirical'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterosked_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'none'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterosked_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg" title="Link to this definition"></a></dt>
 <dd><p>Distributional regression for continuous outcomes.</p>
-<dl class="field-list simple">
+<dl class="field-list">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><dl class="simple">
+<dd class="field-odd"><dl>
 <dt><strong>model_type</strong><span class="classifier">str or sklearn class</span></dt><dd><p>Str specifying a sklearn model class to use; options include
 ‘ridge’, ‘lasso’, ‘elasticnet’, ‘randomforest’, ‘knn’. One can
-also directly pass an sklearn class constructor, e.g., 
+also directly pass an sklearn class, e.g., 
 <code class="docutils literal notranslate"><span class="pre">model_type=sklearn.ensemble.KNeighborsRegressor</span></code>.</p>
 </dd>
 <dt><strong>how_transform</strong><span class="classifier">str</span></dt><dd><p>Str specifying how to transform the features before fitting
-the base sklearn model.</p>
+the underlying model. One of several options:</p>
+<ul class="simple">
+<li><p>‘identity’: does not transform the features</p></li>
+<li><p>‘interactions’ : interaction terms btwn. the treatment/covariates</p></li>
+</ul>
+<p>The default is <code class="docutils literal notranslate"><span class="pre">interactions</span></code>.</p>
 </dd>
-<dt><strong>eps_dist</strong><span class="classifier">str</span></dt><dd><p>Str specifying the (parametric) distribution of the residuals.
-One of [‘gaussian’, ‘laplace’, ‘expon’, ‘tdist’]. Defaults 
-to <code class="docutils literal notranslate"><span class="pre">gaussian</span></code>.</p>
+<dt><strong>eps_dist</strong><span class="classifier">str</span></dt><dd><p>Str specifying the distribution of the residuals. Options include
+[‘empirical’, gaussian’, ‘laplace’, ‘expon’, ‘tdist’, ‘skewnorm’]. 
+Defaults to <code class="docutils literal notranslate"><span class="pre">empirical</span></code>, which uses the empirical law of the
+residuals of the training data.</p>
 </dd>
-<dt><strong>heterosked</strong><span class="classifier">bool</span></dt><dd><p>If True, estimates Var(Y | X) as a function of X by using
-the specified model to predict both E[Y^2 | X] and E[Y | X].
-If False, assumes Var(Y | X) is constant. Defaults to False.</p>
+<dt><strong>eps_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for <code class="docutils literal notranslate"><span class="pre">utilities.parse_dist</span></code> for the residual dist.</p>
 </dd>
-<dt><strong>model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for sklearn base model constructor. E.g., for <code class="docutils literal notranslate"><span class="pre">knn</span></code>,
+<dt><strong>heterosked_model</strong><span class="classifier">str or sklearn class</span></dt><dd><p>Str specifying a sklearn model class to use to estimate 
+Var(Y | X) as a function of X. Options are the same as 
+<code class="docutils literal notranslate"><span class="pre">model_type.</span></code> Defaults to heterosked_model=None, in which
+case homoskedasticity is assumed (although the final bounds
+will still be valid in the presence of heteroskedasticity).</p>
+</dd>
+<dt><strong>heterosked_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for the heterosked model. E.g., for <code class="docutils literal notranslate"><span class="pre">knn</span></code>,
+heterosked_kwargs could include <code class="docutils literal notranslate"><span class="pre">n_neighbors</span></code>.</p>
+</dd>
+<dt><strong>**model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs for sklearn base model. E.g., for <code class="docutils literal notranslate"><span class="pre">knn</span></code>,
 model_kwargs could include <code class="docutils literal notranslate"><span class="pre">n_neighbors</span></code>.</p>
 </dd>
 </dl>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<p>import numpy as np
+import dualbounds
+import sklearn.linear_model</p>
+<p># Instantiate dist_reg
+cdreg = dualbounds.dist_reg.CtsDistReg(</p>
+<blockquote>
+<div><p># Arguments for main model
+model_type=sklearn.linear_model.RidgeCV,
+fit_intercept=True,
+gcv_mode=’auto’,
+# How to estimate the law of the residuals
+eps_dist=’gaussian’,
+# How to estimate Var(Y | X)
+heterosked_model=sklearn.linear_model.LassoCV,
+heterosked_kwargs=dict(cv=5),</p>
+</div></blockquote>
+<p>)</p>
+<p># Fit
+n, p = 300, 20
+W = np.random.binomial(1, 0.5, n)
+X = np.random.randn(n, p)
+y = np.random.randn(n)
+cdreg.fit(W=W, X=X, y=y)</p>
+<p># Predict on new X with or without W
+m = 10
+Xnew = np.random.randn(m, p)
+y0_dists, y1_dists = cdreg.predict(X=Xnew)
+y0_dists = cdreg.predict(X=Xnew, W=np.zeros(m))</p>
 <p class="rubric">Methods</p>
 <table class="autosummary longtable docutils align-default">
 <tbody>
@@ -920,7 +1128,7 @@ model_kwargs could include <code class="docutils literal notranslate"><span clas
 </table>
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.CtsDistReg.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg.fit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg.fit" title="Link to this definition"></a></dt>
 <dd><p>Fits model on the data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -938,7 +1146,7 @@ model_kwargs could include <code class="docutils literal notranslate"><span clas
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.CtsDistReg.predict">
-<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg.predict" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#CtsDistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.CtsDistReg.predict" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
@@ -1003,7 +1211,7 @@ the underlying model. One of several options:</p>
 </table>
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.DistReg.feature_transform">
-<span class="sig-name descname"><span class="pre">feature_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.feature_transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.feature_transform" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">feature_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.feature_transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.feature_transform" title="Link to this definition"></a></dt>
 <dd><p>Transforms the features before feeding them to the base model.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1025,7 +1233,7 @@ the underlying model. One of several options:</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.DistReg.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.fit" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.fit" title="Link to this definition"></a></dt>
 <dd><p>Fits model on the data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1043,7 +1251,7 @@ the underlying model. One of several options:</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.DistReg.predict">
-<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.predict" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#DistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.DistReg.predict" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
@@ -1088,22 +1296,92 @@ Useful for computing Lee bounds which assume monotonicity.</p>
 </table>
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="dualbounds.dist_reg.QuantileDistReg">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">QuantileDistReg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nquantiles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alphas</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[0]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">how_transform</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'interactions'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#QuantileDistReg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.QuantileDistReg" title="Link to this definition"></a></dt>
+<dd><p>A continuous distributional regression based on quantile regression.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>nquantiles</strong><span class="classifier">int</span></dt><dd><p>The number of quantiles to fit quantile regressions for.
+Quantiles are evenly spaced between 0 and 1.</p>
+</dd>
+<dt><strong>alphas</strong><span class="classifier">list or np.array</span></dt><dd><p>List of l1 regularization strengths to use in the quantile
+regression; the final strength is determined by cross-validation.  
+Default is alphas=[0] (no regularization).</p>
+</dd>
+<dt><strong>how_transform</strong><span class="classifier">str</span></dt><dd><p>Str specifying how to transform the features before fitting
+the underlying model. One of several options:</p>
+<ul class="simple">
+<li><p>‘identity’: does not transform the features</p></li>
+<li><p>‘interactions’ : interaction terms btwn. the treatment/covariates</p></li>
+</ul>
+<p>The default is <code class="docutils literal notranslate"><span class="pre">interactions</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This method is computationally expensive for large datasets.</p>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">feature_transform</span></code>(W, X)</p></td>
+<td><p>Transforms the features before feeding them to the base model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#dualbounds.dist_reg.QuantileDistReg.fit" title="dualbounds.dist_reg.QuantileDistReg.fit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>(W, X, y)</p></td>
+<td><p>Fits model on the data.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>predict</strong></p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="dualbounds.dist_reg.QuantileDistReg.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#QuantileDistReg.fit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.QuantileDistReg.fit" title="Link to this definition"></a></dt>
+<dd><p>Fits model on the data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>W</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of binary treatment indicators.</p>
+</dd>
+<dt><strong>X</strong><span class="classifier">np.array</span></dt><dd><p>(n, p)-shaped array of covariates.</p>
+</dd>
+<dt><strong>y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outcome measurements.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dualbounds.dist_reg.QuantileDistReg.predict">
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">W</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">array</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#QuantileDistReg.predict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.QuantileDistReg.predict" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="dualbounds.dist_reg.cross_fit_predictions">
-<span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">cross_fit_predictions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_on_selections</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_cls</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">probs_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#cross_fit_predictions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.cross_fit_predictions" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">dualbounds.dist_reg.</span></span><span class="sig-name descname"><span class="pre">cross_fit_predictions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">W</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">X</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">S</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nfolds</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">train_on_selections</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_cls</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">probs_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">model_kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/dist_reg.html#cross_fit_predictions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.dist_reg.cross_fit_predictions" title="Link to this definition"></a></dt>
 <dd><p>Performs cross-fitting on a model class inheriting from <code class="docutils literal notranslate"><span class="pre">dist_reg.DistReg.</span></code></p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><dl class="simple">
 <dt><strong>model</strong><span class="classifier">DistReg</span></dt><dd><p>instantiation of <code class="docutils literal notranslate"><span class="pre">dist_reg.DistReg</span></code> class. This will
 be copied. E.g., 
-<code class="docutils literal notranslate"><span class="pre">model=dist_reg.CtsDistReg(model_type='ridge',</span> <span class="pre">eps_dist=&quot;laplace&quot;).</span></code></p>
+<code class="docutils literal notranslate"><span class="pre">model=dist_reg.CtsDistReg(model_type='ridge',</span> <span class="pre">eps_dist=&quot;empirical&quot;).</span></code></p>
 </dd>
 <dt><strong>model_cls</strong></dt><dd><p>Alterantively, give the class name and have it constructed.
 E.g, <code class="docutils literal notranslate"><span class="pre">model_cls=dist_reg.CtsDistReg</span></code>.</p>
 </dd>
 <dt><strong>model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>kwargs to construct model; used only if model_cls is specified.
-E.g., <code class="docutils literal notranslate"><span class="pre">model_kwargs=dict(eps_dist=laplace)</span></code>.</p>
+E.g., <code class="docutils literal notranslate"><span class="pre">model_kwargs=dict(eps_dist=empirical)</span></code>.</p>
 </dd>
 <dt><strong>S</strong><span class="classifier">array</span></dt><dd><p>Optional n-length array of selection indicators.</p>
 </dd>
@@ -1131,11 +1409,89 @@ the conditional law of Yi(1) | X[i]</p>
 
 </section>
 <section id="module-dualbounds.gen_data">
-<span id="quickly-creating-data-generating-processes"></span><h2>Quickly creating data-generating processes<a class="headerlink" href="#module-dualbounds.gen_data" title="Link to this heading"></a></h2>
+<span id="generate-synthetic-datasets"></span><h2>Generate synthetic datasets<a class="headerlink" href="#module-dualbounds.gen_data" title="Link to this heading"></a></h2>
 <p>Generate synthetic data for tests and illustrations.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.gen_data.gen_regression_data">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.gen_data.</span></span><span class="sig-name descname"><span class="pre">gen_regression_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">p</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lmda_dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'constant'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps_dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'gaussian'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">heterosked</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'constant'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tauv</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interactions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tau</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">betaW_norm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">covmethod</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'identity'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dgp_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sample_seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/gen_data.html#gen_regression_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.gen_data.gen_regression_data" title="Link to this definition"></a></dt>
+<dd><p>Samples a synthetic regression dataset.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>n</strong><span class="classifier">int</span></dt><dd><p>Number of observations.</p>
+</dd>
+<dt><strong>p</strong><span class="classifier">int</span></dt><dd><p>Number of covariates</p>
+</dd>
+<dt><strong>lmda_dist</strong><span class="classifier">str</span></dt><dd><p>str specifying the distribution of lmdai, 
+where Xi = lmdai * N(0, Sigma), so the 
+covariates are elliptically distributed.</p>
+</dd>
+<dt><strong>eps_dist</strong><span class="classifier">str</span></dt><dd><p>str specifying the distribution of the 
+residuals. See <code class="docutils literal notranslate"><span class="pre">utilities.parse_dist</span></code>
+for the list of options.</p>
+</dd>
+<dt><strong>heterosked</strong><span class="classifier">str</span></dt><dd><p>str specifying the type of heteroskedasticity.
+Defaults to <code class="docutils literal notranslate"><span class="pre">constant</span></code>.</p>
+</dd>
+<dt><strong>tauv</strong><span class="classifier">float</span></dt><dd><p>Ratio of Var(Y(1) | X) / Var(Y(0) | X)</p>
+</dd>
+<dt><strong>r2</strong><span class="classifier">float</span></dt><dd><p>Population r^2 of 1 - E[Var(Y | X)] / Var(Y).</p>
+</dd>
+<dt><strong>interactions</strong><span class="classifier">bool</span></dt><dd><p>If True (default), 
+Y = X beta + W * X * beta_int + epsilon.
+Else, the interactions between the treatment
+and the covariates are ommitted.</p>
+</dd>
+<dt><strong>tau</strong><span class="classifier">float</span></dt><dd><p>Average treatment effect.</p>
+</dd>
+<dt><strong>betaW_norm</strong><span class="classifier">float</span></dt><dd><p>E[W | X] = logistic(X &#64; betaW). This parameter
+controls the norm of betaW and thus the 
+variance of the propensity scores.</p>
+</dd>
+<dt><strong>dgp_seed</strong><span class="classifier">int</span></dt><dd><p>Random seed for the data-generating parameters.</p>
+</dd>
+<dt><strong>sample_seed</strong><span class="classifier">int</span></dt><dd><p>Random seed for the randomness from sampling.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>data</strong><span class="classifier">dict</span></dt><dd><p>Dictionary with keys <code class="docutils literal notranslate"><span class="pre">X</span></code> (covariates),
+<code class="docutils literal notranslate"><span class="pre">y</span></code> (response), <code class="docutils literal notranslate"><span class="pre">W</span></code> (treatment), 
+<code class="docutils literal notranslate"><span class="pre">pis</span></code> (true propensity scores), 
+<code class="docutils literal notranslate"><span class="pre">beta</span></code>, <code class="docutils literal notranslate"><span class="pre">beta_int</span></code>, <code class="docutils literal notranslate"><span class="pre">betaW</span></code>, 
+and more.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 <section id="module-dualbounds.utilities">
 <span id="utility-functions"></span><h2>Utility functions<a class="headerlink" href="#module-dualbounds.utilities" title="Link to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.utilities.adjust_support_size">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.utilities.</span></span><span class="sig-name descname"><span class="pre">adjust_support_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">vals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">probs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_nvals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ymin</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ymax</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/utilities.html#adjust_support_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.utilities.adjust_support_size" title="Link to this definition"></a></dt>
+<dd><p>Adjust categorical distribution to have a support of size new_nvals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>vals</strong><span class="classifier">np.array</span></dt><dd><p>(n, nvals)-length array of support. vals[i] must be sorted for each i.</p>
+</dd>
+<dt><strong>probs</strong><span class="classifier">np.array</span></dt><dd><p>(n, nvals)-length array of probabilities</p>
+</dd>
+<dt><strong>new_nvals</strong><span class="classifier">int</span></dt><dd><p>Desired size of support.</p>
+</dd>
+<dt><strong>ymin</strong><span class="classifier">float</span></dt><dd><p>Minimum value for support</p>
+</dd>
+<dt><strong>ymax</strong><span class="classifier">float</span></dt><dd><p>Maximum value for support</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="dualbounds.utilities.apply_pool">
 <span class="sig-prename descclassname"><span class="pre">dualbounds.utilities.</span></span><span class="sig-name descname"><span class="pre">apply_pool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant_inputs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_processes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/utilities.html#apply_pool"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.utilities.apply_pool" title="Link to this definition"></a></dt>
@@ -1227,18 +1583,97 @@ map to a list of different arguments.</p>
 </dl>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.utilities.weighted_quantile">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.utilities.</span></span><span class="sig-name descname"><span class="pre">weighted_quantile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weights</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quantiles</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">old_style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/utilities.html#weighted_quantile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.utilities.weighted_quantile" title="Link to this definition"></a></dt>
+<dd><p>Very close to numpy.percentile, but supports weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>values</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of data</p>
+</dd>
+<dt><strong>weights</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of sample weights</p>
+</dd>
+<dt><strong>quantiles</strong><span class="classifier">array-like</span></dt><dd><p>desired quantiles</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <p id="module-dualbounds.interpolation">Contains various interpolation functions used to 
 go from discrete dual variables to continuous ones.</p>
 <dl class="py function">
-<dt class="sig sig-object py" id="dualbounds.interpolation.linear_interpolate">
-<span class="sig-prename descclassname"><span class="pre">dualbounds.interpolation.</span></span><span class="sig-name descname"><span class="pre">linear_interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/interpolation.html#linear_interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.interpolation.linear_interpolate" title="Link to this definition"></a></dt>
-<dd><dl class="simple">
-<dt>x<span class="classifier">np.array</span></dt><dd><p>n-length array of inputs. Must be sorted, although
+<dt class="sig sig-object py" id="dualbounds.interpolation.adaptive_interpolate">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.interpolation.</span></span><span class="sig-name descname"><span class="pre">adaptive_interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/interpolation.html#adaptive_interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.interpolation.adaptive_interpolate" title="Link to this definition"></a></dt>
+<dd><p>Adaptively chooses between linear and nearest-neighbor
+interpolation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of inputs. Must be sorted, although
 this is not explicitly enforced to save time.</p>
 </dd>
-<dt>y<span class="classifier">np.array</span></dt><dd><p>n-length array of outputs</p>
+<dt><strong>y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outputs</p>
 </dd>
-<dt>newx<span class="classifier">np.array</span></dt><dd><p>m-length array of new inputs</p>
+<dt><strong>newx</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of new inputs</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>newy</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of interpolated outputs</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.interpolation.linear_interpolate">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.interpolation.</span></span><span class="sig-name descname"><span class="pre">linear_interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/interpolation.html#linear_interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.interpolation.linear_interpolate" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of inputs. Must be sorted, although
+this is not explicitly enforced to save time.</p>
+</dd>
+<dt><strong>y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outputs</p>
+</dd>
+<dt><strong>newx</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of new inputs</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>newy</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of interpolated outputs</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dualbounds.interpolation.nn_interpolate">
+<span class="sig-prename descclassname"><span class="pre">dualbounds.interpolation.</span></span><span class="sig-name descname"><span class="pre">nn_interpolate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/interpolation.html#nn_interpolate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.interpolation.nn_interpolate" title="Link to this definition"></a></dt>
+<dd><p>nearest-neighbor interpolation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>x</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of inputs. Must be sorted, although
+this is not explicitly enforced to save time.</p>
+</dd>
+<dt><strong>y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outputs</p>
+</dd>
+<dt><strong>newx</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of new inputs</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>newy</strong><span class="classifier">np.array</span></dt><dd><p>m-length array of interpolated outputs</p>
+</dd>
+</dl>
 </dd>
 </dl>
 </dd></dl>

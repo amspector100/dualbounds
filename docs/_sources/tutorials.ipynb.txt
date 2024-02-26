@@ -46,7 +46,7 @@
    "id": "2e918257-8594-48d5-ab78-7128c5524e2a",
    "metadata": {},
    "source": [
-    "In this section, we give a minimal review the dual bounds framework; a more complete review can be found in the first four pages of [Ji et al. (2023)](https://arxiv.org/abs/2310.08115). Users familiar with this content should skip this section. \n"
+    "This section gives a minimal review of the dual bounds framework. A more complete review can be found in the first four pages of [Ji et al. (2023)](https://arxiv.org/abs/2310.08115). Users familiar with this content should skip this section. \n"
    ]
   },
   {
@@ -72,7 +72,7 @@
    "source": [
     "where $Y_i(1), Y_i(0) \\in \\mathcal{Y}$ denote potential outcomes. Such estimands are *partially identified* because we never observe the joint law of the potential outcomes, but the data still contains information on the law of $(Y(0), X)$ and $(Y(1), X)$ allowing us to *bound* $\\theta$. (More generally, dual bounds can provde bounds on the solutions to generic optimization problems, but we defer discussion of this until later in the tutorial for simplicity).\n",
     "\n",
-    "Thus, to bound $\\theta$, one usually must estimate the laws of $(Y(1), X)$ and $(Y(0), X)$, typically using sophisticated machine learning techniques. However, it is not clear if the resulting bounds on $\\theta$ will be valid if the learned machine learning models are misspecified or inaccurate. For example, if one models $Y$ as having a linear relationship with $(X,W)$, but in truth $Y$ has a highly nonlinear relationship with $(X,W$), naive approaches could lead to inaccurate inference."
+    "Thus, to bound $\\theta$, one must estimate the laws of $(Y(1), X)$ and $(Y(0), X)$, typically using sophisticated machine learning techniques. However, it is not clear if the resulting bounds on $\\theta$ will be valid if the learned machine learning models are misspecified or inaccurate. For example, if one models $Y$ as having a linear relationship with $(X,W)$, but in truth $Y$ has a highly nonlinear relationship with $(X,W$), naive approaches could lead to inaccurate inference."
    ]
   },
   {
@@ -86,7 +86,7 @@
     "\n",
     "2. In randomized experiments, dual bounds yield provably valid confidence intervals on $\\theta$, even if the underlying ML model is arbitrarily misspecified or inaccurate. In observational studies, they have remarkably strong double robustness properties (see Section 3.4 of [Ji et al. (2023)](https://arxiv.org/abs/2310.08115)).\n",
     "\n",
-    "3. On the other hand, if the underlying ML model is highly accurate, dual bounds yield extremely sharp confidence bounds in a formal sense (see Section 3.2 of [Ji et al. (2023)](https://arxiv.org/abs/2310.08115))."
+    "3. On the other hand, if the underlying ML model is highly accurate, dual bounds yield tight confidence bounds in a formal sense (see Section 3.2 of [Ji et al. (2023)](https://arxiv.org/abs/2310.08115))."
    ]
   },
   {
@@ -110,9 +110,9 @@
    "id": "139df393-4437-4d89-bbf9-250725a27cf6",
    "metadata": {},
    "source": [
-    "The ``DualBounds`` class is the main class in the package. The main usage is as follows. \n",
+    "The ``DualBounds`` class is the main class in the package. Its usage is as follows. \n",
     "\n",
-    "**Step 1**: one should initialize the ``DualBounds`` class, which takes as an input (i) the data, (ii) the definition of the function $f$ (which defines the estimand $\\theta$), and (iii) a description of the outcome model to use as an input. The user can also input a vector of propensity scores if they are known; else they will be estimated from the data. \n",
+    "**Step 1**: initialize the ``DualBounds`` class, which takes as an input (i) the data, (ii) the definition of the function $f$ (which defines the estimand $\\theta$), and (iii) a description of the outcome model to use as an input. The user can also input a vector of propensity scores if they are known; else they will be estimated from the data. \n",
     "\n",
     "For example, below, we show how to compute $E[\\mathbb{I}(Y(1) > Y(0)]$, the probability that the treatment effect is positive."
    ]
@@ -161,18 +161,53 @@
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 828.69it/s]\n"
+      "Cross-fitting the outcome model.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "76e07506168c43b89f571256d3c52246",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.57745911, 0.92498299]),\n",
-       " 'ses': array([0.02331765, 0.0129798 ]),\n",
-       " 'cis': array([0.53175736, 0.95042292])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "c388df80af2a487982889724c9d2b873",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.58374648, 0.93389944]),\n",
+       " 'ses': array([0.02336725, 0.01422112]),\n",
+       " 'cis': array([0.5379475 , 0.96177232])}"
       ]
      },
      "execution_count": 3,
@@ -184,7 +219,8 @@
     "# Compute dual bounds and observe output\n",
     "dbnd.compute_dual_bounds(\n",
     "    nfolds=5, # number of cross-fitting folds\n",
-    "    alpha=0.05 # nominal level\n",
+    "    alpha=0.05, # nominal level,\n",
+    "    verbose=True # show progress bars\n",
     ")"
    ]
   },
@@ -211,18 +247,53 @@
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 579.67it/s]\n"
+      "Cross-fitting the outcome model.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "7ee78bbb86fb452b8845fe5b53e04610",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([2.52594772, 4.27917408]),\n",
-       " 'ses': array([0.18387067, 0.15829605]),\n",
-       " 'cis': array([2.22350738, 4.5395479 ])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "b50661c9185f4fd2a15ca10f1e0cbf7c",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([2.65658511, 4.30910011]),\n",
+       " 'ses': array([0.18435337, 0.15765387]),\n",
+       " 'cis': array([2.3533508 , 4.56841764])}"
       ]
      },
      "execution_count": 4,
@@ -257,7 +328,7 @@
    "id": "7fa4c951-6807-4fce-b384-30c0fb477525",
    "metadata": {},
    "source": [
-    "Dual bounds wrap on top of an underlying model which estimates the conditional distributions of $Y(1) \\mid X$ and $Y(0) \\mid X$. To allow for maximum flexibility, ``dualbounds`` gives the user three ways to specify the underlying model, listed below in order of increasing flexibility."
+    "Dual bounds wrap on top of an underlying model which estimates the conditional distributions of $Y(1) \\mid X$ and $Y(0) \\mid X$. There are three ways to specify the underlying model, listed below in order of increasing flexibility."
    ]
   },
   {
@@ -273,7 +344,7 @@
    "id": "d4e58aaa-34c0-4039-8760-8122a81036cb",
    "metadata": {},
    "source": [
-    "The easiest way to choose the model is to use one of the string identifiers, such as ``'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'`` (see the API reference for a complete list), as demonstrated below."
+    "The easiest method is to use one of the string identifiers, such as ``'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'`` (see the API reference for a complete list):"
    ]
   },
   {
@@ -284,9 +355,9 @@
    "outputs": [],
    "source": [
     "dbnd = DualBounds(\n",
-    "    Y_model='randomforest', # use random forest model\n",
     "    f=lambda y0, y1, x: np.maximum(y1-y0,0), # estimand\n",
     "    X=data['X'], W=data['W'], y=data['y'], # data\n",
+    "    Y_model='randomforest', # use random forest model to predict E[Y | X]\n",
     ")"
    ]
   },
@@ -319,10 +390,61 @@
    "id": "323922f0-cadc-4cc8-ba1f-ccffba1b3294",
    "metadata": {},
    "source": [
-    "where the conditional mean function $\\mu(\\cdot, \\cdot)$ is approximated using one of the models listed above (e.g., a random forest or k-nearest neighbors regressor). All methods automatically create interaction terms between the covariates and the treatment.\n",
-    " \n",
-    "\n",
-    "By default, these string identifiers assume Gaussian homoskedastic residuals, i.e., $\\epsilon_i \\stackrel{\\mathrm{i.i.d.}}{\\sim} \\mathcal{N}(0, \\sigma^2)$. This lightweight approach may not be realistic, but nonetheless we have found that it yields reasonably tight confidence intervals even under misspecification. Of course, it provably yields valid confidence intervals even under arbitrary misspecification of the outcome model."
+    "where the conditional mean function $\\mu(\\cdot, \\cdot)$ is approximated using one of the models listed above (e.g., a random forest or k-nearest neighbors regressor). All methods automatically create interaction terms between the covariates and the treatment."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "da23c21d-3097-4147-af6b-8b06b175ca33",
+   "metadata": {},
+   "source": [
+    "**Default 1: Homoskedasticity.** By default, these string identifiers estimate a homoskedastic model where the variance of $\\epsilon_i$ does not depend on $X_i$. However, one can also specify a model to use to estimate the heteroskedasticity pattern, as shown below:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "7d615561-7d8a-46dd-bab9-d0d8d0f28367",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "dbnd = DualBounds(\n",
+    "    f=lambda y0, y1, x: np.maximum(y1-y0,0), # estimand\n",
+    "    X=data['X'], W=data['W'], y=data['y'], # data\n",
+    "    Y_model='randomforest', # use random forest model to predict E[Y | X]\n",
+    "    heterosked_model='lasso', # use lasso to predict Var(Y | X)\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "209752d4-8467-4dcf-85af-c323a9a22fd3",
+   "metadata": {},
+   "source": [
+    "That said, we emphasize that the default (homoskedastic) approach yields valid bounds even under arbitrary heteroskedasticity patterns."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "022b00e8-7a05-43f0-aef0-87119e8b932c",
+   "metadata": {},
+   "source": [
+    "**Default 2: Nonparametric residual estimates.** By default, these string identifiers estimate the law of $\\epsilon_i$ using the empirical law of the training residuals (or, for ridge estimators, the leave-one-out residuals). However, it is possible to change this by changing the ``eps_dist`` parameter."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "4a77d62b-6049-40b5-8adb-154c069da190",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "dbnd = DualBounds(\n",
+    "    f=lambda y0, y1, x: np.maximum(y1-y0,0), # estimand\n",
+    "    X=data['X'], W=data['W'], y=data['y'], # data\n",
+    "    Y_model='randomforest', # use random forest model to predict E[Y | X]\n",
+    "    eps_dist='laplace', # assume a parametric model for the residuals; the default is nonparametric\n",
+    ")"
    ]
   },
   {
@@ -338,39 +460,66 @@
    "id": "3cf1435d-cf8a-4c11-a12b-bf28f1eae938",
    "metadata": {},
    "source": [
-    "By default, the string identifiers assume Gaussianity and homoskedasticity. Analysts can change these assumptions by initializing either a ``CtsDistReg`` or ``BinaryDistReg`` class and passing it into the ``dualbounds`` class instantiation. "
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "e529ddd6-d094-4e1a-9edd-372dd0a72c0e",
-   "metadata": {},
-   "source": [
-    "For example, below we initialize a class which assumes heavy-tailed Laplace errors and heteroskedasticity."
+    "Analysts can also specify the outcome model by passing in a model which inherits from ``dualbounds.dist_reg.DistReg``, including the ``CtsDistReg``, ``QuantileDistReg``, or and ``BinaryDistReg`` classes in the ``dualbounds.dist_reg`` submodule. One example is given below:"
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": 6,
+   "execution_count": 8,
    "id": "dc6c50ae-2806-4df4-8138-b1fd93e4a80b",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 611.70it/s]\n"
+      "Cross-fitting the outcome model.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "b65ac14f0f314c02800ed5c5f3a67275",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([2.75821933, 3.3190261 ]),\n",
-       " 'ses': array([0.23200022, 0.16681487]),\n",
-       " 'cis': array([2.30350725, 3.64597724])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 6,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "85f17278679a4f38b8b125abc2dff584",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([2.92349584, 3.25358989]),\n",
+       " 'ses': array([0.12094459, 0.1081461 ]),\n",
+       " 'cis': array([2.68644881, 3.46555236])}"
+      ]
+     },
+     "execution_count": 8,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -378,9 +527,10 @@
    "source": [
     "Y_model = db.dist_reg.CtsDistReg(\n",
     "    model_type='elasticnet', \n",
-    "    eps_dist='laplace',\n",
+    "    eps_dist='empirical',\n",
     "    how_transform='interactions', # create interactions btwn X and W\n",
-    "    heterosked=True,\n",
+    "    heterosked_model='lasso',\n",
+    "    heterosked_kwargs=dict(cv=3), # kwargs for model for Var(Y|X)\n",
     ")\n",
     "dbnd = DualBounds(\n",
     "    Y_model=Y_model, # use random forest model\n",
@@ -395,31 +545,66 @@
    "id": "2da62a40-daad-4d38-a912-f6331dfac790",
    "metadata": {},
    "source": [
-    "One can also directly input ``sklearn`` classes. For example, below we show how to use the ``AdaBoostClassifier`` from sklearn for binary data."
+    "One can also directly input ``sklearn`` or ``sklearn``-like classes. For example, below we show how to use the ``AdaBoostClassifier`` from sklearn for binary data."
    ]
   },
   {
    "cell_type": "code",
-   "execution_count": 7,
+   "execution_count": 9,
    "id": "3d263885-febd-445a-84d2-b0ab98def55c",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|███████████████████████████████████████████████████████| 900/900 [00:00<00:00, 2645.23it/s]\n"
+      "Cross-fitting the outcome model.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "2d661126f015481fa88538f39cb3caef",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.24130477, 0.37151485]),\n",
-       " 'ses': array([0.02993697, 0.02251905]),\n",
-       " 'cis': array([0.18262938, 0.41565138])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 7,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "521eac0005c94daeadb3791d7b1bb8c6",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.24869847, 0.38173473]),\n",
+       " 'ses': array([0.02885673, 0.02221959]),\n",
+       " 'cis': array([0.19214033, 0.42528433])}"
+      ]
+     },
+     "execution_count": 9,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -428,6 +613,7 @@
     "import sklearn.ensemble as ensemble\n",
     "Y_model = db.dist_reg.BinaryDistReg(\n",
     "    model_type=ensemble.AdaBoostClassifier,\n",
+    "    algorithm='SAMME'\n",
     ")\n",
     "dbnd = DualBounds(\n",
     "    Y_model=Y_model, # use random forest model\n",
@@ -472,26 +658,40 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 8,
+   "execution_count": 10,
    "id": "3243ace7-4952-4b31-b4e0-4acd71d1ab9d",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 733.14it/s]\n"
+      "Estimating optimal dual variables.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "db93ce37bc1547dc833cbbc8946dabd8",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.29014241, 1.22454801]),\n",
-       " 'ses': array([0.03908947, 0.02725067]),\n",
-       " 'cis': array([0.21352846, 1.27795834])}"
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 8,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.303238  , 1.22256972]),\n",
+       " 'ses': array([0.03884216, 0.02727235]),\n",
+       " 'cis': array([0.22710875, 1.27602255])}"
+      ]
+     },
+     "execution_count": 10,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -531,26 +731,40 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 9,
+   "execution_count": 11,
    "id": "fae34c28-476e-4d0e-95ef-133b1cc60ee5",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 481.40it/s]\n"
+      "Estimating optimal dual variables.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "e93bdb5e40da488e83b5f13112bcdb8e",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.58061888, 0.92968078]),\n",
-       " 'ses': array([0.02343839, 0.01286777]),\n",
-       " 'cis': array([0.53468048, 0.95490115])}"
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 9,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.58923196, 0.9276765 ]),\n",
+       " 'ses': array([0.0234632, 0.0128731]),\n",
+       " 'cis': array([0.54324494, 0.95290731])}"
+      ]
+     },
+     "execution_count": 11,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -590,26 +804,82 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 10,
+   "execution_count": 12,
    "id": "ca956b23-4a69-4ff4-95dc-19e34d62012a",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 568.16it/s]\n"
+      "Fitting propensity scores.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "5cb928689c0544b292db37cf78eb779d",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.58088302, 0.93676891]),\n",
-       " 'ses': array([0.023641 , 0.0133706]),\n",
-       " 'cis': array([0.53454751, 0.96297481])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 10,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the outcome model.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "5df1953bc4df44ea91fe3a8e901e509c",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "f5b7c6ab471c4bfe9c8d800dde471ddc",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.58610047, 0.93029166]),\n",
+       " 'ses': array([0.02375752, 0.0140871 ]),\n",
+       " 'cis': array([0.53953658, 0.95790187])}"
+      ]
+     },
+     "execution_count": 12,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -634,33 +904,89 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 11,
+   "execution_count": 13,
    "id": "b34e63ca-8785-460a-8ec2-f1b7123298a0",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:01<00:00, 614.49it/s]\n"
+      "Fitting propensity scores.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "1f1f22f26c754d35bdfcb8344532c7b9",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([0.5770192 , 0.92539417]),\n",
-       " 'ses': array([0.02351094, 0.01315318]),\n",
-       " 'cis': array([0.5309386 , 0.95117393])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 11,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the outcome model.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "92f9540e5aea49989386c82e9800d0c5",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "9b01dd1647aa478390c719c3a4125cb7",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.5839935 , 0.93530366]),\n",
+       " 'ses': array([0.02369072, 0.01440982]),\n",
+       " 'cis': array([0.53756055, 0.9635464 ])}"
+      ]
+     },
+     "execution_count": 13,
      "metadata": {},
      "output_type": "execute_result"
     }
    ],
    "source": [
     "dbnd = DualBounds(\n",
-    "    W_model=ensemble.AdaBoostClassifier(), \n",
+    "    W_model=ensemble.AdaBoostClassifier(algorithm='SAMME'), \n",
     "    f=lambda y0, y1, x: y0 < y1, # estimand\n",
     "    X=data['X'], W=data['W'], y=data['y'], # data\n",
     ")\n",
@@ -673,6 +999,178 @@
    "metadata": {},
    "source": [
     "Lastly, analysts can also directly estimate the vector propensity scores and input them, although analysts should ensure that they are correctly employing cross-fitting in this case to ensure validity."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b1328bc4-eb46-442a-be4f-ce187d77e47c",
+   "metadata": {},
+   "source": [
+    "## Model selection with the multiplier bootstrap (highly recommended)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2dea1b4a-e5b5-4e36-91bf-c76694d0e38a",
+   "metadata": {},
+   "source": [
+    "In randomized experiments, the ``DualBounds`` object produces valid confidence intervals under arbitrary misspecification of the outcome model, meaning that the analyst can try many different outcome models to see which produces the tightest bounds. After fitting many outcome models and computing dual bounds based on each of them, the multiplier bootstrap provides a principled way to combine evidence across many different estimates while retaining rigorous coverage guarantees for the final confidence interval (i.e., accounting for multiplicity)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cb22e4ac-7c4c-4b81-874e-1a48f6edd6b9",
+   "metadata": {},
+   "source": [
+    "Below, we show how to do this in challenging setting with heteroskedasticity."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "d3960e0c-8c17-42f4-9cd5-3491dae927e6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Generate synthetic data from a linear model with heteroskedasticity\n",
+    "data = db.gen_data.gen_regression_data(\n",
+    "    n=900, # Num. datapoints\n",
+    "    p=30, # Num. covariates\n",
+    "    r2=0.95, # population R^2\n",
+    "    tau=3, # average treatment effect\n",
+    "    tauv=0.2,\n",
+    "    interactions=True, # ensures treatment effect is heterogenous\n",
+    "    heterosked='exp_linear', # Pattern of heteroskedasticity\n",
+    "    eps_dist='laplace',\n",
+    "    sample_seed=123, # random seed\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8ed1a282-c8de-455c-a344-4a0d163d29db",
+   "metadata": {},
+   "source": [
+    "First, we compute dual bounds based on several different choices of outcome model."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "ba70447d-541f-44e9-984d-519eb56f4e8d",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting Y_model=ridge, heterosked_model=none.\n",
+      "Fitting Y_model=ridge, heterosked_model=lasso.\n",
+      "Fitting Y_model=ridge, heterosked_model=rf.\n",
+      "Fitting Y_model=rf, heterosked_model=none.\n",
+      "Fitting Y_model=rf, heterosked_model=lasso.\n",
+      "Fitting Y_model=rf, heterosked_model=rf.\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Nominal level\n",
+    "alpha = 0.1\n",
+    "# List of dualbounds objects\n",
+    "db_objects = []\n",
+    "widths = []\n",
+    "Y_models = ['ridge', 'rf']\n",
+    "heterosked_models = ['none', 'lasso', 'rf']\n",
+    "model_names = []\n",
+    "for Y_model in Y_models:\n",
+    "    for heterosked_model in heterosked_models:\n",
+    "        print(f\"Fitting Y_model={Y_model}, heterosked_model={heterosked_model}.\")\n",
+    "        gdb = DualBounds(\n",
+    "            # data\n",
+    "            X=data['X'], W=data['W'], pis=data['pis'], y=data['y'], \n",
+    "            # estimand\n",
+    "            f=lambda y0, y1, x: y0 < y1,\n",
+    "            # models\n",
+    "            Y_model=Y_model,\n",
+    "            heterosked_model=heterosked_model,\n",
+    "            eps_dist='laplace',\n",
+    "        )\n",
+    "        gdb.compute_dual_bounds(nfolds=3, alpha=alpha, verbose=False)\n",
+    "        db_objects.append(gdb)\n",
+    "        widths.append(gdb.cis[1] - gdb.cis[0])\n",
+    "        model_names.append(f'Y_model={Y_model}\\nHeterosked={heterosked_model}')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "738929ce-6df5-47b0-a7ac-116083374a82",
+   "metadata": {},
+   "source": [
+    "Second, we aggregate the bounds using the multiplier bootstrap."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "801374ca-cbec-4b6c-90f7-d6b39cf9042a",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.6977678 , 0.87014996]),\n",
+       " 'cis': array([0.65149206, 0.90593943])}"
+      ]
+     },
+     "execution_count": 16,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "bootstrap_output = db.bootstrap.dualbound_multiplier_bootstrap(db_objects, alpha=alpha)\n",
+    "bootstrap_output"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "cd0784cd-feea-4fe9-82cc-bafcbdddda17",
+   "metadata": {},
+   "source": [
+    "We can see that the bootstrap output width is nearly equal to the smallest width among all methods."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "a6e9116e-f090-4084-a6ad-c9798fa8ddbc",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "iVBORw0KGgoAAAANSUhEUgAAA10AAAG9CAYAAADuoBz0AAAAOXRFWHRTb2Z0d2FyZQBNYXRwbG90bGliIHZlcnNpb24zLjguMiwgaHR0cHM6Ly9tYXRwbG90bGliLm9yZy8g+/7EAAAACXBIWXMAAA9hAAAPYQGoP6dpAABXkklEQVR4nO3deXQUVfr/8U8ngWyQhC0hkEiAIARl3wRFiAODOiqLCIMoq7gMCIiOwm8UBEXcBUfGBRWQEcWBCG6AmkkgIDsCo0DYIWAgsoawJNB9f3/wTUuThW7oysb7dU6fk751q+qp4qE7T27VLZsxxggAAAAAYAmf4g4AAAAAAMoyii4AAAAAsBBFFwAAAABYiKILAAAAACxE0QUAAAAAFqLoAgAAAAALUXQBAAAAgIUougAAAADAQn7FHUBRczgc+u2331SxYkXZbLbiDgcAAABAMTHG6OTJk6pRo4Z8fKwbj7rmiq7ffvtN0dHRxR0GAAAAgBIiLS1NUVFRlm3/miu6KlasKOnCiQ0JCSnmaAAAAAAUl8zMTEVHRztrBKuUiKJr6tSpeu2113Tw4EE1adJE//znP9W6det8+3bs2FFLlizJ037nnXfq22+/vey+ci8pDAkJoegCAAAAYPltR8U+kcacOXM0atQojRs3TuvXr1eTJk3UpUsXZWRk5Ns/ISFB6enpztcvv/wiX19f3XfffUUcOQAAAABcXrEXXW+++aaGDBmigQMHqmHDhnrvvfcUFBSkjz/+ON/+lStXVvXq1Z2vH374QUFBQRRdAAAAAEqkYi26cnJytG7dOnXq1MnZ5uPjo06dOmnFihVubeOjjz7SX//6VwUHB+e7PDs7W5mZmS4vAAAAACgqxXpP1+HDh2W32xUREeHSHhERoa1bt152/dWrV+uXX37RRx99VGCfSZMmafz48R7HZrfbde7cOY/XAwCUPuXKlZOvr29xhwEAKKNKxEQaV+qjjz5So0aNCpx0Q5LGjBmjUaNGOd/nzlBSEGOMDh48qOPHj3szVABACRcWFqbq1avzDEcAgNcVa9FVtWpV+fr66tChQy7thw4dUvXq1Qtd99SpU/r88881YcKEQvv5+/vL39/f7ZhyC67w8HAFBQXx5QsAZZwxRqdPn3ZO4BQZGVnMEQEAyppiLbrKly+vFi1aKDExUd26dZMkORwOJSYmatiwYYWu+5///EfZ2dl64IEHvBaP3W53FlxVqlTx2nYBACVbYGCgJCkjI0Ph4eFcaggA8Kpin71w1KhRmjZtmmbOnKktW7boscce06lTpzRw4EBJUr9+/TRmzJg863300Ufq1q2bV4uj3Hu4goKCvLZNAEDpkPvZz/28AABvK/Z7unr37q3ff/9dY8eO1cGDB9W0aVMtWrTIObnGvn375OPjWhumpqZq2bJl+v777y2JiUsKAeDaw2c/AMAqxT7SJUnDhg3T3r17lZ2drVWrVqlNmzbOZcnJyZoxY4ZL//r168sYo86dOxdxpGVLcnKybDZboZOGzJgxQ2FhYZfdls1m0/z5870WW6758+crNjZWvr6+GjlypNe3nx93zoskxcTEaPLkyW5vd8+ePbLZbNqwYYNH+0Hpcfr0ad17770KCQlx/tu6kydW/f9BXpxrAChedrtdycnJ+uyzz5ScnCy73V7cIRWJElF04eq89957qlixos6fP+9sy8rKUrly5dSxY0eXvrm/6O/cuVPt2rVTenq6QkND3d7X888/r6ZNm3op8st75JFH1LNnT6WlpemFF17It09MTIxsNps+//zzPMtuuOEG2Wy2PIW7JwoqPNesWaOHH374ird7JeffXQMGDJDNZnO+qlSpottvv12bNm3y+r4KU1J+wd2xY4cGDhyoqKgo+fv7q3bt2urTp4/Wrl3r1f3MnDlTKSkp+umnn5z/tlebJyXFlfyRYMCAAc77dQEASEhIUExMjOLj43X//fcrPj5eMTExSkhIKO7QLEfRVQbEx8crKyvL5RfIlJQUVa9eXatWrdLZs2ed7UlJSbruuutUt25dlS9fvkRPj5yVlaWMjAx16dJFNWrUUMWKFQvsGx0drenTp7u0rVy5UgcPHizwwdlXq1q1ald1/583zn9OTk6By26//Xalp6crPT1diYmJ8vPz01133XXF+7JKYcfgDWvXrlWLFi20bds2vf/++9q8ebO+/PJLNWjQQE8++aRX97Vz507FxcXpxhtvdP7bXm2ewPocAQBYLyEhQT179tT+/ftd2g8cOKCePXuW+cKLoqsMqF+/viIjI5WcnOxsS05OVteuXVW7dm2tXLnSpT0+Pt7586V/uZ4xY4auu+46BQUFqXv37jpy5IjLsvHjx2vjxo3OEZSLR5AOHz6s7t27KygoSPXq1dNXX31VaNzHjh1Tv379VKlSJQUFBemOO+7Q9u3bnbHlFlm33XabbDaby/Fdqm/fvlqyZInS0tKcbR9//LH69u0rP78/bl289BI/STp+/HiB209OTtbAgQN14sQJ5zE///zzkvJeXmiz2fTuu+/qjjvuUGBgoOrUqaO5c+cWGHN+53/ZsmVq3769AgMDFR0dreHDh+vUqVPO5TExMXrhhRfUr18/hYSEFDqC4u/vr+rVq6t69epq2rSpRo8erbS0NP3+++/OPv/73/902223KTAwUFWqVNHDDz+srKws53KHw6EJEyY4R4hy77nMlZOTo2HDhikyMlIBAQGqVauWJk2a5IxVkrp37y6bzeZ8nzta+uGHH6p27doKCAiQJC1atEi33HKLwsLCVKVKFd11113auXOnc1+5/3aff/652rVrp4CAAN14441asmRJgefAGKMBAwaoXr16SklJ0V/+8hfVrVtXTZs21bhx47RgwQK3z0XuqM3rr7+uyMhIValSRUOHDnVOutCxY0e98cYbWrp0qWw2m3OU+dI82b59u2699VYFBASoYcOG+uGHH/LEnZaWpl69eiksLEyVK1dW165dtWfPHrdjkaTs7Gw988wzio6Olr+/v2JjY10eJP/LL7/ojjvuUIUKFRQREaEHH3xQhw8fLvBcXip3BHjx4sWKi4tThQoVnIW+dOHfeebMmVqwYIHz/07u/zF3j2/ixImqUaOG6tevr//3//6fy6XnuZo0aeJ8dMiaNWvUuXNnVa1aVaGhoerQoYPWr1/v9jEBAKxht9s1YsQIGWPyLMttGzlyZJm+1JCiq4yIj49XUlKS831SUpI6duyoDh06ONvPnDmjVatWOYuuS61atUqDBw/WsGHDtGHDBsXHx+vFF190Lu/du7eefPJJ3XDDDc4RlN69ezuXjx8/Xr169dKmTZt05513qm/fvjp69GiBMQ8YMEBr167VV199pRUrVsgYozvvvFPnzp1Tu3btlJqaKkmaN2+e0tPT1a5duwK3FRERoS5dumjmzJmSLtxbM2fOHA0aNMiNs1ewdu3aafLkyQoJCXEe81NPPVVg/+eee0733nuvNm7cqL59++qvf/2rtmzZ4ta+du7cqdtvv1333nuvNm3apDlz5mjZsmV5Hp/w+uuvq0mTJvr555/13HPPubXtrKws/fvf/1ZsbKxzxs9Tp06pS5cuqlSpktasWaP//Oc/+vHHH132N2XKFL3xxht6/fXXtWnTJnXp0kX33HOPszh+++239dVXX+mLL75QamqqPv30U2dxtWbNGknS9OnTlZ6e7nwvXbjcb968eUpISHAWwKdOndKoUaO0du1aJSYmysfHR927d5fD4XA5lr///e968skn9fPPP6tt27a6++67Xf44cLENGzbo119/1ZNPPplnQh5JzstG3TkX0oX/Vzt37lRSUpJmzpypGTNmOP/wkJCQoCFDhqht27ZKT0/P9y92DodDPXr0UPny5bVq1Sq99957euaZZ1z6nDt3Tl26dFHFihWVkpKi5cuXOwuai0d8CotFujDz62effaa3335bW7Zs0fvvv68KFSpIuvCHhttuu03NmjXT2rVrtWjRIh06dEi9evXK9zwW5PTp03r99dc1a9YsLV26VPv27XP+/3jqqafUq1cvlxHXdu3auX18iYmJSk1N1Q8//KBvvvlGffv21erVq10K8V9//VWbNm3S/fffL0k6efKk+vfvr2XLlmnlypWqV6+e7rzzTp08edKj4wIAeFdKSkqeEa6LGWOUlpamlJSUIoyqiJlrzIkTJ4wkc+LEiTzLzpw5YzZv3mzOnDmTd8WsrIJfl/YvrO/p0+719dC0adNMcHCwOXfunMnMzDR+fn4mIyPDzJ4929x6663GGGMSExONJLN3715jjDFJSUlGkjl27Jgxxpg+ffqYO++802W7vXv3NqGhoc7348aNM02aNMmzf0nm2Wefveiwsowks3Dhwnzj3bZtm5Fkli9f7mw7fPiwCQwMNF988YUxxphjx44ZSSYpKanQY69Vq5Z56623zPz5803dunWNw+EwM2fONM2aNTPGGBMaGmqmT59ujDFm9+7dRpL5+eefnetfup9Lz8v06dNdzsGl+734HDz66KMufdq0aWMee+yxfPd96X4GDx5sHn74YZf1U1JSjI+PjzMna9WqZbp161bo+TDGmP79+xtfX18THBxsgoODjSQTGRlp1q1b5+zzwQcfmEqVKpmsi/Lt22+/NT4+PubgwYPGGGNq1KhhJk6c6LLtVq1amb/97W/GGGMef/xxc9tttxmHw5FvHJLMl19+6dI2btw4U65cOZORkVHoMfz+++9Gkvnf//5njPnj/L388svOPufOnTNRUVHmlVdeyXcbc+bMMZLM+vXrC92XO+ei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zJmj1NRUjR49Whs2bNCIESMkSW+++aY+++wzbd26Vdu2bdN//vMfVa9e3TlBRUxMjBITE3Xw4MECiyhJqlSpkqpUqaIPPvhAO3bs0H//+1+NGjUq375Tp07Vl19+qa1bt2ro0KE6duxYgZeS2mw2TZ8+Xdu2bVP79u313XffadeuXdq0aZMmTpzozDV3zoU3dOrUSddff7369++vjRs3KiUlRf/4xz9c+vTt21dVq1ZV165dlZKSot27dys5OVnDhw8v9Cbki8XExKh///4aNGiQ5s+f79zGF198IUkaOnSojh49qj59+mjNmjXauXOnFi9erIEDB3r1crKYmBht2rRJqampOnz4sM6dO3fVx9e3b199/vnn+s9//uNyaaF04XNl1qxZ2rJli1atWqW+fftedtQPzCqGK0OhDk/16NFDc+fOVc2aNV3ao6KiNHfu3DI/ok7RVYbEx8frzJkzio2NdflFsUOHDjp58qRzavmC3HTTTZo2bZqmTJmiJk2a6Pvvv89TkNx77726/fbbFR8fr2rVqumzzz674ninT5+uFi1a6K677lLbtm1ljNF3332X55IlT1WpUqXQX7Q+/vhjnT9/Xi1atNDIkSMve6ldu3bt9Oijj6p3796qVq2aXn311QL7jh8/Xp9//rkaN26sTz75RJ999pnbI3eNGzfWkiVLnAVCs2bNNHbsWJf7fzyxaNEiRUZGKjIyUm3atHHOypc7ChoUFKTFixfr6NGjatWqlXr27Kk//elPeuedd5zbGD58uEaNGqUnn3xSjRo10qJFi/TVV1+pXr16kqSKFSvq1VdfVcuWLdWqVSvt2bNH3333nfMyzjfeeEM//PCDoqOjC728z8fHR59//rnWrVunG2+8UU888YRee+21fPu+/PLLevnll9WkSRMtW7ZMX331lapWrVrgtlu3bq21a9cqNjZWQ4YMUVxcnO655x79+uuvzqnc3TkX3uDj46Mvv/xSZ86cUevWrfXQQw9p4sSJLn2CgoK0dOlSXXfdderRo4fi4uI0ePBgnT17ViEhIW7v691331XPnj31t7/9TQ0aNNCQIUOcI3m5I5h2u11//vOf1ahRI40cOVJhYWH5zvJ4pYYMGaL69eurZcuWqlatmpYvX37Vx9ezZ08dOXJEp0+fzvPg5Y8++kjHjh1T8+bN9eCDD2r48OEuI2HIH7OK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AAAoJkVVG7g10nXptPAAAAAAAPd4fE/XJ598ouzs7DztOTk5+uSTT7wSFAAAAACUFW5dXngxX19fpaenKzw83KX9yJEjCg8P5/JCAAAAAKVCUdUGHo90GWNcHoica//+/QoNDfVKUAAAAABQVrh1T5ckNWvWTDabTTabTX/605/k5/fHqna7Xbt379btt99uSZAAAAAAUFq5XXR169ZNkrRhwwZ16dJFFSpUcC4rX768YmJidO+993o9QAAAAAAozdwuusaNGydJiomJUe/evRUQEGBZUAAAAABQVrhddOXq37+/FXEAAAAAQJnkVtFVqVKlfCfPyM/Ro0evKiAAAAAAKEvcKromT57s/PnIkSN68cUX1aVLF7Vt21aStGLFCi1evFjPPfecJUECAAAAQGnl8XO67r33XsXHx2vYsGEu7e+8845+/PFHzZ8/35vxeR3P6QIAAAAgleDndC1evDjfqeFvv/12/fjjj14JCgAAAADKCo+LripVqmjBggV52hcsWKAqVap4JSgAAAAAKCs8nr1w/Pjxeuihh5ScnKw2bdpIklatWqVFixZp2rRpXg8QAAAAAEozj4uuAQMGKC4uTm+//bYSEhIkSXFxcVq2bJmzCAMAAAAAXODxRBqlHRNpAAAAAJCKrjZwa6QrMzPTGURmZmahfSlkAAAAAOAPbj8cOT09XeHh4QoLC8v3QcnGGNlsNtntdq8HCQAAAACllVtF13//+19VrlzZ+XN+RRcAAAAAIC+37+navXu3ateubXU8luOeLgAAAABSCXw4ct26dVW7dm0NGjRI//73v7V//37LggIAAACAssLtKeP/+9//Kjk5WcnJyfrss8+Uk5OjOnXq6LbbblN8fLzi4+MVERFhZawAAAAAUOpc0ZTxZ8+e1U8//eQswlavXq1z586pQYMG+vXXX62I02u4vBAAAACAVHS1wVU9pysnJ0fLly/XwoUL9f777ysrK6vEz15I0QUAAABAKmHP6cqVk5OjlStXKikpScnJyVq1apWio6N166236p133lGHDh2sihMAAAAASiW3i67bbrtNq1atUu3atdWhQwc98sgjmj17tiIjI62MDwAAAABKNbeLrpSUFEVGRuq2225Tx44d1aFDB1WpUsXK2AAAAACg1HN7yvjjx4/rgw8+UFBQkF555RXVqFFDjRo10rBhwzR37lz9/vvvVsYJAAAAAKXSFU+kcfLkSS1btsx5f9fGjRtVr149/fLLL96O0auYSAMAAACAVAIfjnyp4OBgVa5cWZUrV1alSpXk5+enLVu2eDM2AAAAACj13L6ny+FwaO3atUpOTlZSUpKWL1+uU6dOqWbNmoqPj9fUqVMVHx9vZawAAAAAUOq4XXSFhYXp1KlTql69uuLj4/XWW2+pY8eOqlu3rpXxAQAAAECp5nbR9dprryk+Pl7XX3+9lfEAAAAAQJnidtH1yCOPWBkHAAAAAJRJVzyRBgAAAADg8ii6AAAAAMBCFF0AAAAAYCGKLgAAAACwEEUXAAAAAFiIogsAAAAALETRBQAAAAAWougCAAAAAAtRdAEAAACAhSi6AAAAAMBCFF0AAAAAYCGKLgAAAACwEEUXAAAAAFiIogsAAAAALETRBQAAAAAWougCAAAAAAuViKJr6tSpiomJUUBAgNq0aaPVq1cX2DchIUEtW7ZUWFiYgoOD1bRpU82aNasIowUAAAAA9xV70TVnzhyNGjVK48aN0/r169WkSRN16dJFGRkZ+favXLmy/vGPf2jFihXatGmTBg4cqIEDB2rx4sVFHDkAAAAAXJ7NGGOKM4A2bdqoVatWeueddyRJDodD0dHRevzxxzV69Gi3ttG8eXP95S9/0QsvvHDZvpmZmQoNDdWJEycUEhJyVbFfLbvdrpSUFKWnpysyMlLt27eXr69vscYEAAAAXCuKqjYo1pGunJwcrVu3Tp06dXK2+fj4qFOnTlqxYsVl1zfGKDExUampqbr11lutDNXrEhISFBMTo/j4eN1///2Kj49XTEyMEhISijs0AAAAAF7kV5w7P3z4sOx2uyIiIlzaIyIitHXr1gLXO3HihGrWrKns7Gz5+vrqX//6lzp37pxv3+zsbGVnZzvfZ2Zmeif4q5CQkKCePXvq0kHGAwcOqGfPnpo7d6569OhRTNEBAAAA8KZiv6frSlSsWFEbNmzQmjVrNHHiRI0aNUrJycn59p00aZJCQ0Odr+jo6KIN9hJ2u10jRozIU3BJcraNHDlSdru9qEMDAAAAYIFiLbqqVq0qX19fHTp0yKX90KFDql69eoHr+fj4KDY2Vk2bNtWTTz6pnj17atKkSfn2HTNmjE6cOOF8paWlefUYPJWSkqL9+/cXuNwYo7S0NKWkpBRhVAAAAACsUqxFV/ny5dWiRQslJiY62xwOhxITE9W2bVu3t+NwOFwuIbyYv7+/QkJCXF7FKT093av9AAAAAJRsxXpPlySNGjVK/fv3V8uWLdW6dWtNnjxZp06d0sCBAyVJ/fr1U82aNZ0jWZMmTVLLli1Vt25dZWdn67vvvtOsWbP07rvvFudhuC0yMtKr/QAAAACUbMVedPXu3Vu///67xo4dq4MHD6pp06ZatGiRc3KNffv2ycfnjwG5U6dO6W9/+5v279+vwMBANWjQQP/+97/Vu3fv4joEj7Rv315RUVE6cOBAvvd12Ww2RUVFqX379sUQHQAAAABvK/bndBW1kvCcrtzZCyW5FF42m02SmL0QAAAAKALXxHO6rlU9evTQ3LlzVbNmTZf2qKgoCi4AAACgjGGkqxjZ7XalpKQoPT1dkZGRat++vXx9fYs1JpRc5AsAAIB3FVVtUOz3dF3LfH191bFjx+IOA6VAQkKCRowY4fK4gaioKE2ZMoWRUQAAgBKOywuBEi73HsBLn+924MAB9ezZUwkJCcUUGQAAANxB0QWUYHa7XSNGjMh3psvctpEjR8putxd1aAAAAHATRRdQgqWkpOQZ4bqYMUZpaWlKSUkpwqgAAADgCYouoARLT0/3aj8AAAAUPYouoASLjIz0aj8AAAAUPYouoARr3769oqKinA/OvpTNZlN0dLTat29fxJEBAADAXRRdQAnm6+urKVOmSFKewiv3/eTJk3leFwAAQAlG0QWUcD169NDcuXNVs2ZNl/aoqCjNnTuX53QBAACUcDaT31zUZVhRPXUa8Da73a6UlBSlp6crMjJS7du3Z4QLAADgKhRVbeBn2ZYBeJWvr686duxY3GEAAADAQ1xeCAAAAAAWougCAAAAAAtRdAEAAACAhSi6AAAAAMBCFF0AAAAAYCGKLgAAAACwEEUXAAAAAFiIogsAAAAALETRBQAAAAAWougCAAAAAAtRdAEAAACAhSi6AAAAAMBCFF0AAAAAYCGKLgAAAACwkF9xB1BsTp2SfH3ztvv6SgEBrv0K4uMjBQZeWd/TpyVj8u9rs0lBQVfW98wZyeEoOI7g4Cvre/asZLd7p29Q0IW4JSk7Wzp/3jt9AwMvnGdJysmRzp3zTt+AgD9yxZO+585d6F8Qf3/Jz8/zvufPXzgXBSlfXipXzvO+dvuFf7uClCt3ob+nfR2OC7nmjb5+fhfOhXTh/8Tp097p68n/ez4j8u/LZ4TnffmMuPAznxFX1pfPiAs/8xnheV8+Iy78nPv/vrD/d95krjEnTpwwksyJC6c67+vOO11XCArKv59kTIcOrn2rVi24b8uWrn1r1Sq4b8OGrn0bNiy4b61arn1btiy4b9Wqrn07dCi4b1CQa9877yy476Vp1LNn4X2zsv7o279/4X0zMv7o+7e/Fd539+4/+j71VOF9f/nlj77jxhXed/XqP/q++mrhfZOS/uj7zjuF9/3mmz/6Tp9eeN8vvvij7xdfFN53+vQ/+n7zTeF933nnj75JSYX3ffXVP/quXl1433Hj/uj7yy+F933qqT/67t5deN+//e2PvhkZhfft3/+PvllZhfft2dO4KKwvnxEXXnxG/PHiM+LCi8+ICy8+Iy68+Iz448VnxIVXCf2MOCEZSebEiRPGSlxeCAAAAAAWshljTHEHUZQyMzMVGhqqE7/9ppCQkLwduCwg/75cFuB5Xy4LuPAzlw5dWV8+Iy78zGeE5335jLjwM58RV9aXz4gLP/MZ4XnfUvoZkZmZqdAaNXTixIn8awMvuXaLLotPLAAAAICSrahqAy4vBAAAAAALUXQBAAAAgIUougAAAADAQhRdAAAAAGAhii4AAAAAsBBFFwAAAABYiKILAAAAACxE0QUAAAAAFqLoAgAAAAALUXQBAAAAgIX8ijsAAIA17Ha7UlJSlJ6ersjISLVv316+vr7FHRYAANccii4AKIMSEhI0YsQI7d+/39kWFRWlKVOmqEePHsUYGQAA1x4uLwSAMiYhIUE9e/Z0Kbgk6cCBA+rZs6cSEhKKKTIAAK5NFF0AUIbY7XaNGDFCxpg8y3LbRo4cKbvdXtShAQBwzaLoAoAyJCUlJc8I18WMMUpLS1NKSkoRRgUAwLWNogsAypD09HSv9gMAAFePogsAypDIyEiv9gMAAFePogsAypD27dsrKipKNpst3+U2m03R0dFq3759EUcGAMC1i6ILAMoQX19fTZkyRZLyFF657ydPnszzugAAKEIUXQBQxvTo0UNz585VzZo1XdqjoqI0d+5cntMFAEARs5n85hUuwzIzMxUaGqoTJ04oJCSkuMMBAMvY7XalpKQoPT1dkZGRat++PSNcAABcpKhqAz/LtgwAKFa+vr7q2LFjcYcBAMA1j8sLAQAAAMBCFF0AAAAAYCGKLgAAAACwEEUXAAAAAFiIogsAAAAALETRBQAAAAAWougCAAAAAAtRdAEAAACAhSi6AAAAAMBCFF0AAAAAYCG/4g6gqBljJEmZmZnFHAkAAACA4pRbE+TWCFa55oqukydPSpKio6OLORIAAAAAJcHJkycVGhpq2fZtxuqyroRxOBz67bffVLFiRdlstuIOR5mZmYqOjlZaWppCQkKKOxyUcOQLPEXOwFPkDDxFzsBTJSlnjDE6efKkatSoIR8f6+68uuZGunx8fBQVFVXcYeQREhJS7EmH0oN8gafIGXiKnIGnyBl4qqTkjJUjXLmYSAMAAAAALETRBQAAAAAWougqZv7+/ho3bpz8/f2LOxSUAuQLPEXOwFPkDDxFzsBT12LOXHMTaQAAAABAUWKkCwAAAAAsRNEFAAAAABai6AIAAAAAC1F0WWTGjBkKCwvzaB2bzab58+d7NY6OHTtq5MiRhfaJiYnR5MmTvbpfeI6cgafIGRSFkpJnxhg9/PDDqly5smw2mzZs2ODV7cN7yBl44lrJl1JVdBlj1KlTJ3Xp0iXPsn/9618KCwvT/v37iyGykishIUEvvPBCcYdRbMgZz5Ez5IynrvWcuRLkmecWLVqkGTNm6JtvvlF6erpuvPHG4g6pSJEznruWc4Z88ZzV+VKqii6bzabp06dr1apVev/9953tu3fv1tNPP61//vOfioqKKsYIS46cnBxJUuXKlVWxYsVijqb4kDPuI2cuIGfcR85cOfLMfbl5tnPnTkVGRqpdu3aqXr26/Pz8ijmyokXOuI+cIV88UVT5UqqKLkmKjo7WlClT9NRTT2n37t0yxmjw4MH685//rAcffLDQdXOHL7/55hvVr19fQUFB6tmzp06fPq2ZM2cqJiZGlSpV0vDhw2W3253rHTt2TP369VOlSpUUFBSkO+64Q9u3b8+z7euuu05BQUHq3r27jhw5kmf/CxYsUPPmzRUQEKA6depo/PjxOn/+vFfOy/PPP6+mTZvqww8/VO3atRUQECAp72U/GRkZuvvuuxUYGKjatWvr008/zbOtrVu36pZbblFAQIAaNmyoH3/8Mc8wblpamnr16qWwsDBVrlxZXbt21Z49e7xyLN5GzuSPnCkYOZM/csa7yLP85ZdnAwYM0OOPP659+/bJZrMpJibGK/sqbciZ/JEz+SNf8lds+WJKqa5du5qOHTuat99+21SrVs1kZGRcdp3p06ebcuXKmc6dO5v169ebJUuWmCpVqpg///nPplevXubXX381X3/9tSlfvrz5/PPPnevdc889Ji4uzixdutRs2LDBdOnSxcTGxpqcnBxjjDErV640Pj4+5pVXXjGpqalmypQpJiwszISGhjq3sXTpUhMSEmJmzJhhdu7cab7//nsTExNjnn/+eWcfSebLL790vm/YsKEJDg4u8HX77bc7+44bN87Ztn79erNx40ZjjDEdOnQwI0aMcPa74447TJMmTcyKFSvM2rVrTbt27UxgYKB56623jDHGnD9/3tSvX9907tzZbNiwwaSkpJjWrVu7xJaTk2Pi4uLMoEGDzKZNm8zmzZvN/fffb+rXr2+ys7Pd/ScscuQMOeMpcoacKQrk2eXz7Pjx42bChAkmKirKpKenu3WOyjJyhpzxBPlSMvKl1BZdhw4dMlWrVjU+Pj4uJ70w06dPN5LMjh07nG2PPPKICQoKMidPnnS2denSxTzyyCPGGGO2bdtmJJnly5c7lx8+fNgEBgaaL774whhjTJ8+fcydd97psq/evXu7JNCf/vQn89JLL7n0mTVrlomMjHS+vzSB9uzZY7Zv317ga//+/c6+48aNM+XKlcuTJBf/MpSammokmdWrVzuXb9myxUhy/jK0cOFC4+fnZ9LT0519fvjhB5fYZs2aZerXr28cDoezT3Z2tgkMDDSLFy82JRU5Q854ipwhZ4oCeeZenr311lumVq1abp2fso6cIWc8Qb6UjHwptRe3hoeH65FHHtH8+fPVrVs3t9cLCgpS3bp1ne8jIiIUExOjChUquLRlZGRIkrZs2SI/Pz+1adPGubxKlSqqX7++tmzZ4uzTvXt3l/20bdtWixYtcr7fuHGjli9frokTJzrb7Ha7zp49q9OnTysoKChPrLVq1XL7uHL7V6tWrcDlucfSokULZ1uDBg1cZoxJTU1VdHS0qlev7mxr3bq1y3Y2btyoHTt25LmH4+zZs9q5c6dHMRclciYvcqZw5Exe5Iz3kWd5XS7PrnXkTF7kTMHIl7yKI19KbdElSX5+fh7f5FauXDmX9zabLd82h8Nx1fFdLCsrS+PHj1ePHj3yLMu9L+JSN9xwg/bu3VvgNtu3b6+FCxc63wcHB199oG7IyspSixYt8r1Po6R/4JEz5IynyBlypiiQZ8WTZ6UZOUPOeIJ8Kf58KdVFV1GIi4vT+fPntWrVKrVr106SdOTIEaWmpqphw4bOPqtWrXJZb+XKlS7vmzdvrtTUVMXGxrq97++++07nzp0rcHlgYKDb25Iu/LX5/PnzWrdunVq1aiXpwl+cjx8/7uxTv359paWl6dChQ4qIiJAkrVmzxmU7zZs315w5cxQeHq6QkBCPYrgWkDPkjKfIGXKmKJSlPEPRIGfgCfKlcBRdl1GvXj117dpVQ4YM0fvvv6+KFStq9OjRqlmzprp27SpJGj58uG6++Wa9/vrr6tq1qxYvXuwyTCpJY8eO1V133aXrrrtOPXv2lI+PjzZu3KhffvlFL774Yr779nSo9HLq16+v22+/XY888ojeffdd+fn5aeTIkS6J2LlzZ9WtW1f9+/fXq6++qpMnT+rZZ5+VdOGvGZLUt29fvfbaa+ratasmTJigqKgo7d27VwkJCXr66aev+SlIyRlyxlPkDDlTFMpSnqFokDPwBPlSuFI3ZXxxmD59ulq0aKG77rpLbdu2lTFG3333nXOI9aabbtK0adM0ZcoUNWnSRN9//73zF4hcXbp00TfffKPvv/9erVq10k033aS33nqryJNk+vTpqlGjhjp06KAePXro4YcfVnh4uHO5r6+v5s+fr6ysLLVq1UoPPfSQ/vGPf0j6Y0g3KChIS5cu1XXXXacePXooLi5OgwcP1tmzZ/mL9P8hZ8gZT5Ez5ExRKEt5hqJBzsAT5EvBbP83AwhQoOXLl+uWW27Rjh07XG6oBApCzsBT5AwAoCyj6EIeX375pSpUqKB69eppx44dGjFihCpVqqRly5YVd2goocgZeIqcAQBcS8rU5YV33HGHKlSokO/rpZdeKu7wSo2TJ09q6NChatCggQYMGKBWrVppwYIFxR2WJcgZ7yBnyBlPXUs5cyXIM3iKnIEnyJeiV6ZGug4cOKAzZ87ku6xy5cqqXLlyEUeEko6cgafIGRQF8gyeImfgCfKl6JWpogsAAAAASpoydXlhSdSxY0eNHDnSq9scMGCAR08UR+lS0nJmz549stls2rBhg1djQvEpaTlWmPnz5ys2Nla+vr5ej/laVppyACVDScsZvpvKnpKWY4W5ku+mElV0FXRikpOTZbPZXB6uWZiYmBhNnjzZq7GhZCJnYDVyrHg98sgj6tmzp9LS0vTCCy8USwzkADxFzsBq5FjxupLvphJVdJU0OTk5xR0CShlyBla7VnLs3LlzysrKUkZGhrp06aIaNWqoYsWKxR1WiXCt5AC8h5yB1a6VHLua76ZSWXQtW7ZM7du3V2BgoKKjozV8+HCdOnVK0oWhyb179+qJJ56QzWaTzWZzaz3pQrX/wgsvqF+/fgoJCdHDDz8sSZo3b55uuOEG+fv7KyYmRm+88YZLPP/6179Ur149BQQEKCIiQj179iww9m+//VahoaH69NNPJUlpaWnq1auXwsLCVLlyZXXt2lV79uxx9rfb7Ro1apTCwsJUpUoVPf3007qa2/Byh+MTEhIUHx+voKAgNWnSRCtWrHDpd7ljjomJ0UsvvaRBgwapYsWKuu666/TBBx+49LncsRUlcsZ7t27a7XYNHjxYtWvXVmBgoOrXr68pU6a49ElOTlbr1q0VHByssLAw3Xzzzdq7d68kaePGjYqPj1fFihUVEhKiFi1aaO3atc51L3fuSipy7Oo/l+bMmaMOHTooICBAn376qfOL7LbbbpPNZlNycvIV76MokAN8N3mKnOG7yWrkWAn6bjIlSP/+/U3Xrl3ztCclJRlJ5tixY2bHjh0mODjYvPXWW2bbtm1m+fLlplmzZmbAgAHGGGOOHDlioqKizIQJE0x6erpJT083xpjLrmeMMbVq1TIhISHm9ddfNzt27DA7duwwa9euNT4+PmbChAkmNTXVTJ8+3QQGBprp06cbY4xZs2aN8fX1NbNnzzZ79uwx69evN1OmTHFus0OHDmbEiBHGGGM+/fRTU7FiRfP1118bY4zJyckxcXFxZtCgQWbTpk1m8+bN5v777zf169c32dnZxhhjXnnlFVOpUiUzb948s3nzZjN48GBTsWJFl/M0ceJEExwcXOhr7969xhhjdu/ebSSZBg0amG+++cakpqaanj17mlq1aplz584ZY8xljzn3XFWuXNlMnTrVbN++3UyaNMn4+PiYrVu3un1s3kDOFF3O/Pzzz84Yxo4da9asWWN27dpl/v3vf5ugoCAzZ84cY4wx586dM6Ghoeapp54yO3bsMJs3bzYzZsxwbu+GG24wDzzwgNmyZYvZtm2b+eKLL8yGDRuMMe7lXlEjx4oux2JiYsy8efPMrl27zJ49e0xqaqqRZObNm2fS09O9+tnhCXKA7yZPkTN8N1mNHCt9300lrujy9fXNc/ABAQHOBBo8eLB5+OGHXdZLSUkxPj4+5syZM8aYC4nw1ltvufRxd71u3bq59Ln//vtN586dXdr+/ve/m4YNGxpjjJk3b54JCQkxmZmZ+R5TbgK98847JjQ01CQnJzuXzZo1y9SvX984HA5nW3Z2tgkMDDSLFy82xhgTGRlpXn31Vefyc+fOmaioKJcEOnLkiNm+fXuhr9wvrdwE+vDDD53r//rrr0aS2bJli1vHnHuuHnjgAed7h8NhwsPDzbvvvuv2sXkDOVN0OZP7xZafoUOHmnvvvde5bUkucV+sYsWKZsaMGfkucyf3iho5VnQ5NnnyZJc4jx07ZiSZpKSkfI+jqJADfDd5ipzhu8lq5Fjp+27yu+IxN4vEx8fr3XffdWlbtWqVHnjgAUkXhn83bdrkHGqUJGOMHA6Hdu/erbi4uHy36+56LVu2dFlvy5Yt6tq1q0vbzTffrMmTJ8tut6tz586qVauW6tSpo9tvv1233367unfvrqCgIGf/uXPnKiMjQ8uXL1erVq1cYtqxY0eea0HPnj2rnTt36sSJE0pPT1ebNm2cy/z8/NSyZUuX4dIreZ5C48aNnT9HRkZKkjIyMtSgQYPLHrOvr2+ebdhsNlWvXl0ZGRluHZs3kTNFkzMXmzp1qj7++GPt27dPZ86cUU5Ojpo2berc9oABA9SlSxd17txZnTp1Uq9evZx5NmrUKD300EOaNWuWOnXqpPvuu09169Z169zl5l5RI8eKJscuPc6ShBzgu8lT5AzfTVYjx0rXd1OJK7qCg4MVGxvr0rZ//37nz1lZWXrkkUc0fPjwPOted911BW7X3fWCg4M9irdixYpav369kpOT9f3332vs2LF6/vnntWbNGoWFhUmSmjVrpvXr1+vjjz9Wy5YtndfMZmVlqUWLFi5JnatatWpux/DSSy9d9unhmzdvdjnOcuXKOX/OjcfhcLi9z0u3kbud3G1469jcQc5cYHXO5Pr888/11FNP6Y033lDbtm1VsWJFvfbaa1q1apWzz/Tp0zV8+HAtWrRIc+bM0bPPPqsffvhBN910k55//nndf//9+vbbb7Vw4UKNGzdOn3/+ubp37+52/EWNHLvA6hzz9DiLEjlwAd9N7iNnLuC7yTrk2AWl5bupxBVdl9O8eXNt3rw5T5JdrHz58rLb7R6vl5+4uDgtX77cpW358uW6/vrrnX/Z8PPzU6dOndSpUyeNGzdOYWFh+u9//6sePXpIkurWras33nhDHTt2lK+vr9555x1nTHPmzFF4eLhCQkLy3X9kZKRWrVqlW2+9VZJ0/vx5rVu3Ts2bN3f2efTRR9WrV69Cj6NGjRpePebLcefYigo5492cWb58udq1a6e//e1vzrb8/kLcrFkzNWvWTGPGjFHbtm01e/Zs3XTTTZKk66+/Xtdff72eeOIJ9enTR9OnT1f37t29knvFgRyz/nOppCMH+G7yFDnDd5PVyLES9t3k0cWIFnPnpsCNGzeawMBAM3ToUPPzzz+bbdu2mfnz55uhQ4c6+3fu3Nncc889Zv/+/eb33383xhi31svvutZ169a53BQ4Y8YMl5sCv/76azNlyhTz888/mz179ph//etfxsfHx/zyyy/GGNebArdu3WqqV6/ufH/q1ClTr14907FjR7N06VKza9cuk5SUZB5//HGTlpZmjDHm5ZdfNpUrVzZffvml2bJlixkyZEiemwI9kd810Jdem3q5Yy7oXDVp0sSMGzfO7WPzBnKm6HNmypQpJiQkxCxatMikpqaaZ5991oSEhJgmTZoYY4zZtWuXGT16tPnpp5/Mnj17zOLFi02VKlXMv/71L3P69GkzdOhQk5SUZPbs2WOWLVtm6tata55++mm3zl1xIMeK53PJmJJ1Txc5wHeTJ8gZvpusRo6Vvu+mUld0GWPM6tWrTefOnU2FChVMcHCwady4sZk4caKz/4oVK0zjxo2Nv7+/ubiuvNx6+SWQMcbMnTvXNGzY0JQrV85cd9115rXXXnMuS0lJMR06dDCVKlUygYGBpnHjxs6ZcoxxTSBjjNm8ebMJDw83o0aNMsYYk56ebvr162eqVq1q/P39TZ06dcyQIUPMiRMnjDEXbgIcMWKECQkJMWFhYWbUqFGmX79+ln6xXe6YCzpXF3+xuXNs3kDOFH3OnD171gwYMMCEhoaasLAw89hjj5nRo0c7v9gOHjxounXrZiIjI0358uVNrVq1zNixY43dbjfZ2dnmr3/9q4mOjjbly5c3NWrUMMOGDXPemHu5c1ccyLHi+VwypnQVXcaQA3w3/YGc4bvJauRY6ftushnjxYckAAAAAABclMqHIwMAAABAaUHRBQAAAAAWougCAAAAAAtRdAEAAACAhSi6AAAAAMBCFF0AAAAAYCGKLgAAAACwEEUXAAAAAFiIogsAAAAALETRBQAAAAAWougCAAAAAAtRdAEAAACAhf4/3eBeBHKTfKEAAAAASUVORK5CYII=",
+      "text/plain": [
+       "<Figure size 1000x500 with 1 Axes>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "import matplotlib.pyplot as plt\n",
+    "fig, ax = plt.subplots(figsize=(10, 5))\n",
+    "bootstrap_width = bootstrap_output['cis'][1] - bootstrap_output['cis'][0]\n",
+    "ax.scatter(model_names, widths, color='black')\n",
+    "ax.axhline(\n",
+    "    bootstrap_width, \n",
+    "    label='Width of Multiplier Boostrap Confidence Interval', \n",
+    "    color='red',\n",
+    "    linestyle='dashed',\n",
+    ")\n",
+    "ax.set(ylabel=\"Width of confidence interval\")\n",
+    "ax.legend()\n",
+    "plt.show()"
    ]
   },
   {
@@ -709,19 +1207,40 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 12,
+   "execution_count": 18,
    "id": "cd122531-a280-4d0c-9eb6-d8a1ec963661",
    "metadata": {},
    "outputs": [
     {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the outcome model.\n"
+     ]
+    },
+    {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "263203cd8bd348369f64c07fb716b578",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimate': 7.271835000465313,\n",
-       " 'se': 0.5761754092436733,\n",
-       " 'lower_ci': 6.324110788810609}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 12,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimate': 7.205186692749319,\n",
+       " 'se': 0.5280915920313564,\n",
+       " 'lower_ci': 6.336553322233965}"
+      ]
+     },
+     "execution_count": 18,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -755,26 +1274,61 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 13,
+   "execution_count": 19,
    "id": "f9372eca-9280-478b-b9c6-f5992cc0b232",
    "metadata": {},
    "outputs": [
     {
-     "name": "stderr",
+     "name": "stdout",
      "output_type": "stream",
      "text": [
-      "100%|████████████████████████████████████████████████████████| 900/900 [00:02<00:00, 338.36it/s]\n"
+      "Cross-fitting the outcome model.\n"
      ]
     },
     {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "b7c3ab981490447aa42846454996e77f",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([ 7.18208094, 16.10882366]),\n",
-       " 'ses': array([0.56993296, 0.86895712]),\n",
-       " 'cis': array([ 6.06503287, 17.81194832])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 13,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "9477112dc57e4b78ae247e369cc243f9",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([ 8.742372  , 11.78466472]),\n",
+       " 'ses': array([0.57567097, 0.67486996]),\n",
+       " 'cis': array([ 7.61407763, 13.10738553])}"
+      ]
+     },
+     "execution_count": 19,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -842,19 +1396,75 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 15,
+   "execution_count": 20,
    "id": "cbcb8ec0-c90c-4ff1-bb32-5a34f10a86fe",
    "metadata": {},
    "outputs": [
     {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the selection model.\n"
+     ]
+    },
+    {
      "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "1e3db45236a340f98929e55a3b8e8350",
+       "version_major": 2,
+       "version_minor": 0
+      },
       "text/plain": [
-       "{'estimates': array([2.08484643, 3.25616402]),\n",
-       " 'ses': array([0.2094036 , 0.19805625]),\n",
-       " 'cis': array([1.67442291, 3.64434714])}"
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
       ]
      },
-     "execution_count": 15,
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the outcome model.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "29651cda2b6e4da484e02363db93f5b5",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "a529937d1c7048f49da8be0bea95fa84",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([2.08157437, 3.27107886]),\n",
+       " 'ses': array([0.21124576, 0.20098984]),\n",
+       " 'cis': array([1.66754028, 3.66501171])}"
+      ]
+     },
+     "execution_count": 20,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -888,7 +1498,7 @@
    "id": "88378eef-dc0f-47d8-97fb-94b7a67987ed",
    "metadata": {},
    "source": [
-    "It is also possible to bound this estimand without the monotonicity assumption using the generic ``DualBounds`` class, although we caution that without any other assumptions the bounds might be too wide to be useful. Please see [Ji et al. (2023)](https://arxiv.org/pdf/2310.08115.pdf), Section 2.5 for details."
+    "It is also possible to bound this estimand without the monotonicity assumption using the generic ``DualBounds`` class, although we caution that without the monotonicity assumption, the bounds might be too wide to be useful. Please see [Ji et al. (2023)](https://arxiv.org/pdf/2310.08115.pdf), Section 2.5 for details."
    ]
   }
  ],

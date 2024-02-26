@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; dualbounds 0.1.0 documentation</title>
+  <title>Index &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
@@ -15,7 +15,7 @@
   
         <script src="_static/jquery.js?v=5d32c60e"></script>
         <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=01f34227"></script>
+        <script src="_static/documentation_options.js?v=938c9ccc"></script>
         <script src="_static/doctools.js?v=888ff710"></script>
         <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -36,7 +36,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -86,19 +86,27 @@
  | <a href="#C"><strong>C</strong></a>
  | <a href="#D"><strong>D</strong></a>
  | <a href="#F"><strong>F</strong></a>
+ | <a href="#G"><strong>G</strong></a>
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
+ | <a href="#N"><strong>N</strong></a>
  | <a href="#P"><strong>P</strong></a>
+ | <a href="#Q"><strong>Q</strong></a>
  | <a href="#V"><strong>V</strong></a>
+ | <a href="#W"><strong>W</strong></a>
  
 </div>
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="apiref.html#dualbounds.utilities.apply_pool">apply_pool() (in module dualbounds.utilities)</a>
+      <li><a href="apiref.html#dualbounds.interpolation.adaptive_interpolate">adaptive_interpolate() (in module dualbounds.interpolation)</a>
+</li>
+      <li><a href="apiref.html#dualbounds.utilities.adjust_support_size">adjust_support_size() (in module dualbounds.utilities)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.utilities.apply_pool">apply_pool() (in module dualbounds.utilities)</a>
+</li>
       <li><a href="apiref.html#dualbounds.utilities.apply_pool_factorial">apply_pool_factorial() (in module dualbounds.utilities)</a>
 </li>
   </ul></td>
@@ -167,8 +175,17 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apiref.html#dualbounds.dist_reg.DistReg">DistReg (class in dualbounds.dist_reg)</a>
 </li>
+      <li><a href="apiref.html#dualbounds.bootstrap.dualbound_multiplier_bootstrap">dualbound_multiplier_bootstrap() (in module dualbounds.bootstrap)</a>
+</li>
       <li><a href="apiref.html#dualbounds.generic.DualBounds">DualBounds (class in dualbounds.generic)</a>
 </li>
+      <li>
+    dualbounds.bootstrap
+
+      <ul>
+        <li><a href="apiref.html#module-dualbounds.bootstrap">module</a>
+</li>
+      </ul></li>
       <li>
     dualbounds.dist_reg
 
@@ -190,6 +207,8 @@
         <li><a href="apiref.html#module-dualbounds.generic">module</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     dualbounds.interpolation
 
@@ -197,8 +216,6 @@
         <li><a href="apiref.html#module-dualbounds.interpolation">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     dualbounds.lee
 
@@ -242,10 +259,20 @@
 </li>
         <li><a href="apiref.html#dualbounds.dist_reg.DistReg.fit">(dualbounds.dist_reg.DistReg method)</a>
 </li>
+        <li><a href="apiref.html#dualbounds.dist_reg.QuantileDistReg.fit">(dualbounds.dist_reg.QuantileDistReg method)</a>
+</li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apiref.html#dualbounds.generic.DualBounds.fit_propensity_scores">fit_propensity_scores() (dualbounds.generic.DualBounds method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="G">G</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.gen_data.gen_regression_data">gen_regression_data() (in module dualbounds.gen_data)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -269,6 +296,8 @@
     module
 
       <ul>
+        <li><a href="apiref.html#module-dualbounds.bootstrap">dualbounds.bootstrap</a>
+</li>
         <li><a href="apiref.html#module-dualbounds.dist_reg">dualbounds.dist_reg</a>
 </li>
         <li><a href="apiref.html#module-dualbounds.gen_data">dualbounds.gen_data</a>
@@ -290,12 +319,24 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apiref.html#dualbounds.dist_reg.MonotoneLogisticReg">MonotoneLogisticReg (class in dualbounds.dist_reg)</a>
 </li>
+      <li><a href="apiref.html#dualbounds.bootstrap.multiplier_bootstrap">multiplier_bootstrap() (in module dualbounds.bootstrap)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="N">N</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.interpolation.nn_interpolate">nn_interpolate() (in module dualbounds.interpolation)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.generic.plug_in_no_covariates">plug_in_no_covariates() (in module dualbounds.generic)</a>
+</li>
       <li><a href="apiref.html#dualbounds.dist_reg.BinaryDistReg.predict">predict() (dualbounds.dist_reg.BinaryDistReg method)</a>
 
       <ul>
@@ -303,10 +344,20 @@
 </li>
         <li><a href="apiref.html#dualbounds.dist_reg.DistReg.predict">(dualbounds.dist_reg.DistReg method)</a>
 </li>
+        <li><a href="apiref.html#dualbounds.dist_reg.QuantileDistReg.predict">(dualbounds.dist_reg.QuantileDistReg method)</a>
+</li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="apiref.html#dualbounds.dist_reg.BinaryDistReg.predict_proba">predict_proba() (dualbounds.dist_reg.BinaryDistReg method)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="Q">Q</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.dist_reg.QuantileDistReg">QuantileDistReg (class in dualbounds.dist_reg)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -321,6 +372,14 @@
       <li><a href="apiref.html#dualbounds.varcate.VarCATEDualBounds">VarCATEDualBounds (class in dualbounds.varcate)</a>
 </li>
       <li><a href="apiref.html#dualbounds.varite.VarITEDualBounds">VarITEDualBounds (class in dualbounds.varite)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="W">W</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="apiref.html#dualbounds.utilities.weighted_quantile">weighted_quantile() (in module dualbounds.utilities)</a>
 </li>
   </ul></td>
 </tr></table>

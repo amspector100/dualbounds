@@ -5,6 +5,10 @@ import ot
 from scipy import stats
 from . import utilities, dist_reg, interpolation
 from .utilities import BatchedCategorical
+# typing
+from scipy.stats._distn_infrastructure import rv_generic
+import sklearn.base
+from typing import Optional, Union
 
 MIN_NVALS = 7
 DISC_THRESH = 2 # treat vars. with <= DISC_THRESH values as discrete
@@ -114,7 +118,7 @@ class DualBounds:
 		Optinal support of y, if known.
 		Defaults to ``None`` (inferred from the data).
 	**model_kwargs : dict
-		Additional kwargs for an underlying ``DistReg`` model,
+		Additional kwargs for the ``DistReg`` outcome model,
 		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
 
 	Examples
@@ -151,17 +155,17 @@ class DualBounds:
 	"""
 	def __init__(
 		self, 
-		f,
-		X,
-		W,
-		y,
-		pis=None,
-		Y_model=None,
-		W_model=None,
-		discrete=None,
-		support=None,
+		f: callable,
+		X: np.array,
+		W: np.array,
+		y: np.array,
+		pis: Optional[np.array]=None,
+		Y_model: Union[str, dist_reg.DistReg]='ridge',
+		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
+		discrete: Optional[np.array]=None,
+		support: Optional[np.array]=None,
 		**model_kwargs,
-	):
+	) -> None:
 		### Data
 		self.f = f
 		self.X = X
@@ -864,15 +868,15 @@ class DualBounds:
 
 	def compute_dual_bounds(
 		self,
-		nfolds=5,
-		aipw=True,
-		alpha=0.05,
-		y0_dists=None,
-		y1_dists=None,
-		verbose=True,
-		suppress_warning=False,
+		nfolds: int = 5,
+		aipw: bool = True,
+		alpha: float = 0.05,
+		y0_dists: Optional[list[rv_generic]] = None,
+		y1_dists: Optional[list[rv_generic]] = None,
+		verbose: bool = True,
+		suppress_warning: bool = False,
 		**solve_kwargs,
-	):
+	) -> dict:
 		"""
 		Main function which computes dual bounds in three steps:
 		(1) cross-fitting, (2) computing optimal dual variables,

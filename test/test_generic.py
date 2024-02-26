@@ -140,26 +140,26 @@ class TestGenericDualBounds(unittest.TestCase):
 		model_types.append(db.dist_reg.QuantileDistReg(nquantiles=10, alphas=[0, 0.1]))
 		mt_exps.extend([lm.RidgeCV, dict])
 
-		## 2. m2_models to test
-		m2_model_types = ['none', 'lasso', 'ols', 'None', None, None, None]
-		m2_exps = []
-		for m2t in m2_model_types:
+		## 2. sigma_models to test
+		sigma_model_types = ['none', 'lasso', 'ols', 'None', None, None, None]
+		sigma_model_exps = []
+		for m2t in sigma_model_types:
 			if m2t is None:
-				m2_exps.append(None)
+				sigma_model_exps.append(None)
 			elif m2t.lower() == 'none':
-				m2_exps.append(None)
+				sigma_model_exps.append(None)
 			else:
-				m2_exps.append(db.dist_reg.parse_model_type(m2t, discrete=False))
+				sigma_model_exps.append(db.dist_reg.parse_model_type(m2t, discrete=False))
 
 
 		## 3. Epsilon dists to test
 		eps_dists = ['empirical', 'laplace', 'empirical', 'expon', 'tdist']
 		eps_dists.extend(['these_args', 'should_be_ignored_and_not_raise_error'])
-		for model, mt_exp, m2_model, m2_exp, eps_dist in zip(
+		for model, mt_exp, sigma_model, sigma_model_exp, eps_dist in zip(
 			model_types,
 			mt_exps,
-			m2_model_types,
-			m2_exps,
+			sigma_model_types,
+			sigma_model_exps,
 			eps_dists
 		):
 			gdb = db.generic.DualBounds(
@@ -167,7 +167,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				X=data['X'], W=data['W'], 
 				y=data['y'], pis=data['pis'], 
 				Y_model=model,
-				heterosked_model=m2_model,
+				heterosked_model=sigma_model,
 				eps_dist=eps_dist,
 			)
 			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
@@ -178,16 +178,16 @@ class TestGenericDualBounds(unittest.TestCase):
 				f"fit Y_model {Ym} with W_model={model} is not of type {mt_exp}"
 			)
 			# Check correct class for the heteroskedastic model
-			if m2_exp is not None:
-				Ym2 = gdb.model_fits[0].m2_model
+			if sigma_model_exp is not None:
+				Ym2 = gdb.model_fits[0].sigma2_model
 				self.assertTrue(
-					isinstance(Ym2, m2_exp),
-					f"m2_model {Ym2} with heterosked_model={m2_model} is not of type {m2_exp}"
+					isinstance(Ym2, sigma_model_exp),
+					f"sigma_model {Ym2} with heterosked_model={sigma_model} is not of type {sigma_model_exp}"
 				)
-			if m2_exp is None:
-				# In this case heterosked_model='none', so there should be no m2_model
+			if sigma_model_exp is None:
+				# In this case heterosked_model='none', so there should be no sigma_model
 				with np.testing.assert_raises(AttributeError):
-					x = gdb.model_fits[0].m2_model
+					x = gdb.model_fits[0].sigma2_model
 
 	def test_base_models_discrete(self):
 		"""
@@ -227,7 +227,7 @@ class TestGenericDualBounds(unittest.TestCase):
 		expecteds = [
 			db.dist_reg.parse_model_type(wm, discrete=True) for wm in W_models
 		]
-		W_models.append(sklearn.ensemble.AdaBoostClassifier())
+		W_models.append(sklearn.ensemble.AdaBoostClassifier(algorithm='SAMME'))
 		expecteds.append(sklearn.ensemble.AdaBoostClassifier)
 		for W_model, expected in zip(W_models, expecteds):
 			gdb = db.generic.DualBounds(

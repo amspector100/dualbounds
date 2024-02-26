@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dualbounds.lee &mdash; dualbounds 0.1.0 documentation</title>
+  <title>dualbounds.lee &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
@@ -15,7 +15,7 @@
   
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=01f34227"></script>
+        <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
         <script src="../../_static/doctools.js?v=888ff710"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -36,7 +36,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -549,6 +549,7 @@
 		<span class="bp">self</span><span class="p">,</span>
 		<span class="n">nfolds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
 		<span class="n">suppress_warning</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+		<span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 	<span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Performs cross-fitting to estimate the outcome and selection models.</span>
@@ -576,11 +577,16 @@
 				<span class="n">Y_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">S_model</span><span class="p">,</span> <span class="n">support</span><span class="o">=</span><span class="nb">set</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]),</span> 
 				<span class="n">discrete</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">monotonicity</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> 
 			<span class="p">)</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">s0_probs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">s1_probs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">S_model_fits</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
+			<span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+				<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cross-fitting the selection model.&quot;</span><span class="p">)</span>
+			<span class="n">sout</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
 				<span class="n">W</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> 
-				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">S_model</span><span class="p">,</span>
+				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> 
+				<span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">S_model</span><span class="p">,</span>
+				<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 				<span class="n">probs_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">s0_probs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">s1_probs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">S_model_fits</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">S_oos_preds</span> <span class="o">=</span> <span class="n">sout</span>
 		<span class="k">elif</span> <span class="ow">not</span> <span class="n">suppress_warning</span><span class="p">:</span>
 			<span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
 				<span class="n">generic</span><span class="o">.</span><span class="n">CROSSFIT_WARNING</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;y0_&quot;</span><span class="p">,</span> <span class="s2">&quot;s0_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;y1_&quot;</span><span class="p">,</span> <span class="s2">&quot;s1_&quot;</span><span class="p">)</span>
@@ -591,10 +597,15 @@
 			<span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span> <span class="o">=</span> <span class="n">generic</span><span class="o">.</span><span class="n">get_default_model</span><span class="p">(</span>
 				<span class="n">discrete</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">,</span> <span class="n">support</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">support</span><span class="p">,</span> <span class="n">Y_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
 			<span class="p">)</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_fits</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
+			<span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+				<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cross-fitting the outcome model.&quot;</span><span class="p">)</span>
+			<span class="n">yout</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
 				<span class="n">W</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">,</span> <span class="n">S</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> 
-				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
+				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> 
+				<span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
+				<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_fits</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">oos_preds</span> <span class="o">=</span> <span class="n">yout</span>
 		<span class="k">elif</span> <span class="ow">not</span> <span class="n">suppress_warning</span><span class="p">:</span>
 			<span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">generic</span><span class="o">.</span><span class="n">CROSSFIT_WARNING</span><span class="p">)</span>
 
@@ -615,6 +626,7 @@
 		<span class="n">y0_dists</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="n">y1_dists</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="n">suppress_warning</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+		<span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 		<span class="o">**</span><span class="n">solve_kwargs</span><span class="p">,</span>
 	<span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
@@ -654,11 +666,11 @@
 
 		<span class="c1"># if pis not supplied: will use cross-fitting</span>
 		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">fit_propensity_scores</span><span class="p">(</span><span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">fit_propensity_scores</span><span class="p">(</span><span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">)</span>
 
 		<span class="c1"># fit outcome models using cross-fitting</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">cross_fit</span><span class="p">(</span>
-			<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">suppress_warning</span><span class="o">=</span><span class="n">suppress_warning</span><span class="p">,</span>
+			<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span> <span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">suppress_warning</span><span class="o">=</span><span class="n">suppress_warning</span><span class="p">,</span>
 		<span class="p">)</span>
 
 		<span class="c1"># compute dual variables</span>
@@ -668,6 +680,7 @@
 			<span class="n">y1_dists</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span>
 			<span class="n">ymin</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span>
 			<span class="n">ymax</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+			<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 			<span class="o">**</span><span class="n">solve_kwargs</span><span class="p">,</span>
 		<span class="p">)</span>
 

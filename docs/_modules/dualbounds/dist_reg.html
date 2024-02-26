@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dualbounds.dist_reg &mdash; dualbounds 0.1.0 documentation</title>
+  <title>dualbounds.dist_reg &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
@@ -15,7 +15,7 @@
   
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=01f34227"></script>
+        <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
         <script src="../../_static/doctools.js?v=888ff710"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -36,7 +36,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -85,9 +85,15 @@
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
 <span class="kn">import</span> <span class="nn">sklearn.linear_model</span> <span class="k">as</span> <span class="nn">lm</span>
 <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">utilities</span>
-<span class="kn">from</span> <span class="nn">.utilities</span> <span class="kn">import</span> <span class="n">parse_dist</span><span class="p">,</span> <span class="n">BatchedCategorical</span>
+<span class="kn">from</span> <span class="nn">.utilities</span> <span class="kn">import</span> <span class="n">parse_dist</span><span class="p">,</span> <span class="n">BatchedCategorical</span><span class="p">,</span> <span class="n">vrange</span>
+<span class="c1"># typing</span>
+<span class="kn">import</span> <span class="nn">sklearn.base</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="n">TOL</span> <span class="o">=</span> <span class="mf">1e-6</span>
+<span class="n">DEFAULT_ALPHAS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">logspace</span><span class="p">(</span><span class="mf">0.0001</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+<span class="n">DEFAULT_ALPHAS</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">DEFAULT_ALPHAS</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">10000</span><span class="p">])])</span>
+
 
 <span class="k">def</span> <span class="nf">parse_model_type</span><span class="p">(</span><span class="n">model_type</span><span class="p">,</span> <span class="n">discrete</span><span class="p">):</span>
 	<span class="c1"># return non-strings</span>
@@ -98,6 +104,8 @@
 	<span class="k">if</span> <span class="ow">not</span> <span class="n">discrete</span><span class="p">:</span>
 		<span class="k">if</span> <span class="n">model_type</span> <span class="o">==</span> <span class="s1">&#39;ridge&#39;</span><span class="p">:</span>
 			<span class="k">return</span> <span class="n">lm</span><span class="o">.</span><span class="n">RidgeCV</span>
+		<span class="k">elif</span> <span class="n">model_type</span> <span class="o">==</span> <span class="s1">&#39;ols&#39;</span><span class="p">:</span>
+			<span class="k">return</span> <span class="n">lm</span><span class="o">.</span><span class="n">LinearRegression</span>
 		<span class="k">elif</span> <span class="n">model_type</span> <span class="o">==</span> <span class="s1">&#39;lasso&#39;</span><span class="p">:</span>
 			<span class="k">return</span> <span class="n">lm</span><span class="o">.</span><span class="n">LassoCV</span>
 		<span class="k">elif</span> <span class="n">model_type</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;elastic&#39;</span><span class="p">,</span> <span class="s1">&#39;elasticnet&#39;</span><span class="p">]:</span>
@@ -130,6 +138,33 @@
 	<span class="n">ends</span> <span class="o">=</span> <span class="n">splits</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
 	<span class="k">return</span> <span class="n">starts</span><span class="p">,</span> <span class="n">ends</span>
 
+<span class="k">def</span> <span class="nf">ridge_loo_resids</span><span class="p">(</span>
+	<span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">ridge_cv_model</span>
+<span class="p">):</span>
+	<span class="c1"># Ensure we add an intercept which is unregularized</span>
+	<span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">shape</span>
+	<span class="k">if</span> <span class="n">ridge_cv_model</span><span class="o">.</span><span class="n">fit_intercept</span><span class="p">:</span>
+		<span class="c1"># This is not *exact* if we fit an intercept</span>
+		<span class="c1"># because it assumes the intercept doesn&#39;t change</span>
+		<span class="c1"># but it&#39;s realistically pretty close</span>
+		<span class="n">X_offset</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="n">y_offset</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="n">y</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">y_offset</span><span class="p">;</span> <span class="n">features</span> <span class="o">=</span> <span class="n">features</span> <span class="o">-</span> <span class="n">X_offset</span>
+	<span class="c1"># Regularization strength</span>
+	<span class="k">try</span><span class="p">:</span>
+		<span class="n">alpha</span> <span class="o">=</span> <span class="n">ridge_cv_model</span><span class="o">.</span><span class="n">alpha_</span>
+	<span class="k">except</span><span class="p">:</span>
+		<span class="n">alpha</span> <span class="o">=</span> <span class="n">ridge_cv_model</span><span class="o">.</span><span class="n">alpha</span>
+	<span class="c1"># Predictions</span>
+	<span class="n">Q</span> <span class="o">=</span> <span class="n">features</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">features</span> <span class="o">+</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+	<span class="n">Qinv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span>
+	<span class="n">hatbeta</span> <span class="o">=</span> <span class="n">Qinv</span> <span class="o">@</span> <span class="n">features</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">y</span>
+	<span class="n">preds</span> <span class="o">=</span> <span class="n">features</span> <span class="o">@</span> <span class="n">hatbeta</span>
+	<span class="c1"># Leave one out residuals</span>
+	<span class="n">scales</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">features</span> <span class="o">@</span> <span class="n">Qinv</span><span class="p">)</span> <span class="o">*</span> <span class="n">features</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+	<span class="n">loo_resids</span> <span class="o">=</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">preds</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">scales</span><span class="p">)</span>
+	<span class="k">return</span> <span class="n">loo_resids</span>
+
 <div class="viewcode-block" id="cross_fit_predictions">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.cross_fit_predictions">[docs]</a>
 <span class="k">def</span> <span class="nf">cross_fit_predictions</span><span class="p">(</span>
@@ -142,6 +177,7 @@
 	<span class="n">model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 	<span class="n">model_cls</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> 
 	<span class="n">probs_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+	<span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 	<span class="o">**</span><span class="n">model_kwargs</span>
 <span class="p">):</span>
 <span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
@@ -152,13 +188,13 @@
 <span class="sd">	model : DistReg</span>
 <span class="sd">		instantiation of ``dist_reg.DistReg`` class. This will</span>
 <span class="sd">		be copied. E.g., </span>
-<span class="sd">		``model=dist_reg.CtsDistReg(model_type=&#39;ridge&#39;, eps_dist=&quot;laplace&quot;).``</span>
+<span class="sd">		``model=dist_reg.CtsDistReg(model_type=&#39;ridge&#39;, eps_dist=&quot;empirical&quot;).``</span>
 <span class="sd">	model_cls : </span>
 <span class="sd">		Alterantively, give the class name and have it constructed.</span>
 <span class="sd">		E.g, ``model_cls=dist_reg.CtsDistReg``.</span>
 <span class="sd">	model_kwargs : dict</span>
 <span class="sd">		kwargs to construct model; used only if model_cls is specified.</span>
-<span class="sd">		E.g., ``model_kwargs=dict(eps_dist=laplace)``.</span>
+<span class="sd">		E.g., ``model_kwargs=dict(eps_dist=empirical)``.</span>
 <span class="sd">	S : array</span>
 <span class="sd">		Optional n-length array of selection indicators.</span>
 <span class="sd">	train_on_selections : bool</span>
@@ -181,15 +217,20 @@
 	<span class="c1"># concatenate S to features</span>
 	<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
 	<span class="k">if</span> <span class="n">S</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">S_flag</span> <span class="o">=</span> <span class="kc">False</span>
 		<span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-	<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">S</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">X</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="n">S_flag</span> <span class="o">=</span> <span class="kc">True</span>
+		<span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">S</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">X</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
 	<span class="c1"># create folds</span>
 	<span class="n">starts</span><span class="p">,</span> <span class="n">ends</span> <span class="o">=</span> <span class="n">create_folds</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">)</span>
 	<span class="c1"># loop through folds</span>
 	<span class="n">pred0s</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">pred1s</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># results for W = 0, W = 1</span>
+	<span class="n">oos_preds</span> <span class="o">=</span> <span class="p">[]</span> <span class="c1"># results for true W</span>
 	<span class="n">fit_models</span> <span class="o">=</span> <span class="p">[]</span>
-	<span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">):</span>
+	<span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="n">vrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">):</span>
+		<span class="n">start</span> <span class="o">=</span> <span class="n">starts</span><span class="p">[</span><span class="n">ii</span><span class="p">];</span> <span class="n">end</span> <span class="o">=</span> <span class="n">ends</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
 		<span class="c1"># Pick out data from the other folds</span>
 		<span class="n">not_in_fold</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">start</span> <span class="ow">or</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">end</span><span class="p">]</span>
 		<span class="k">if</span> <span class="n">train_on_selections</span><span class="p">:</span>
@@ -210,18 +251,23 @@
 		<span class="p">)</span>
 
 		<span class="c1"># predict and append on this fold</span>
-		<span class="n">subX</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">();</span> <span class="n">subX</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># set selection = 1 for predictions</span>
+		<span class="n">subX</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">();</span> 
+		<span class="k">if</span> <span class="n">S_flag</span><span class="p">:</span>
+			<span class="n">subX</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># set selection = 1 for predictions</span>
 		<span class="k">if</span> <span class="ow">not</span> <span class="n">probs_only</span><span class="p">:</span>
 			<span class="n">pred0</span><span class="p">,</span> <span class="n">pred1</span> <span class="o">=</span> <span class="n">reg_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">subX</span><span class="p">)</span>
+			<span class="n">oos_pred</span> <span class="o">=</span> <span class="n">reg_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">subX</span><span class="p">,</span> <span class="n">W</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">])</span>
 		<span class="k">else</span><span class="p">:</span>
 			<span class="n">pred0</span><span class="p">,</span> <span class="n">pred1</span> <span class="o">=</span> <span class="n">reg_model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">subX</span><span class="p">)</span>
+			<span class="n">oos_pred</span> <span class="o">=</span> <span class="n">reg_model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">subX</span><span class="p">,</span> <span class="n">W</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">])</span>
 		<span class="n">pred0s</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pred0</span><span class="p">);</span> <span class="n">pred1s</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pred1</span><span class="p">)</span>
+		<span class="n">oos_preds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">oos_pred</span><span class="p">)</span>
 		<span class="n">fit_models</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">reg_model</span><span class="p">)</span>
 	<span class="c1"># concatenate if arrays; else return</span>
 	<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pred0s</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 		<span class="n">pred0s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">pred0s</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 		<span class="n">pred1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">pred1s</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-	<span class="k">return</span> <span class="n">pred0s</span><span class="p">,</span> <span class="n">pred1s</span><span class="p">,</span> <span class="n">fit_models</span></div>
+	<span class="k">return</span> <span class="n">pred0s</span><span class="p">,</span> <span class="n">pred1s</span><span class="p">,</span> <span class="n">fit_models</span><span class="p">,</span> <span class="n">oos_preds</span></div>
 
 
 <div class="viewcode-block" id="DistReg">
@@ -248,7 +294,7 @@
 
 <div class="viewcode-block" id="DistReg.fit">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.DistReg.fit">[docs]</a>
-	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Fits model on the data.</span>
 
@@ -266,7 +312,7 @@
 
 <div class="viewcode-block" id="DistReg.feature_transform">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.DistReg.feature_transform">[docs]</a>
-	<span class="k">def</span> <span class="nf">feature_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">feature_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Transforms the features before feeding them to the base model.</span>
 
@@ -296,7 +342,7 @@
 
 <div class="viewcode-block" id="DistReg.predict">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.DistReg.predict">[docs]</a>
-	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Parameters</span>
 <span class="sd">		----------</span>
@@ -331,72 +377,309 @@
 <span class="sd">	model_type : str or sklearn class</span>
 <span class="sd">		Str specifying a sklearn model class to use; options include</span>
 <span class="sd">		&#39;ridge&#39;, &#39;lasso&#39;, &#39;elasticnet&#39;, &#39;randomforest&#39;, &#39;knn&#39;. One can</span>
-<span class="sd">		also directly pass an sklearn class constructor, e.g., </span>
+<span class="sd">		also directly pass an sklearn class, e.g., </span>
 <span class="sd">		``model_type=sklearn.ensemble.KNeighborsRegressor``. </span>
 <span class="sd">	how_transform : str</span>
 <span class="sd">		Str specifying how to transform the features before fitting</span>
-<span class="sd">		the base sklearn model.</span>
+<span class="sd">		the underlying model. One of several options:</span>
+
+<span class="sd">		- &#39;identity&#39;: does not transform the features</span>
+<span class="sd">		- &#39;interactions&#39; : interaction terms btwn. the treatment/covariates</span>
+
+<span class="sd">		The default is ``interactions``.</span>
 <span class="sd">	eps_dist : str</span>
-<span class="sd">		Str specifying the (parametric) distribution of the residuals.</span>
-<span class="sd">		One of [&#39;gaussian&#39;, &#39;laplace&#39;, &#39;expon&#39;, &#39;tdist&#39;]. Defaults </span>
-<span class="sd">		to ``gaussian``.</span>
-<span class="sd">	heterosked : bool</span>
-<span class="sd">		If True, estimates Var(Y | X) as a function of X by using</span>
-<span class="sd">		the specified model to predict both E[Y^2 | X] and E[Y | X].</span>
-<span class="sd">		If False, assumes Var(Y | X) is constant. Defaults to False.</span>
-<span class="sd">	model_kwargs : dict</span>
-<span class="sd">		kwargs for sklearn base model constructor. E.g., for ``knn``,</span>
+<span class="sd">		Str specifying the distribution of the residuals. Options include</span>
+<span class="sd">		[&#39;empirical&#39;, gaussian&#39;, &#39;laplace&#39;, &#39;expon&#39;, &#39;tdist&#39;, &#39;skewnorm&#39;]. </span>
+<span class="sd">		Defaults to ``empirical``, which uses the empirical law of the</span>
+<span class="sd">		residuals of the training data.</span>
+<span class="sd">	eps_kwargs : dict</span>
+<span class="sd">		kwargs for ``utilities.parse_dist`` for the residual dist.</span>
+<span class="sd">	heterosked_model : str or sklearn class</span>
+<span class="sd">		Str specifying a sklearn model class to use to estimate </span>
+<span class="sd">		Var(Y | X) as a function of X. Options are the same as </span>
+<span class="sd">		``model_type.`` Defaults to heterosked_model=None, in which</span>
+<span class="sd">		case homoskedasticity is assumed (although the final bounds</span>
+<span class="sd">		will still be valid in the presence of heteroskedasticity).</span>
+<span class="sd">	heterosked_kwargs : dict</span>
+<span class="sd">		kwargs for the heterosked model. E.g., for ``knn``,</span>
+<span class="sd">		heterosked_kwargs could include ``n_neighbors``.</span>
+<span class="sd">	**model_kwargs : dict</span>
+<span class="sd">		kwargs for sklearn base model. E.g., for ``knn``,</span>
 <span class="sd">		model_kwargs could include ``n_neighbors``.</span>
+
+<span class="sd">	Examples</span>
+<span class="sd">	--------</span>
+<span class="sd">		import numpy as np</span>
+<span class="sd">		import dualbounds</span>
+<span class="sd">		import sklearn.linear_model</span>
+
+<span class="sd">		# Instantiate dist_reg</span>
+<span class="sd">		cdreg = dualbounds.dist_reg.CtsDistReg(</span>
+<span class="sd">			# Arguments for main model</span>
+<span class="sd">			model_type=sklearn.linear_model.RidgeCV,</span>
+<span class="sd">			fit_intercept=True,</span>
+<span class="sd">			gcv_mode=&#39;auto&#39;,</span>
+<span class="sd">			# How to estimate the law of the residuals</span>
+<span class="sd">			eps_dist=&#39;gaussian&#39;,</span>
+<span class="sd">			# How to estimate Var(Y | X)</span>
+<span class="sd">			heterosked_model=sklearn.linear_model.LassoCV,</span>
+<span class="sd">			heterosked_kwargs=dict(cv=5),</span>
+<span class="sd">		)</span>
+
+<span class="sd">		# Fit</span>
+<span class="sd">		n, p = 300, 20</span>
+<span class="sd">		W = np.random.binomial(1, 0.5, n)</span>
+<span class="sd">		X = np.random.randn(n, p)</span>
+<span class="sd">		y = np.random.randn(n)</span>
+<span class="sd">		cdreg.fit(W=W, X=X, y=y)</span>
+
+<span class="sd">		# Predict on new X with or without W</span>
+<span class="sd">		m = 10</span>
+<span class="sd">		Xnew = np.random.randn(m, p)</span>
+<span class="sd">		y0_dists, y1_dists = cdreg.predict(X=Xnew)</span>
+<span class="sd">		y0_dists = cdreg.predict(X=Xnew, W=np.zeros(m))</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span>
-		<span class="n">model_type</span><span class="o">=</span><span class="s1">&#39;ridge&#39;</span><span class="p">,</span>
-		<span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;gaussian&#39;</span><span class="p">,</span>
-		<span class="n">how_transform</span><span class="o">=</span><span class="s1">&#39;interactions&#39;</span><span class="p">,</span>
-		<span class="n">heterosked</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+		<span class="n">model_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">sklearn</span><span class="o">.</span><span class="n">base</span><span class="o">.</span><span class="n">BaseEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;ridge&#39;</span><span class="p">,</span>
+		<span class="n">how_transform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;interactions&#39;</span><span class="p">,</span>
+		<span class="n">eps_dist</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;empirical&#39;</span><span class="p">,</span>
+		<span class="n">eps_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+		<span class="n">heterosked_model</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s1">&#39;none&#39;</span><span class="p">,</span>
+		<span class="n">heterosked_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="o">**</span><span class="n">model_kwargs</span><span class="p">,</span>
 	<span class="p">):</span>
+		<span class="c1"># Distribution of residuals</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">eps_dist</span> <span class="o">=</span> <span class="n">eps_dist</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">eps_kwargs</span> <span class="o">=</span> <span class="p">{}</span> <span class="k">if</span> <span class="n">eps_kwargs</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">eps_kwargs</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">use_loo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;use_loo&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+		<span class="c1"># Main predictive model</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">model_type</span> <span class="o">=</span> <span class="n">parse_model_type</span><span class="p">(</span><span class="n">model_type</span><span class="p">,</span> <span class="n">discrete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span> <span class="o">=</span> <span class="n">model_kwargs</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">how_transform</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">how_transform</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span> <span class="o">=</span> <span class="n">heterosked</span>
+		<span class="c1">## Heteroskedasticity</span>
+		<span class="c1"># Parse if we want to fit a model for heteroskedasticity</span>
+		<span class="k">if</span> <span class="n">heterosked_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+			<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">heterosked_model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+				<span class="n">heterosked_model</span> <span class="o">=</span> <span class="n">heterosked_model</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span> <span class="o">=</span> <span class="n">heterosked_model</span> <span class="o">!=</span> <span class="s1">&#39;none&#39;</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span> <span class="o">=</span> <span class="kc">False</span>
+		<span class="c1"># If so, parse the model type</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_type</span> <span class="o">=</span> <span class="n">parse_model_type</span><span class="p">(</span><span class="n">heterosked_model</span><span class="p">,</span> <span class="n">discrete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_kwargs</span> <span class="o">=</span> <span class="n">heterosked_kwargs</span>
+			<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_kwargs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="c1"># Default kwargs</span>
+		<span class="k">if</span> <span class="n">model_type</span> <span class="o">==</span> <span class="s1">&#39;ridge&#39;</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;alphas&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;alphas&quot;</span><span class="p">,</span> <span class="n">DEFAULT_ALPHAS</span><span class="p">)</span>
+		
 
 <div class="viewcode-block" id="CtsDistReg.fit">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.CtsDistReg.fit">[docs]</a>
-	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
-		<span class="c1"># fit ridge</span>
+	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">Wtrain</span> <span class="o">=</span> <span class="n">W</span>
+		<span class="c1"># fit model</span>
 		<span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_transform</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_type</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">)</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
 
-		<span class="c1"># fit variance</span>
+		<span class="c1"># compute residuals. Use Cheap LOO resids for ridge</span>
+		<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="n">lm</span><span class="o">.</span><span class="n">RidgeCV</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_loo</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">resids</span> <span class="o">=</span> <span class="n">ridge_loo_resids</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">ridge_cv_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">resids</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+
+		<span class="c1"># Estimate E[Var(Y | X)] using residuals.</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">resids</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
 		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span><span class="p">:</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">m2_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_type</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">)</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">m2_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_type</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model_kwargs</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">resids</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatsigma_preds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">),</span>
+				<span class="mf">0.01</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> 
+				<span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+			<span class="p">))</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatsigma_preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span>
 
-		<span class="c1"># estimate of E[Var(Y | X)] </span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span>
-			<span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">)</span> <span class="o">-</span> <span class="n">y</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
-		<span class="p">)</span></div>
+		<span class="c1"># If eps_dist == empirical, fit empirical law</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps_dist</span> <span class="o">==</span> <span class="s1">&#39;empirical&#39;</span><span class="p">:</span>
+			<span class="n">norm_resids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resids</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma_preds</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">norm_resids</span><span class="p">[</span><span class="n">W</span> <span class="o">==</span> <span class="mi">0</span><span class="p">])</span>
+			<span class="c1"># Center to ensure we don&#39;t scale a small mean by a large amount</span>
+			<span class="c1"># when heterosked=True.</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rprobs0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span><span class="p">)</span>
+			<span class="c1"># Repeat for treatment</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">norm_resids</span><span class="p">[</span><span class="n">W</span> <span class="o">==</span> <span class="mi">1</span><span class="p">])</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span> <span class="o">-=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rprobs1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span><span class="p">)</span>
+			<span class="c1"># adjust support size for computational reasons</span>
+			<span class="n">adj_kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+				<span class="n">new_nvals</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eps_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;nvals&quot;</span><span class="p">,</span> <span class="mi">90</span><span class="p">),</span> <span class="n">ymin</span><span class="o">=</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">ymax</span><span class="o">=</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rprobs0</span> <span class="o">=</span> <span class="n">utilities</span><span class="o">.</span><span class="n">_adjust_support_size_unbatched</span><span class="p">(</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rprobs0</span><span class="p">,</span> <span class="o">**</span><span class="n">adj_kwargs</span>
+			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rprobs1</span> <span class="o">=</span> <span class="n">utilities</span><span class="o">.</span><span class="n">_adjust_support_size_unbatched</span><span class="p">(</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rprobs1</span><span class="p">,</span> <span class="o">**</span><span class="n">adj_kwargs</span>
+			<span class="p">)</span></div>
 
-	
+
 <div class="viewcode-block" id="CtsDistReg.predict">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.CtsDistReg.predict">[docs]</a>
-	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 		<span class="k">if</span> <span class="n">W</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
 			<span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_transform</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
 			<span class="n">mu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
 			<span class="c1"># heteroskedasticity</span>
 			<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">heterosked</span><span class="p">:</span>
-				<span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m2_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">)</span> <span class="o">-</span> <span class="n">mu</span><span class="o">**</span><span class="mi">2</span>
-				<span class="c1"># ensure positivity</span>
-				<span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">scale</span><span class="p">,</span> <span class="mf">0.1</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span><span class="p">)</span>
+				<span class="n">scale</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">sigma2_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">),</span>
+					<span class="mf">0.01</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+					<span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span>
+				<span class="p">))</span>
 			<span class="k">else</span><span class="p">:</span>
 				<span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hatsigma</span>
-			<span class="c1"># return scipy dists</span>
-			<span class="k">return</span> <span class="n">parse_dist</span><span class="p">(</span>
-				<span class="bp">self</span><span class="o">.</span><span class="n">eps_dist</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu</span><span class="p">,</span> <span class="n">sd</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> 
+			<span class="c1"># Option 1: nonparametric law of eps</span>
+			<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">eps_dist</span> <span class="o">==</span> <span class="s1">&#39;empirical&#39;</span><span class="p">:</span>
+				<span class="c1"># law of normalized residuals</span>
+				<span class="c1"># only use empirical residuals from the same treatment/control group</span>
+				<span class="n">vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+					<span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">rvals0</span> <span class="k">if</span> <span class="n">Wi</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">rvals1</span> <span class="k">for</span> <span class="n">Wi</span> <span class="ow">in</span> <span class="n">W</span><span class="p">],</span>
+					<span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
+				<span class="p">)</span>
+				<span class="n">vals</span> <span class="o">=</span> <span class="n">vals</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">scale</span><span class="p">])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">mu</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+				<span class="c1"># Create probs and return</span>
+				<span class="n">probs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+					<span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">rprobs0</span> <span class="k">if</span> <span class="n">Wi</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">rprobs1</span> <span class="k">for</span> <span class="n">Wi</span> <span class="ow">in</span> <span class="n">W</span><span class="p">],</span> 
+					<span class="n">axis</span><span class="o">=</span><span class="mi">0</span>
+				<span class="p">)</span>
+				<span class="k">return</span> <span class="n">utilities</span><span class="o">.</span><span class="n">BatchedCategorical</span><span class="p">(</span>
+					<span class="n">vals</span><span class="o">=</span><span class="n">vals</span><span class="p">,</span> <span class="n">probs</span><span class="o">=</span><span class="n">probs</span>
+				<span class="p">)</span>
+			<span class="c1"># Option 2: parametric law of eps, return scipy dists</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="k">return</span> <span class="n">parse_dist</span><span class="p">(</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">eps_dist</span><span class="p">,</span> <span class="n">mu</span><span class="o">=</span><span class="n">mu</span><span class="p">,</span> <span class="n">sd</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">eps_kwargs</span><span class="p">,</span>
+				<span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+			<span class="n">W0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">);</span> <span class="n">W1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+			<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W0</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W1</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="QuantileDistReg">
+<a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.QuantileDistReg">[docs]</a>
+<span class="k">class</span> <span class="nc">QuantileDistReg</span><span class="p">(</span><span class="n">DistReg</span><span class="p">):</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	A continuous distributional regression based on quantile regression.</span>
+
+<span class="sd">	Parameters</span>
+<span class="sd">	----------</span>
+<span class="sd">	nquantiles : int</span>
+<span class="sd">		The number of quantiles to fit quantile regressions for.</span>
+<span class="sd">		Quantiles are evenly spaced between 0 and 1.</span>
+<span class="sd">	alphas : list or np.array</span>
+<span class="sd">		List of l1 regularization strengths to use in the quantile</span>
+<span class="sd">		regression; the final strength is determined by cross-validation.  </span>
+<span class="sd">		Default is alphas=[0] (no regularization).</span>
+<span class="sd">	how_transform : str</span>
+<span class="sd">		Str specifying how to transform the features before fitting</span>
+<span class="sd">		the underlying model. One of several options:</span>
+
+<span class="sd">		- &#39;identity&#39;: does not transform the features</span>
+<span class="sd">		- &#39;interactions&#39; : interaction terms btwn. the treatment/covariates</span>
+
+<span class="sd">		The default is ``interactions``.</span>
+
+<span class="sd">	Notes</span>
+<span class="sd">	-----</span>
+<span class="sd">	This method is computationally expensive for large datasets.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+		<span class="bp">self</span><span class="p">,</span> 
+		<span class="n">nquantiles</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+		<span class="n">alphas</span><span class="p">:</span> <span class="nb">list</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+		<span class="n">how_transform</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s1">&#39;interactions&#39;</span><span class="p">,</span>
+	<span class="p">):</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">nq</span> <span class="o">=</span> <span class="n">nquantiles</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">how_transform</span> <span class="o">=</span> <span class="n">how_transform</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">around</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nq</span><span class="p">),</span> <span class="mi">8</span><span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">probs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantiles</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">alphas</span> <span class="o">=</span> <span class="n">alphas</span>
+
+<div class="viewcode-block" id="QuantileDistReg.fit">
+<a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.QuantileDistReg.fit">[docs]</a>
+	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="c1"># Pick regularization by using CV lasso reg. strength</span>
+		<span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_transform</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="kn">from</span> <span class="nn">sklearn.metrics</span> <span class="kn">import</span> <span class="n">d2_pinball_score</span><span class="p">,</span> <span class="n">make_scorer</span>
+			<span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">cross_validate</span>
+		<span class="c1"># Fit many quantiles</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">scores</span> <span class="o">=</span> <span class="p">{}</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ymin</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">ymax</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+		<span class="k">for</span> <span class="n">quantile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantiles</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">quantile</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]:</span>
+				<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+					<span class="n">qr</span> <span class="o">=</span> <span class="n">lm</span><span class="o">.</span><span class="n">QuantileRegressor</span><span class="p">(</span>
+						<span class="n">alpha</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">quantile</span><span class="o">=</span><span class="n">quantile</span><span class="p">,</span> 
+					<span class="p">)</span>
+					<span class="n">qr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="n">quantile</span><span class="p">]</span> <span class="o">=</span> <span class="n">qr</span>
+				<span class="c1"># Cross-validate the quantile regression</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="n">scores</span> <span class="o">=</span> <span class="p">[]</span>
+					<span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">:</span>
+						<span class="n">qrcand</span> <span class="o">=</span> <span class="n">lm</span><span class="o">.</span><span class="n">QuantileRegressor</span><span class="p">(</span>
+							<span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">quantile</span><span class="o">=</span><span class="n">quantile</span><span class="p">,</span>
+						<span class="p">)</span>
+						<span class="n">score</span> <span class="o">=</span> <span class="n">cross_validate</span><span class="p">(</span>
+							<span class="n">qrcand</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">cv</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+							<span class="n">scoring</span><span class="o">=</span><span class="n">make_scorer</span><span class="p">(</span><span class="n">d2_pinball_score</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">quantile</span><span class="p">),</span>
+						<span class="p">)</span>
+						<span class="n">scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">score</span><span class="p">[</span><span class="s1">&#39;test_score&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+					<span class="n">qr</span> <span class="o">=</span> <span class="n">lm</span><span class="o">.</span><span class="n">QuantileRegressor</span><span class="p">(</span>
+						<span class="n">alpha</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">alphas</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">scores</span><span class="p">)],</span> <span class="n">quantile</span><span class="o">=</span><span class="n">quantile</span><span class="p">,</span> 
+					<span class="p">)</span>
+					<span class="n">qr</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">features</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+					<span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="n">quantile</span><span class="p">]</span> <span class="o">=</span> <span class="n">qr</span>
+			<span class="k">else</span><span class="p">:</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="n">quantile</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">scores</span><span class="p">[</span><span class="n">quantile</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+			
+<div class="viewcode-block" id="QuantileDistReg.predict">
+<a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.QuantileDistReg.predict">[docs]</a>
+	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="k">if</span> <span class="n">W</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+			<span class="n">features</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_transform</span><span class="p">(</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">)</span>
+			<span class="n">all_preds</span> <span class="o">=</span> <span class="p">[]</span> 
+			<span class="k">for</span> <span class="n">quantile</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">quantiles</span><span class="p">:</span>
+				<span class="k">if</span> <span class="n">quantile</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+					<span class="n">preds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">))</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">ymin</span>
+				<span class="k">elif</span> <span class="n">quantile</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+					<span class="n">preds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">))</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">ymax</span>
+				<span class="k">else</span><span class="p">:</span>
+					<span class="n">preds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="n">quantile</span><span class="p">]</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+				<span class="n">all_preds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span>
+
+			<span class="n">all_preds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">all_preds</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># n x self.nq</span>
+			<span class="c1"># sort to ensure coherence</span>
+			<span class="n">all_preds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">all_preds</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+			<span class="c1"># take centers and return</span>
+			<span class="n">yvals</span> <span class="o">=</span> <span class="p">(</span><span class="n">all_preds</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="n">all_preds</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mi">2</span>
+			<span class="n">probs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">probs</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">))],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+			<span class="k">return</span> <span class="n">utilities</span><span class="o">.</span><span class="n">BatchedCategorical</span><span class="p">(</span>
+				<span class="n">vals</span><span class="o">=</span><span class="n">yvals</span><span class="p">,</span> <span class="n">probs</span><span class="o">=</span><span class="n">probs</span>
 			<span class="p">)</span>
 		<span class="k">else</span><span class="p">:</span>
 			<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
@@ -409,35 +692,59 @@
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.BinaryDistReg">[docs]</a>
 <span class="k">class</span> <span class="nc">BinaryDistReg</span><span class="p">(</span><span class="n">DistReg</span><span class="p">):</span>
 <span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">	A wrapper of sklearn.LogisticRegression which inherits from ``DistReg``</span>
+<span class="sd">	Binary regression which inherits from ``DistReg``</span>
 
 <span class="sd">	Parameters</span>
 <span class="sd">	----------</span>
+<span class="sd">	model_type : str or sklearn class.</span>
+<span class="sd">		Str specifying a sklearn model class to use; options include</span>
+<span class="sd">		&#39;ridge&#39;, &#39;lasso&#39;, &#39;elasticnet&#39;, &#39;randomforest&#39;, &#39;knn&#39;. One can</span>
+<span class="sd">		also directly pass an sklearn class, e.g., </span>
+<span class="sd">		``model_type=sklearn.linear_model.LogisticRegressionCV``.</span>
 <span class="sd">	how_transform : str</span>
 <span class="sd">		Str specifying how to transform the features before fitting</span>
-<span class="sd">		a ``LogisticCV`` model. See the base ``DistReg`` class for details.</span>
+<span class="sd">		the underlying model. One of several options:</span>
+
+<span class="sd">		- &#39;identity&#39;: does not transform the features</span>
+<span class="sd">		- &#39;interactions&#39; : interaction terms btwn. the treatment/covariates</span>
+
+<span class="sd">		The default is ``interactions``.</span>
 <span class="sd">	monotonicity : bool</span>
 <span class="sd">		If true, ensures that the coefficient corresponding to the treatment</span>
 <span class="sd">		is nonnegative. This is important when fitting Lee Bounds that assume</span>
 <span class="sd">		monotonicity. Defaults to False.</span>
 <span class="sd">	model_kwargs : dict</span>
-<span class="sd">		kwargs to sklearn </span>
+<span class="sd">		kwargs to sklearn model class.</span>
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span> 
-		<span class="n">model_type</span><span class="o">=</span><span class="s1">&#39;logistic&#39;</span><span class="p">,</span> 
-		<span class="n">monotonicity</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-		<span class="n">how_transform</span><span class="o">=</span><span class="s1">&#39;interactions&#39;</span><span class="p">,</span>
+		<span class="n">model_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">sklearn</span><span class="o">.</span><span class="n">base</span><span class="o">.</span><span class="n">BaseEstimator</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;logistic&#39;</span><span class="p">,</span> 
+		<span class="n">monotonicity</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+		<span class="n">how_transform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;interactions&#39;</span><span class="p">,</span>
 		<span class="o">**</span><span class="n">model_kwargs</span>
-	<span class="p">):</span>
+	<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">mtype_raw</span> <span class="o">=</span> <span class="n">model_type</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">model_type</span> <span class="o">=</span> <span class="n">parse_model_type</span><span class="p">(</span><span class="n">model_type</span><span class="p">,</span> <span class="n">discrete</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">monotonicity</span> <span class="o">=</span> <span class="n">monotonicity</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span> <span class="o">=</span> <span class="n">model_kwargs</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">how_transform</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">how_transform</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span> <span class="o">=</span> <span class="n">model_kwargs</span>
+
+		<span class="c1">## Default kwargs</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mtype_raw</span> <span class="o">==</span> <span class="s1">&#39;lasso&#39;</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;penalty&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;l1&#39;</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;solver&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;solver&#39;</span><span class="p">,</span> <span class="s1">&#39;saga&#39;</span><span class="p">)</span>
+		<span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">mtype_raw</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;ridge&#39;</span><span class="p">]:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;penalty&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;l2&#39;</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;solver&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;solver&#39;</span><span class="p">,</span> <span class="s1">&#39;lbfgs&#39;</span><span class="p">)</span>
+		<span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">mtype_raw</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;elasticnet&#39;</span><span class="p">,</span> <span class="s1">&#39;elastic&#39;</span><span class="p">]:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;penalty&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;elasticnet&#39;</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;solver&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;solver&#39;</span><span class="p">,</span> <span class="s1">&#39;saga&#39;</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span><span class="p">[</span><span class="s1">&#39;l1_ratios&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+
 
 <div class="viewcode-block" id="BinaryDistReg.fit">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.BinaryDistReg.fit">[docs]</a>
-	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 		<span class="c1"># check y is binary</span>
 		<span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">]):</span>
 			<span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;y must be binary; instead np.unique(y)=</span><span class="si">{</span><span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -450,7 +757,7 @@
 <div class="viewcode-block" id="BinaryDistReg.predict_proba">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.BinaryDistReg.predict_proba">[docs]</a>
 	<span class="k">def</span> <span class="nf">predict_proba</span><span class="p">(</span>
-		<span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="kc">None</span>
+		<span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span>
 	<span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))</span>
@@ -479,7 +786,7 @@
 
 <div class="viewcode-block" id="BinaryDistReg.predict">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.dist_reg.BinaryDistReg.predict">[docs]</a>
-	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">W</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		If W is None, returns (y0_dists, y1_dists)</span>
 <span class="sd">		Else, returns (y_dists) </span>
@@ -511,7 +818,7 @@
 	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 		<span class="k">pass</span>
 
-	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">lmda</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">lmda</span><span class="p">:</span> <span class="nb">float</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
 		<span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span>
 		<span class="n">sig1</span> <span class="o">=</span> <span class="n">X</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
 		<span class="n">zeros</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
@@ -528,7 +835,7 @@
 			<span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">solver</span><span class="o">=</span><span class="s1">&#39;ECOS&#39;</span><span class="p">,</span> <span class="n">max_iters</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">=</span> <span class="n">beta</span><span class="o">.</span><span class="n">value</span>
 
-	<span class="k">def</span> <span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">predict_proba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">):</span>
 		<span class="n">mu</span> <span class="o">=</span> <span class="n">X</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">beta</span>
 		<span class="n">p1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mu</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mu</span><span class="p">))</span>
 		<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p1s</span><span class="p">,</span> <span class="n">p1s</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>

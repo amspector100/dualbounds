@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dualbounds.generic &mdash; dualbounds 0.1.0 documentation</title>
+  <title>dualbounds.generic &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
@@ -15,7 +15,7 @@
   
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=01f34227"></script>
+        <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
         <script src="../../_static/doctools.js?v=888ff710"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -36,7 +36,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -86,6 +86,10 @@
 <span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
 <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">utilities</span><span class="p">,</span> <span class="n">dist_reg</span><span class="p">,</span> <span class="n">interpolation</span>
 <span class="kn">from</span> <span class="nn">.utilities</span> <span class="kn">import</span> <span class="n">BatchedCategorical</span>
+<span class="c1"># typing</span>
+<span class="kn">from</span> <span class="nn">scipy.stats._distn_infrastructure</span> <span class="kn">import</span> <span class="n">rv_generic</span>
+<span class="kn">import</span> <span class="nn">sklearn.base</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="n">MIN_NVALS</span> <span class="o">=</span> <span class="mi">7</span>
 <span class="n">DISC_THRESH</span> <span class="o">=</span> <span class="mi">2</span> <span class="c1"># treat vars. with &lt;= DISC_THRESH values as discrete</span>
@@ -136,6 +140,26 @@
 		<span class="n">support</span> <span class="o">=</span> <span class="kc">None</span>
 	<span class="k">return</span> <span class="n">discrete</span><span class="p">,</span> <span class="n">support</span>
 
+<span class="k">def</span> <span class="nf">_default_ylims</span><span class="p">(</span>
+	<span class="n">y</span><span class="p">,</span> 
+	<span class="n">y0_min</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+	<span class="n">y1_min</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+	<span class="n">y0_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+	<span class="n">y1_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+	<span class="o">**</span><span class="n">kwargs</span> <span class="c1"># ignored</span>
+<span class="p">):</span>
+	<span class="c1"># Computes default bounds on y</span>
+	<span class="k">if</span> <span class="n">y0_min</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">y0_min</span> <span class="o">=</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">-</span> <span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">/</span> <span class="mi">2</span>
+	<span class="k">if</span> <span class="n">y1_min</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">y1_min</span> <span class="o">=</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">-</span> <span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">/</span> <span class="mi">2</span>
+	<span class="k">if</span> <span class="n">y0_max</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">y0_max</span> <span class="o">=</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">/</span> <span class="mi">2</span>
+	<span class="k">if</span> <span class="n">y1_max</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">y1_max</span> <span class="o">=</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">/</span> <span class="mi">2</span>
+	<span class="k">return</span> <span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span>
+
+
 <div class="viewcode-block" id="DualBounds">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.generic.DualBounds">[docs]</a>
 <span class="k">class</span> <span class="nc">DualBounds</span><span class="p">:</span>
@@ -162,7 +186,10 @@
 <span class="sd">		One of [&#39;ridge&#39;, &#39;lasso&#39;, &#39;elasticnet&#39;, &#39;randomforest&#39;, &#39;knn&#39;].</span>
 <span class="sd">		Alternatively, a distributional regression class inheriting </span>
 <span class="sd">		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,</span>
-<span class="sd">		defaults to ``Y_model=dist_reg.CtsDistReg(model_type=&#39;ridge&#39;)``.</span>
+<span class="sd">		defaults to</span>
+<span class="sd">		``Y_model=dist_reg.CtsDistReg(</span>
+<span class="sd">			model_type=&#39;ridge&#39;, heterosked_model=None</span>
+<span class="sd">		)``.</span>
 <span class="sd">	W_model : str or sklearn classifier</span>
 <span class="sd">		Specifies how to estimate the propensity scores if ``pis`` is</span>
 <span class="sd">		not known.  Either a str identifier as above or an sklearn</span>
@@ -174,7 +201,7 @@
 <span class="sd">		Optinal support of y, if known.</span>
 <span class="sd">		Defaults to ``None`` (inferred from the data).</span>
 <span class="sd">	**model_kwargs : dict</span>
-<span class="sd">		Additional kwargs for an underlying ``DistReg`` model,</span>
+<span class="sd">		Additional kwargs for the ``DistReg`` outcome model,</span>
 <span class="sd">		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.</span>
 
 <span class="sd">	Examples</span>
@@ -211,17 +238,17 @@
 <span class="sd">	&quot;&quot;&quot;</span>
 	<span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span> 
-		<span class="n">f</span><span class="p">,</span>
-		<span class="n">X</span><span class="p">,</span>
-		<span class="n">W</span><span class="p">,</span>
-		<span class="n">y</span><span class="p">,</span>
-		<span class="n">pis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">Y_model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">W_model</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">discrete</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">support</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+		<span class="n">f</span><span class="p">:</span> <span class="nb">callable</span><span class="p">,</span>
+		<span class="n">X</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span>
+		<span class="n">W</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span>
+		<span class="n">y</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">,</span>
+		<span class="n">pis</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+		<span class="n">Y_model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">DistReg</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;ridge&#39;</span><span class="p">,</span>
+		<span class="n">W_model</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">sklearn</span><span class="o">.</span><span class="n">base</span><span class="o">.</span><span class="n">BaseEstimator</span><span class="p">]</span><span class="o">=</span><span class="s1">&#39;ridge&#39;</span><span class="p">,</span>
+		<span class="n">discrete</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+		<span class="n">support</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">]</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="o">**</span><span class="n">model_kwargs</span><span class="p">,</span>
-	<span class="p">):</span>
+	<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 		<span class="c1">### Data</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">f</span> <span class="o">=</span> <span class="n">f</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">X</span> <span class="o">=</span> <span class="n">X</span>
@@ -278,38 +305,59 @@
 				<span class="n">yprobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ydist</span><span class="o">.</span><span class="n">probs</span><span class="p">)</span>
 			<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">yvals</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">yprobs</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-		<span class="c1">### Continuous case ###</span>
-		<span class="k">if</span> <span class="n">nvals</span> <span class="o">&lt;=</span> <span class="n">MIN_NVALS</span><span class="p">:</span>
-			<span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;nvals must be larger than </span><span class="si">{</span><span class="n">nvals</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-		
-		<span class="c1"># make sure we get small enough quantiles</span>
-		<span class="k">if</span> <span class="n">alpha</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="n">alpha</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">nvals</span><span class="p">)</span>
-		<span class="n">alpha</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">nvals</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">))</span>
 
-		<span class="c1"># num of interp. pts between min/max quantiles</span>
-		<span class="c1"># and ymin/ymax, added to ensure feasbility</span>
+		<span class="c1">### Continuous case ###</span>
 		<span class="k">if</span> <span class="n">ninterp</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 			<span class="n">ninterp</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="mf">0.1</span> <span class="o">*</span> <span class="p">(</span><span class="n">nvals</span><span class="o">-</span><span class="mi">2</span><span class="p">)),</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">5</span><span class="p">)</span>
-		<span class="n">nvals_adj</span> <span class="o">=</span> <span class="n">nvals</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ninterp</span> <span class="o">-</span> <span class="mi">3</span>
+		<span class="c1"># Case 2(a): we already have a discrete distribution</span>
+		<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ydists</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">utilities</span><span class="o">.</span><span class="n">BatchedCategorical</span><span class="p">):</span>
+			<span class="k">for</span> <span class="n">ii</span><span class="p">,</span> <span class="n">ydist</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ydists</span><span class="p">):</span>
+				<span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ydist</span><span class="p">,</span> <span class="n">utilities</span><span class="o">.</span><span class="n">BatchedCategorical</span><span class="p">):</span>
+					<span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+						<span class="sa">f</span><span class="s2">&quot;ydists[0] is a BatchedCategorical, ydists[</span><span class="si">{</span><span class="n">ii</span><span class="si">}</span><span class="s2">] is not---mixing cts/discrete dists is unsupported.&quot;</span>
+					<span class="p">)</span>
+			<span class="c1"># Extract and adjust everything to ensure the same support size</span>
+			<span class="n">nvals_adj</span> <span class="o">=</span> <span class="n">nvals</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ninterp</span>
+			<span class="n">dists_adj</span> <span class="o">=</span> <span class="p">[</span>
+				<span class="n">utilities</span><span class="o">.</span><span class="n">adjust_support_size</span><span class="p">(</span>
+					<span class="n">vals</span><span class="o">=</span><span class="n">ydist</span><span class="o">.</span><span class="n">vals</span><span class="p">,</span> <span class="n">probs</span><span class="o">=</span><span class="n">ydist</span><span class="o">.</span><span class="n">probs</span><span class="p">,</span> <span class="n">new_nvals</span><span class="o">=</span><span class="n">nvals_adj</span><span class="p">,</span> <span class="n">ymin</span><span class="o">=</span><span class="n">ymin</span><span class="p">,</span> <span class="n">ymax</span><span class="o">=</span><span class="n">ymax</span>
+				<span class="p">)</span>
+				<span class="k">for</span> <span class="n">ydist</span> <span class="ow">in</span> <span class="n">ydists</span>
+			<span class="p">]</span>
+			<span class="n">yvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">dists_adj</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+			<span class="n">yprobs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">dists_adj</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-		<span class="c1">### Main discretization based on evenly spaced quantiles</span>
-		<span class="c1"># choose endpoints of bins for disc. approx</span>
-		<span class="n">endpoints</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
-			<span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">],</span>
-			<span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">nvals_adj</span><span class="p">,</span> <span class="p">(</span><span class="n">nvals_adj</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">nvals_adj</span><span class="p">,</span> <span class="n">nvals_adj</span><span class="p">),</span>
-			<span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
-		<span class="p">))</span>
-		<span class="n">qs</span> <span class="o">=</span> <span class="p">(</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">/</span><span class="mi">2</span>
-		<span class="c1"># loop through batches and concatenate</span>
-		<span class="n">yvals</span> <span class="o">=</span> <span class="p">[]</span>
-		<span class="k">for</span> <span class="n">dists</span> <span class="ow">in</span> <span class="n">ydists</span><span class="p">:</span>
-			<span class="n">yvals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dists</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">qs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-		<span class="n">yvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">yvals</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-		<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">yvals</span><span class="p">)</span>
-		<span class="c1"># concatenate y probs</span>
-		<span class="n">yprobs</span> <span class="o">=</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-		<span class="n">yprobs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">yprobs</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="c1"># Case 2(b): we have a continuous distribution</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="k">if</span> <span class="n">nvals</span> <span class="o">&lt;=</span> <span class="n">MIN_NVALS</span><span class="p">:</span>
+				<span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;nvals must be larger than </span><span class="si">{</span><span class="n">nvals</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+			
+			<span class="c1"># make sure we get small enough quantiles</span>
+			<span class="k">if</span> <span class="n">alpha</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+				<span class="n">alpha</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">nvals</span><span class="p">)</span>
+			<span class="n">alpha</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">nvals</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">))</span>
+
+			<span class="c1"># num of interp. pts between min/max quantiles</span>
+			<span class="c1"># and ymin/ymax, added to ensure feasbility</span>
+			<span class="n">nvals_adj</span> <span class="o">=</span> <span class="n">nvals</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ninterp</span> <span class="o">-</span> <span class="mi">3</span>
+
+			<span class="c1">### Main discretization based on evenly spaced quantiles</span>
+			<span class="c1"># choose endpoints of bins for disc. approx</span>
+			<span class="n">endpoints</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span>
+				<span class="p">[[</span><span class="mi">0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">],</span>
+				<span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">nvals_adj</span><span class="p">,</span> <span class="p">(</span><span class="n">nvals_adj</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">nvals_adj</span><span class="p">,</span> <span class="n">nvals_adj</span><span class="p">),</span>
+				<span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
+			<span class="p">))</span>
+			<span class="n">qs</span> <span class="o">=</span> <span class="p">(</span><span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">+</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">/</span><span class="mi">2</span>
+			<span class="c1"># loop through batches and concatenate</span>
+			<span class="n">yvals</span> <span class="o">=</span> <span class="p">[]</span>
+			<span class="k">for</span> <span class="n">dists</span> <span class="ow">in</span> <span class="n">ydists</span><span class="p">:</span>
+				<span class="n">yvals</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dists</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="n">qs</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+			<span class="n">yvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">yvals</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+			<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">yvals</span><span class="p">)</span>
+			<span class="c1"># concatenate y probs</span>
+			<span class="n">yprobs</span> <span class="o">=</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">endpoints</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+			<span class="n">yprobs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">yprobs</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
 		<span class="c1">### Insert additional support points with zero prob</span>
 		<span class="k">if</span> <span class="n">ninterp</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
@@ -356,6 +404,7 @@
 <span class="sd">			nvals1-length array of dual variables</span>
 <span class="sd">			associated with Y(1)</span>
 <span class="sd">		lower : bool</span>
+<span class="sd">			Specifies lower vs. upper bound.</span>
 <span class="sd">		ymin : float</span>
 <span class="sd">			Minimum value of y</span>
 <span class="sd">		ymax : float</span>
@@ -365,89 +414,87 @@
 
 <span class="sd">		Returns</span>
 <span class="sd">		-------</span>
+<span class="sd">		new_y0_vals : np.array</span>
+<span class="sd">			``nvals0 + grid_size`` length array of new y0_vals.</span>
+<span class="sd">			*Exact size may change to avoid duplicate values</span>
 <span class="sd">		new_nu0 : np.array</span>
-<span class="sd">			``nvals0`` length array of new dual vars. for Y(0)</span>
+<span class="sd">			``nvals0 + grid_size`` length array of interpolated</span>
+<span class="sd">			and feasible dual vars. for Y(0).</span>
+<span class="sd">		new_y1_vals : np.array</span>
+<span class="sd">			``nvals1 + grid_size`` length array of new y1_vals</span>
 <span class="sd">		new_nu1 : np.array</span>
-<span class="sd">			``nvals1`` length array of new dual vars. for Y(1)</span>
+<span class="sd">			``nvals1 + grid_size`` length array of interpolated</span>
+<span class="sd">			and feasible dual vars. for Y(1).</span>
+<span class="sd">			*Exact size may change to avoid duplicate values.</span>
 <span class="sd">		dx : float</span>
-<span class="sd">			Constant which can be subtracted off to obtain valid </span>
-<span class="sd">			dual variables. I.e., new_nk = nuk - dx/2.</span>
+<span class="sd">			Maximum numerical error induced by interpolation</span>
+<span class="sd">			process.</span>
+<span class="sd">		objval_diff : np.array</span>
+<span class="sd">			The estimated objective value change for the new</span>
+<span class="sd">			dual variables.</span>
 <span class="sd">		&quot;&quot;&quot;</span>
-		<span class="c1"># interpolate to compute new dual variables</span>
-		<span class="n">new_y0vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">y0_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">)</span>
-		<span class="n">new_y1vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">y1_min</span><span class="p">,</span> <span class="n">y1_max</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">)</span>
-		<span class="n">interp_nu0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-			<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu0</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y0vals</span><span class="p">,</span>
-		<span class="p">)</span>
-		<span class="n">interp_nu1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-			<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu1</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y1vals</span><span class="p">,</span>
-		<span class="p">)</span>
-		<span class="c1"># compute required bounds</span>
-		<span class="n">fx</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
-		<span class="n">fvals</span> <span class="o">=</span> <span class="n">fx</span><span class="p">(</span>
-			<span class="n">new_y0vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">new_y1vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-		<span class="p">)</span>
-		<span class="c1">## Step 1: adjust elementwise (as opposed to a constant subtraction)</span>
-		<span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+		<span class="n">obj_orig</span> <span class="o">=</span> <span class="n">nu0</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">nu1</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+		<span class="k">if</span> <span class="n">grid_size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+			<span class="c1"># interpolate to compute new dual variables</span>
+			<span class="n">new_y0_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+				<span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">y0_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="p">])))</span>
+			<span class="n">new_y1_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span>
+				<span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">y1_min</span><span class="p">,</span> <span class="n">y1_max</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="p">])))</span>
+			<span class="n">new_nu0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+				<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu0</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y0_vals</span><span class="p">,</span>
+			<span class="p">)</span>
+			<span class="n">new_nu1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+				<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu1</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y1_vals</span><span class="p">,</span>
+			<span class="p">)</span>
+			<span class="c1"># compute required bounds</span>
+			<span class="n">fx</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+			<span class="n">fvals</span> <span class="o">=</span> <span class="n">fx</span><span class="p">(</span>
+				<span class="n">new_y0_vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">new_y1_vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+			<span class="p">)</span>
+			<span class="c1">## Adjust elementwise (as opposed to a constant subtraction)</span>
 			<span class="c1"># Calculate how far we are from feasibility</span>
-			<span class="n">deltas</span> <span class="o">=</span> <span class="n">interp_nu0</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">interp_nu1</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+			<span class="n">deltas</span> <span class="o">=</span> <span class="n">new_nu0</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">new_nu1</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 			<span class="n">deltas</span> <span class="o">=</span> <span class="n">deltas</span> <span class="o">-</span> <span class="n">fvals</span>
 			<span class="k">if</span> <span class="n">lower</span><span class="p">:</span>
-				<span class="n">deltas0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">deltas</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
-				<span class="n">deltas1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">deltas</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
-				<span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">deltas0</span><span class="p">)</span>
-				<span class="k">if</span> <span class="n">ii</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-					<span class="n">init_axis</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">deltas1</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">deltas0</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
+				<span class="n">deltas0</span> <span class="o">=</span> <span class="n">deltas</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+				<span class="n">dx0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">deltas0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+				<span class="n">deltas1</span> <span class="o">=</span> <span class="n">deltas</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+				<span class="n">dx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">deltas1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+				<span class="n">adj_axis</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">dx1</span> <span class="o">&lt;=</span> <span class="n">dx0</span> <span class="k">else</span> <span class="mi">0</span>
 			<span class="k">else</span><span class="p">:</span>
-				<span class="n">deltas0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">deltas</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
-				<span class="n">deltas1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">deltas</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="mi">0</span><span class="p">)</span>
-				<span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">deltas0</span><span class="p">)</span>
-				<span class="k">if</span> <span class="n">ii</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-					<span class="n">init_axis</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">deltas1</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">deltas0</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span>
-			<span class="c1"># Stopping condition</span>
-			<span class="c1">#obj = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]</span>
-			<span class="c1">#print(f&quot;At iter={ii}, obj={obj}, dx={dx}&quot;)</span>
-			<span class="k">if</span> <span class="n">lower</span> <span class="ow">and</span> <span class="n">dx</span> <span class="o">&lt;=</span> <span class="n">tol</span><span class="p">:</span>
-				<span class="k">break</span>
-			<span class="k">if</span> <span class="ow">not</span> <span class="n">lower</span> <span class="ow">and</span> <span class="n">dx</span> <span class="o">&gt;=</span> <span class="o">-</span> <span class="n">tol</span><span class="p">:</span>
-				<span class="k">break</span>
+				<span class="n">deltas0</span> <span class="o">=</span> <span class="n">deltas</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+				<span class="n">dx0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">deltas0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+				<span class="n">deltas1</span> <span class="o">=</span> <span class="n">deltas</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+				<span class="n">dx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">deltas1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+				<span class="n">adj_axis</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">dx1</span> <span class="o">&gt;=</span> <span class="n">dx0</span> <span class="k">else</span> <span class="mi">0</span>
+
 			<span class="c1"># Adjust and recompute interp_nu0/interp_nu1</span>
-			<span class="k">if</span> <span class="n">ii</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="n">init_axis</span><span class="p">:</span>
-				<span class="n">to_sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-					<span class="n">x</span><span class="o">=</span><span class="n">new_y0vals</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">deltas0</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-				<span class="p">)</span>
-				<span class="n">nu0</span> <span class="o">=</span> <span class="n">nu0</span> <span class="o">-</span> <span class="n">to_sub</span>
-				<span class="n">interp_nu0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-					<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu0</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y0vals</span><span class="p">,</span>
+			<span class="k">if</span> <span class="n">adj_axis</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+				<span class="n">new_nu0</span> <span class="o">-=</span> <span class="n">deltas0</span>
+				<span class="n">nu0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+					<span class="n">x</span><span class="o">=</span><span class="n">new_y0_vals</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">new_nu0</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
 				<span class="p">)</span>
 			<span class="k">else</span><span class="p">:</span>
-				<span class="n">to_sub</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-					<span class="n">x</span><span class="o">=</span><span class="n">new_y1vals</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">deltas1</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-				<span class="p">)</span>
-				<span class="n">nu1</span> <span class="o">=</span> <span class="n">nu1</span> <span class="o">-</span> <span class="n">to_sub</span>
-				<span class="n">interp_nu1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-					<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu1</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">new_y1vals</span><span class="p">,</span>
+				<span class="n">new_nu1</span> <span class="o">-=</span> <span class="n">deltas1</span>
+				<span class="n">nu1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+					<span class="n">x</span><span class="o">=</span><span class="n">new_y1_vals</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">new_nu1</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
 				<span class="p">)</span>
 
-		<span class="c1">## Step 2: subtract global constant to ensure feasibility</span>
-		<span class="n">deltas</span> <span class="o">=</span> <span class="n">interp_nu0</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">interp_nu1</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">fvals</span>
-		<span class="k">if</span> <span class="n">lower</span><span class="p">:</span>
-			<span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">deltas</span><span class="p">)</span>
+			<span class="c1">## Track change in objective</span>
+			<span class="n">new_objval</span> <span class="o">=</span> <span class="n">nu0</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">nu1</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="n">objval_diff</span> <span class="o">=</span> <span class="n">obj_orig</span> <span class="o">-</span> <span class="n">new_objval</span>
+
 		<span class="k">else</span><span class="p">:</span>
-			<span class="n">dx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">deltas</span><span class="p">)</span>
-
-		<span class="c1">## For debugging only, delete later</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">new_y0vals</span> <span class="o">=</span> <span class="n">new_y0vals</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">new_y1vals</span> <span class="o">=</span> <span class="n">new_y1vals</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">interp_nu0</span> <span class="o">=</span> <span class="n">interp_nu0</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">interp_nu1</span> <span class="o">=</span> <span class="n">interp_nu1</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">orig_nu0</span> <span class="o">=</span> <span class="n">nu0</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">orig_nu1</span> <span class="o">=</span> <span class="n">nu1</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">deltas</span> <span class="o">=</span> <span class="n">deltas</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">fvals_debug</span> <span class="o">=</span> <span class="n">fvals</span>
+			<span class="n">new_y0_vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="n">new_nu0</span> <span class="o">=</span> <span class="n">nu0</span>
+			<span class="n">new_y1_vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+			<span class="n">new_nu1</span> <span class="o">=</span> <span class="n">nu1</span>
+			<span class="n">objval_diff</span> <span class="o">=</span> <span class="mi">0</span>
 
 		<span class="c1"># return</span>
-		<span class="k">return</span> <span class="n">nu0</span> <span class="o">-</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">nu1</span> <span class="o">-</span> <span class="n">dx</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">dx</span>
+		<span class="k">return</span> <span class="n">new_y0_vals</span><span class="p">,</span> <span class="n">new_nu0</span><span class="p">,</span> <span class="n">new_y1_vals</span><span class="p">,</span> <span class="n">new_nu1</span><span class="p">,</span> <span class="n">objval_diff</span>
 
 	<span class="k">def</span> <span class="nf">_solve_single_instance</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span> 
@@ -493,7 +540,7 @@
 		<span class="n">ninterp</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="n">nvals0</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
 		<span class="n">nvals1</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
-		<span class="n">interp_fn</span><span class="o">=</span><span class="n">interpolation</span><span class="o">.</span><span class="n">linear_interpolate</span><span class="p">,</span>
+		<span class="n">interp_fn</span><span class="o">=</span><span class="n">interpolation</span><span class="o">.</span><span class="n">adaptive_interpolate</span><span class="p">,</span>
 		<span class="n">y0_min</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="n">y0_max</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 		<span class="n">y1_min</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -539,13 +586,17 @@
 <span class="sd">			signature as ``interpolation.linear_interpolate``,</span>
 <span class="sd">			which is the default. Ignored for discrete Y.</span>
 <span class="sd">		y0_min : float</span>
-<span class="sd">			Minimum support for Y(0). Defaults to self.y.min()</span>
+<span class="sd">			Minimum support for Y(0).</span>
+<span class="sd">			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())</span>
 <span class="sd">		y1_min : float</span>
-<span class="sd">			Minimum support for Y(1). Defaults to self.y.min()</span>
+<span class="sd">			Minimum support for Y(1). </span>
+<span class="sd">			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())</span>
 <span class="sd">		y0_max : float</span>
-<span class="sd">			Maximum support for Y(0). Defaults to self.y.max()</span>
+<span class="sd">			Maximum support for Y(0). </span>
+<span class="sd">			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())</span>
 <span class="sd">		y1_max : float</span>
-<span class="sd">			Maximum support for Y(1). Defaults to self.y.max()</span>
+<span class="sd">			Maximum support for Y(1). </span>
+<span class="sd">			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())</span>
 <span class="sd">		kwargs : dict</span>
 <span class="sd">			kwargs for ``_ensure_feasibility`` method, e.g., ``grid_size``.</span>
 <span class="sd">		&quot;&quot;&quot;</span>
@@ -561,15 +612,10 @@
 			<span class="bp">self</span><span class="o">.</span><span class="n">nvals1</span> <span class="o">=</span> <span class="n">nvals1</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span> <span class="o">=</span> <span class="n">interp_fn</span>
 
-		<span class="c1">## Parse defaults</span>
-		<span class="k">if</span> <span class="n">y0_min</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="n">y0_min</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
-		<span class="k">if</span> <span class="n">y1_min</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="n">y1_min</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
-		<span class="k">if</span> <span class="n">y0_max</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="n">y0_max</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
-		<span class="k">if</span> <span class="n">y1_max</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="n">y1_max</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+		<span class="c1"># max/min yvals</span>
+		<span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span> <span class="o">=</span> <span class="n">_default_ylims</span><span class="p">(</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="o">=</span><span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span>
+		<span class="p">)</span>
 
 		<span class="c1"># this discretizes if Y is continuous</span>
 		<span class="k">if</span> <span class="n">y0_vals</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y0_probs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -596,13 +642,19 @@
 		<span class="c1"># Initialize results</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">nu0s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nvals0</span><span class="p">))</span> <span class="c1"># first dimension = [lower, upper]</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">nu1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nvals1</span><span class="p">))</span>
+		<span class="c1"># Realized dual variables</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
 		<span class="c1"># estimated cond means of nu0s, nu1s</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">c0s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">c1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
 		<span class="c1"># objective values</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">objvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">dxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">dxs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span> <span class="c1"># ignored, only for backward compatability</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">objdiffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
 		<span class="c1"># loop through</span>
+		<span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+			<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Estimating optimal dual variables.&quot;</span><span class="p">)</span>
 		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">utilities</span><span class="o">.</span><span class="n">vrange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">):</span>
 			<span class="c1"># set parameter values</span>
 			<span class="n">fx</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">f</span><span class="p">(</span><span class="n">y0</span><span class="o">=</span><span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="o">=</span><span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
@@ -619,52 +671,116 @@
 					<span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span>
 				<span class="p">)</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">objvals</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">objval</span>
-				<span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">:</span>
-					<span class="n">nu0x</span><span class="p">,</span> <span class="n">nu1x</span><span class="p">,</span> <span class="n">dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_feasibility</span><span class="p">(</span>
-						<span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">nu0</span><span class="o">=</span><span class="n">nu0x</span><span class="p">,</span> <span class="n">nu1</span><span class="o">=</span><span class="n">nu1x</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span> 
-						<span class="n">y0_min</span><span class="o">=</span><span class="n">y0_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="o">=</span><span class="n">y0_max</span><span class="p">,</span>
-						<span class="n">y1_min</span><span class="o">=</span><span class="n">y1_min</span><span class="p">,</span> <span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span><span class="p">,</span>
-						<span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
-					<span class="p">)</span>
-				<span class="k">else</span><span class="p">:</span>
-					<span class="n">dx</span> <span class="o">=</span> <span class="mi">0</span>
 				<span class="c1"># Save solutions</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">nu0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu0x</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">nu1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu1x</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">c0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu0x</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">c1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu1x</span> <span class="o">@</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_probs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
-				<span class="bp">self</span><span class="o">.</span><span class="n">dxs</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">dx</span>
+				<span class="c1"># Compute realized dual variables</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_and_ensure_feas</span><span class="p">(</span>
+					<span class="n">yi</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> 
+					<span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+					<span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span> 
+					<span class="n">y0_min</span><span class="o">=</span><span class="n">y0_min</span><span class="p">,</span> 
+					<span class="n">y0_max</span><span class="o">=</span><span class="n">y0_max</span><span class="p">,</span>
+					<span class="n">y1_min</span><span class="o">=</span><span class="n">y1_min</span><span class="p">,</span>
+					<span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span><span class="p">,</span>
+					<span class="o">**</span><span class="n">kwargs</span>
+				<span class="p">)</span></div>
 
-		<span class="c1"># Compute realized dual variables</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">_compute_realized_dual_variables</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span></div>
+
+		<span class="c1"># # Compute realized dual variables</span>
+		<span class="c1"># self._compute_realized_dual_variables(</span>
+		<span class="c1"># 	y=self.y, </span>
+		<span class="c1"># 	y0_min=y0_min, </span>
+		<span class="c1"># 	y0_max=y0_max,</span>
+		<span class="c1"># 	y1_min=y1_min,</span>
+		<span class="c1"># 	y1_max=y1_max,</span>
+		<span class="c1"># 	**kwargs</span>
+		<span class="c1"># )</span>
+
+	<span class="k">def</span> <span class="nf">_interpolate_and_ensure_feas</span><span class="p">(</span>
+		<span class="bp">self</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+	<span class="p">):</span>	
+<span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">		This is used in two places:</span>
+<span class="sd">		1. _compute_realized_dual_variables</span>
+<span class="sd">		2. Main loop of compute_dual_variables</span>
+<span class="sd">		&quot;&quot;&quot;</span>
+		<span class="n">nu0x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu0s</span><span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+		<span class="n">nu1x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu1s</span><span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
+		<span class="c1"># Ensure feasibility</span>
+		<span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">:</span>
+			<span class="n">y0v</span><span class="p">,</span> <span class="n">nu0adj</span><span class="p">,</span> <span class="n">y1v</span><span class="p">,</span> <span class="n">nu1adj</span><span class="p">,</span> <span class="n">odx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_feasibility</span><span class="p">(</span>
+				<span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">nu0</span><span class="o">=</span><span class="n">nu0x</span><span class="p">,</span> <span class="n">nu1</span><span class="o">=</span><span class="n">nu1x</span><span class="p">,</span> <span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span> 
+				<span class="n">y0_min</span><span class="o">=</span><span class="n">y0_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="o">=</span><span class="n">y0_max</span><span class="p">,</span>
+				<span class="n">y1_min</span><span class="o">=</span><span class="n">y1_min</span><span class="p">,</span> <span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span><span class="p">,</span> 
+				<span class="o">**</span><span class="n">kwargs</span>
+			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">objdiffs</span><span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">odx</span>
+			<span class="c1"># interpolate to find realized values </span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+				<span class="n">x</span><span class="o">=</span><span class="n">y0v</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">nu0adj</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">yi</span><span class="p">,</span>
+			<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
+				<span class="n">x</span><span class="o">=</span><span class="n">y1v</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">nu1adj</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">yi</span><span class="p">,</span>
+			<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="n">j0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">yi</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+			<span class="n">j1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">yi</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu0x</span><span class="p">[</span><span class="n">j0</span><span class="p">]</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu1x</span><span class="p">[</span><span class="n">j1</span><span class="p">]</span>	
 
 
-	<span class="k">def</span> <span class="nf">_compute_realized_dual_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+	<span class="k">def</span> <span class="nf">_compute_realized_dual_variables</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Helper function which applies interpolation </span>
 <span class="sd">		(for continuous Y) to compute realized dual variables.</span>
+<span class="sd">		It also ensures feasibility through a 2D gridsearch.</span>
 <span class="sd">		&quot;&quot;&quot;</span>
 		<span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">y</span>
+
+		<span class="c1"># Create ylims</span>
+		<span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span> <span class="o">=</span> <span class="n">_default_ylims</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+		<span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;y0_min&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y0_min</span>
+		<span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;y1_min&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y1_min</span>
+		<span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;y0_max&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y0_max</span>
+		<span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;y1_max&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y1_max</span>
+
 		<span class="c1">### Compute realized hatnu1s/hatnu0s</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
-		<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">))</span>
 		<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">):</span>
 			<span class="k">for</span> <span class="n">lower</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
-				<span class="n">nu0x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu0s</span><span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
-				<span class="n">nu1x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu1s</span><span class="p">[</span><span class="mi">1</span><span class="o">-</span><span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
-				<span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">:</span>
-					<span class="c1"># interpolate to find realized values for cts case</span>
-					<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-						<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu0x</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-					<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-					<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">interp_fn</span><span class="p">(</span>
-						<span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">nu1x</span><span class="p">,</span> <span class="n">newx</span><span class="o">=</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-					<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-				<span class="k">else</span><span class="p">:</span>
-					<span class="n">j0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-					<span class="n">j1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_vals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">])[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-					<span class="bp">self</span><span class="o">.</span><span class="n">hatnu0s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu0x</span><span class="p">[</span><span class="n">j0</span><span class="p">]</span>
-					<span class="bp">self</span><span class="o">.</span><span class="n">hatnu1s</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">nu1x</span><span class="p">[</span><span class="n">j1</span><span class="p">]</span>
+				<span class="bp">self</span><span class="o">.</span><span class="n">_interpolate_and_ensure_feas</span><span class="p">(</span>
+					<span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span>
+					<span class="n">yi</span><span class="o">=</span><span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
+					<span class="n">lower</span><span class="o">=</span><span class="n">lower</span><span class="p">,</span> 
+					<span class="n">y0_min</span><span class="o">=</span><span class="n">y0_min</span><span class="p">,</span> 
+					<span class="n">y0_max</span><span class="o">=</span><span class="n">y0_max</span><span class="p">,</span>
+					<span class="n">y1_min</span><span class="o">=</span><span class="n">y1_min</span><span class="p">,</span>
+					<span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span><span class="p">,</span>
+					<span class="o">**</span><span class="n">kwargs</span>
+				<span class="p">)</span>
+				<span class="c1"># nu0x = self.nu0s[1-lower, i]</span>
+				<span class="c1"># nu1x = self.nu1s[1-lower, i]</span>
+				<span class="c1"># if not self.discrete:</span>
+				<span class="c1"># 	# Ensure feasibility</span>
+				<span class="c1"># 	y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(</span>
+				<span class="c1"># 		i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs</span>
+				<span class="c1"># 	)</span>
+				<span class="c1"># 	self.objdiffs[1-lower, i] = odx</span>
+				<span class="c1"># 	# interpolate to find realized values </span>
+				<span class="c1"># 	self.hatnu0s[1 - lower, i] = self.interp_fn(</span>
+				<span class="c1"># 		x=y0v, y=nu0adj, newx=y[i],</span>
+				<span class="c1"># 	)[0]</span>
+				<span class="c1"># 	self.hatnu1s[1 - lower, i] = self.interp_fn(</span>
+				<span class="c1"># 		x=y1v, y=nu1adj, newx=y[i],</span>
+				<span class="c1"># 	)[0]</span>
+				<span class="c1"># else:</span>
+				<span class="c1"># 	j0 = np.where(self.y0_vals[i] == y[i])[0][0]</span>
+				<span class="c1"># 	j1 = np.where(self.y1_vals[i] == y[i])[0][0]</span>
+				<span class="c1"># 	self.hatnu0s[1 - lower, i] = nu0x[j0]</span>
+				<span class="c1"># 	self.hatnu1s[1 - lower, i] = nu1x[j1]</span>
 
 	<span class="k">def</span> <span class="nf">_compute_ipw_summands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
@@ -737,12 +853,14 @@
 <div class="viewcode-block" id="DualBounds.fit_propensity_scores">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.generic.DualBounds.fit_propensity_scores">[docs]</a>
 	<span class="k">def</span> <span class="nf">fit_propensity_scores</span><span class="p">(</span>
-		<span class="bp">self</span><span class="p">,</span> <span class="n">nfolds</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span>
+		<span class="bp">self</span><span class="p">,</span> <span class="n">nfolds</span><span class="p">,</span> <span class="n">clip</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 	<span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Performs cross-fitting to fit the propensity scores.</span>
 <span class="sd">		&quot;&quot;&quot;</span>
 		<span class="c1"># Parse model</span>
+		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">W_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">W_model</span> <span class="o">=</span> <span class="s1">&#39;ridge&#39;</span>
 		<span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">W_model</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
 			<span class="n">model_cls</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">parse_model_type</span><span class="p">(</span>
 				<span class="bp">self</span><span class="o">.</span><span class="n">W_model</span><span class="p">,</span> <span class="n">discrete</span><span class="o">=</span><span class="kc">True</span>
@@ -750,11 +868,14 @@
 			<span class="bp">self</span><span class="o">.</span><span class="n">W_model</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">()</span>
 		
 		<span class="c1"># Loop through</span>
+		<span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+			<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fitting propensity scores.&quot;</span><span class="p">)</span>
 		<span class="n">starts</span><span class="p">,</span> <span class="n">ends</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">create_folds</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span> <span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">)</span>
 		<span class="c1"># loop through and fit</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">W_model_fits</span> <span class="o">=</span> <span class="p">[]</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">pis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
-		<span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">):</span>
+		<span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="n">utilities</span><span class="o">.</span><span class="n">vrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">starts</span><span class="p">),</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">):</span>
+			<span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">starts</span><span class="p">[</span><span class="n">ii</span><span class="p">],</span> <span class="n">ends</span><span class="p">[</span><span class="n">ii</span><span class="p">]</span>
 			<span class="c1"># Pick out data from the other folds</span>
 			<span class="n">not_in_fold</span> <span class="o">=</span> <span class="p">[</span>
 				<span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">start</span> <span class="ow">or</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">end</span>
@@ -780,6 +901,7 @@
 		<span class="bp">self</span><span class="p">,</span>
 		<span class="n">nfolds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
 		<span class="n">suppress_warning</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+		<span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 	<span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Performs cross-fitting to fit the outcome model.</span>
@@ -799,39 +921,59 @@
 
 		<span class="c1"># if pis not supplied: will use cross-fitting</span>
 		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">fit_propensity_scores</span><span class="p">(</span><span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">fit_propensity_scores</span><span class="p">(</span><span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
 
 		<span class="c1"># Fit model</span>
 		<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+			<span class="c1"># Note: this returns the existing model</span>
+			<span class="c1"># if an existing model is provided</span>
 			<span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span> <span class="o">=</span> <span class="n">get_default_model</span><span class="p">(</span>
-				<span class="n">discrete</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">,</span> <span class="n">support</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">support</span><span class="p">,</span> <span class="n">Y_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
+				<span class="n">discrete</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">discrete</span><span class="p">,</span> 
+				<span class="n">support</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">support</span><span class="p">,</span>
+				<span class="n">Y_model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
 				<span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_kwargs</span>
 			<span class="p">)</span>
-			<span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_fits</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
+			<span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+				<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cross-fitting the outcome model.&quot;</span><span class="p">)</span>
+			<span class="n">y_out</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">cross_fit_predictions</span><span class="p">(</span>
 				<span class="n">W</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">W</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> 
-				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
+				<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> 
+				<span class="n">model</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">Y_model</span><span class="p">,</span>
+				<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 			<span class="p">)</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_fits</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">oos_preds</span> <span class="o">=</span> <span class="n">y_out</span>
 		<span class="k">elif</span> <span class="ow">not</span> <span class="n">suppress_warning</span><span class="p">:</span>
 			<span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">CROSSFIT_WARNING</span><span class="p">)</span>
 
 		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span></div>
 
 
+	<span class="k">def</span> <span class="nf">compute_oos_r2</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">oos_preds</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+			<span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only implemented for settings where self.oos_preds is a list of dists&quot;</span><span class="p">)</span>
+		<span class="n">starts</span><span class="p">,</span> <span class="n">ends</span> <span class="o">=</span> <span class="n">dist_reg</span><span class="o">.</span><span class="n">create_folds</span><span class="p">(</span>
+			<span class="n">n</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">,</span>
+			<span class="n">nfolds</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">oos_preds</span><span class="p">)</span>
+		<span class="p">)</span>
+		<span class="bp">self</span><span class="o">.</span><span class="n">oos_resids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n</span><span class="p">)</span>
+		<span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">oos_preds</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">starts</span><span class="p">,</span> <span class="n">ends</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">oos_preds</span><span class="p">):</span>
+			<span class="bp">self</span><span class="o">.</span><span class="n">oos_resids</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">[</span><span class="n">start</span><span class="p">:</span><span class="n">end</span><span class="p">]</span> <span class="o">-</span> <span class="n">oos_preds</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+		<span class="k">return</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">oos_resids</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span>
 
 
 <div class="viewcode-block" id="DualBounds.compute_dual_bounds">
 <a class="viewcode-back" href="../../apiref.html#dualbounds.generic.DualBounds.compute_dual_bounds">[docs]</a>
 	<span class="k">def</span> <span class="nf">compute_dual_bounds</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span>
-		<span class="n">nfolds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-		<span class="n">aipw</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-		<span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span>
-		<span class="n">y0_dists</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">y1_dists</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-		<span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-		<span class="n">suppress_warning</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+		<span class="n">nfolds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+		<span class="n">aipw</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+		<span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span><span class="p">,</span>
+		<span class="n">y0_dists</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">rv_generic</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+		<span class="n">y1_dists</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">rv_generic</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+		<span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+		<span class="n">suppress_warning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 		<span class="o">**</span><span class="n">solve_kwargs</span><span class="p">,</span>
-	<span class="p">):</span>
+	<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">		Main function which computes dual bounds in three steps:</span>
 <span class="sd">		(1) cross-fitting, (2) computing optimal dual variables,</span>
@@ -855,11 +997,11 @@
 <span class="sd">			the ith distribution is an out-of-sample estimate of</span>
 <span class="sd">			the law of Yi(1) | X[i]. This is an optional input;</span>
 <span class="sd">			if provided, ``Y_model`` will be ignored.</span>
-<span class="sd">		suppress_warning : bool</span>
-<span class="sd">			If True, suppresses warning about cross-fitting.</span>
 <span class="sd">		verbose : bool</span>
 <span class="sd">			If True, gives occasional progress reports.</span>
 <span class="sd">			Defaults to True.</span>
+<span class="sd">		suppress_warning : bool</span>
+<span class="sd">			If True, suppresses a warning about cross-fitting.</span>
 <span class="sd">		solve_kwargs : dict</span>
 <span class="sd">			Additional (optional) kwargs for the ``compute_dual_variables``</span>
 <span class="sd">			method, e.g. ``nvals0``, ``nvals1``, ``grid_size``.</span>
@@ -876,23 +1018,102 @@
 		<span class="c1"># Fit model of W | X and Y | X if not provided</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span> <span class="o">=</span> <span class="n">y0_dists</span><span class="p">,</span> <span class="n">y1_dists</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">cross_fit</span><span class="p">(</span>
-			<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">suppress_warning</span><span class="o">=</span><span class="n">suppress_warning</span>
+			<span class="n">nfolds</span><span class="o">=</span><span class="n">nfolds</span><span class="p">,</span> <span class="n">suppress_warning</span><span class="o">=</span><span class="n">suppress_warning</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 		<span class="p">)</span>
 
 		<span class="c1"># compute dual variables</span>
 		<span class="bp">self</span><span class="o">.</span><span class="n">compute_dual_variables</span><span class="p">(</span>
 			<span class="n">y0_dists</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y0_dists</span><span class="p">,</span>
 			<span class="n">y1_dists</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y1_dists</span><span class="p">,</span>
-			<span class="n">y0_min</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span>
-			<span class="n">y0_max</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
-			<span class="n">y1_min</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span>
-			<span class="n">y1_max</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
 			<span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">,</span>
 			<span class="o">**</span><span class="n">solve_kwargs</span><span class="p">,</span>
 		<span class="p">)</span>
 		<span class="c1"># compute dual bounds</span>
 		<span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_final_bounds</span><span class="p">(</span><span class="n">aipw</span><span class="o">=</span><span class="n">aipw</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">)</span></div>
 </div>
+
+
+<div class="viewcode-block" id="plug_in_no_covariates">
+<a class="viewcode-back" href="../../apiref.html#dualbounds.generic.plug_in_no_covariates">[docs]</a>
+<span class="k">def</span> <span class="nf">plug_in_no_covariates</span><span class="p">(</span>
+	<span class="n">y</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">pis</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">max_nvals</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+<span class="w">	</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">	Computes plug-in bounds on E[f(Y(0),Y(1))] without using covariates.</span>
+
+<span class="sd">	Parameters</span>
+<span class="sd">	----------</span>
+<span class="sd">	y : np.array</span>
+<span class="sd">		n-length array of outcomes</span>
+<span class="sd">	W : np.array</span>
+<span class="sd">		n-length array of treatments.</span>
+<span class="sd">	f : function</span>
+<span class="sd">		f(y0, y1, x) defines the objective.</span>
+<span class="sd">	pis : np.array</span>
+<span class="sd">		n-length array of propensity scores.</span>
+<span class="sd">		Default: all equal to 1/2.</span>
+<span class="sd">	B : int</span>
+<span class="sd">		Number of bootstrap replications to compute standard errors.</span>
+<span class="sd">		Defaults to 0 (no standard errors).</span>
+<span class="sd">	verbose : bool</span>
+<span class="sd">		Show progress bar while bootstrapping if verbose=True.</span>
+<span class="sd">	alpha : float</span>
+<span class="sd">		nominal Type I error level.</span>
+<span class="sd">	max_nvals : int</span>
+<span class="sd">		Maximum dimension of OT problem.</span>
+<span class="sd">	&quot;&quot;&quot;</span>
+	<span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+	<span class="k">if</span> <span class="n">pis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">pis</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+	<span class="k">if</span> <span class="n">B</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="c1"># Dists</span>
+		<span class="n">y0_vals</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">W</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+		<span class="n">y0_probs</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">pis</span><span class="p">[</span><span class="n">W</span><span class="o">==</span><span class="mi">0</span><span class="p">]);</span> <span class="n">y0_probs</span> <span class="o">/=</span> <span class="n">y0_probs</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+		<span class="n">y1_vals</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">W</span> <span class="o">==</span> <span class="mi">1</span><span class="p">]</span>
+		<span class="n">y1_probs</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">pis</span><span class="p">[</span><span class="n">W</span><span class="o">==</span><span class="mi">1</span><span class="p">]);</span> <span class="n">y1_probs</span> <span class="o">/=</span> <span class="n">y1_probs</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+		<span class="c1"># Reduce dimension to prevent memory errors for huge datasets</span>
+		<span class="n">qs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="n">max_nvals</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="n">max_nvals</span><span class="o">/</span><span class="p">(</span><span class="n">max_nvals</span><span class="o">+</span><span class="mi">1</span><span class="p">),</span> <span class="n">max_nvals</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">y0_vals</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_nvals</span><span class="p">:</span>
+			<span class="n">y0_vals</span> <span class="o">=</span> <span class="n">utilities</span><span class="o">.</span><span class="n">weighted_quantile</span><span class="p">(</span><span class="n">y0_vals</span><span class="p">,</span> <span class="n">y0_probs</span><span class="p">,</span> <span class="n">quantiles</span><span class="o">=</span><span class="n">qs</span><span class="p">)</span>
+			<span class="n">y0_probs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y0_vals</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y0_vals</span><span class="p">)</span>
+		<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">y1_vals</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_nvals</span><span class="p">:</span>
+			<span class="n">y1_vals</span> <span class="o">=</span> <span class="n">utilities</span><span class="o">.</span><span class="n">weighted_quantile</span><span class="p">(</span><span class="n">y1_vals</span><span class="p">,</span> <span class="n">y1_probs</span><span class="p">,</span> <span class="n">quantiles</span><span class="o">=</span><span class="n">qs</span><span class="p">)</span>
+			<span class="n">y1_probs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y1_vals</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">y1_vals</span><span class="p">)</span>
+
+		<span class="c1"># Fvals</span>
+		<span class="n">fvals</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">y0_vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">y1_vals</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="c1"># lower and upper</span>
+		<span class="n">lower</span> <span class="o">=</span> <span class="n">ot</span><span class="o">.</span><span class="n">lp</span><span class="o">.</span><span class="n">emd2</span><span class="p">(</span>
+			<span class="n">a</span><span class="o">=</span><span class="n">y0_probs</span><span class="p">,</span>
+			<span class="n">b</span><span class="o">=</span><span class="n">y1_probs</span><span class="p">,</span>
+			<span class="n">M</span><span class="o">=</span><span class="n">fvals</span><span class="p">,</span>
+		<span class="p">)</span>
+		<span class="n">upper</span> <span class="o">=</span> <span class="o">-</span><span class="n">ot</span><span class="o">.</span><span class="n">lp</span><span class="o">.</span><span class="n">emd2</span><span class="p">(</span>
+			<span class="n">a</span><span class="o">=</span><span class="n">y0_probs</span><span class="p">,</span>
+			<span class="n">b</span><span class="o">=</span><span class="n">y1_probs</span><span class="p">,</span>
+			<span class="n">M</span><span class="o">=-</span><span class="n">fvals</span><span class="p">,</span>
+		<span class="p">)</span>
+		<span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">lower</span><span class="p">,</span> <span class="n">upper</span><span class="p">])</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="c1"># Estimates</span>
+		<span class="n">ests</span> <span class="o">=</span> <span class="n">plug_in_no_covariates</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="c1"># Bootstrap</span>
+		<span class="n">bs_ests</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">B</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+		<span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">utilities</span><span class="o">.</span><span class="n">vrange</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">):</span>
+			<span class="n">inds</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+			<span class="n">bs_ests</span><span class="p">[</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="n">plug_in_no_covariates</span><span class="p">(</span>
+				<span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">[</span><span class="n">inds</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">[</span><span class="n">inds</span><span class="p">],</span> <span class="n">f</span><span class="o">=</span><span class="n">f</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="mi">0</span>
+			<span class="p">)</span>
+		<span class="c1"># Bias</span>
+		<span class="n">bias</span> <span class="o">=</span> <span class="n">bs_ests</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="n">ests</span>
+		<span class="n">ses</span> <span class="o">=</span> <span class="n">bs_ests</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="n">cis</span> <span class="o">=</span> <span class="n">ests</span> <span class="o">-</span> <span class="n">bias</span>
+		<span class="n">cis</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">stats</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">ses</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="n">cis</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">stats</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">ses</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+		<span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+			<span class="n">estimates</span><span class="o">=</span><span class="n">ests</span><span class="p">,</span>
+			<span class="n">ses</span><span class="o">=</span><span class="n">ses</span><span class="p">,</span>
+			<span class="n">cis</span><span class="o">=</span><span class="n">cis</span><span class="p">,</span>
+		<span class="p">)</span></div>
 
 </pre></div>
 

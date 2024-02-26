@@ -5,10 +5,14 @@ from scipy import stats
 import sklearn.linear_model as lm
 from . import utilities
 from .utilities import parse_dist, BatchedCategorical, vrange
+# typing
+import sklearn.base
+from typing import Optional, Union
 
 TOL = 1e-6
 DEFAULT_ALPHAS = np.log(np.logspace(0.0001, 100, base=np.e, num=10))
 DEFAULT_ALPHAS = np.concatenate([DEFAULT_ALPHAS, np.array([1000, 10000])])
+
 
 def parse_model_type(model_type, discrete):
 	# return non-strings
@@ -202,7 +206,7 @@ class DistReg:
 		self.how_transform = how_transform
 
 
-	def fit(self, W, X, y):
+	def fit(self, W: np.array, X: np.array, y: np.array):
 		"""
 		Fits model on the data.
 
@@ -217,7 +221,7 @@ class DistReg:
 		"""
 		raise NotImplementedError()
 
-	def feature_transform(self, W, X):
+	def feature_transform(self, W: np.array, X: np.array):
 		"""
 		Transforms the features before feeding them to the base model.
 
@@ -244,7 +248,7 @@ class DistReg:
 		else:
 			raise ValueError(f"Unrecognized transformation {self.how_transform}")
 
-	def predict(self, X, W=None):
+	def predict(self, X: np.array, W: Optional[np.array]=None):
 		"""
 		Parameters
 		----------
@@ -339,12 +343,12 @@ class CtsDistReg(DistReg):
 	"""
 	def __init__(
 		self,
-		model_type='ridge',
-		how_transform='interactions',
-		eps_dist='empirical',
-		eps_kwargs=None,
-		heterosked_model='none',
-		heterosked_kwargs=None,
+		model_type: Union[str, sklearn.base.BaseEstimator] = 'ridge',
+		how_transform: str = 'interactions',
+		eps_dist: str = 'empirical',
+		eps_kwargs: Optional[dict]=None,
+		heterosked_model: str='none',
+		heterosked_kwargs: Optional[dict]=None,
 		**model_kwargs,
 	):
 		# Distribution of residuals
@@ -374,7 +378,7 @@ class CtsDistReg(DistReg):
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 		
 
-	def fit(self, W, X, y):
+	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
 		self.Wtrain = W
 		# fit model
 		features = self.feature_transform(W=W, X=X)
@@ -423,7 +427,7 @@ class CtsDistReg(DistReg):
 				self.rvals1, self.rprobs1, **adj_kwargs
 			)
 
-	def predict(self, X, W=None):
+	def predict(self, X: np.array, W: Optional[np.array]=None):
 		if W is not None:
 			features = self.feature_transform(W, X=X)
 			mu = self.model.predict(features)
@@ -491,9 +495,9 @@ class QuantileDistReg(DistReg):
 	"""
 	def __init__(
 		self, 
-		nquantiles=50,
-		alphas=[0],
-		how_transform='interactions',
+		nquantiles: int=50,
+		alphas: list=[0],
+		how_transform: str='interactions',
 	):
 		self.nq = nquantiles
 		self.how_transform = how_transform
@@ -501,7 +505,7 @@ class QuantileDistReg(DistReg):
 		self.probs = self.quantiles[1:] - self.quantiles[0:-1]
 		self.alphas = alphas
 
-	def fit(self, W, X, y):
+	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
 		# Pick regularization by using CV lasso reg. strength
 		features = self.feature_transform(W=W, X=X)
 		if len(self.alphas) > 0:
@@ -541,7 +545,7 @@ class QuantileDistReg(DistReg):
 				self.model[quantile] = None
 				self.scores[quantile] = None
 			
-	def predict(self, X, W=None):
+	def predict(self, X: np.array, W: Optional[np.array]=None):
 		"""
 		"""
 		if W is not None:
@@ -598,11 +602,11 @@ class BinaryDistReg(DistReg):
 	"""
 	def __init__(
 		self, 
-		model_type='logistic', 
-		monotonicity=False,
-		how_transform='interactions',
+		model_type: Union[str, sklearn.base.BaseEstimator] = 'logistic', 
+		monotonicity: bool = False,
+		how_transform: str = 'interactions',
 		**model_kwargs
-	):
+	) -> None:
 		self.mtype_raw = model_type
 		self.model_type = parse_model_type(model_type, discrete=True)
 		self.monotonicity = monotonicity
@@ -622,7 +626,7 @@ class BinaryDistReg(DistReg):
 			self.model_kwargs['l1_ratios'] = np.array([0, 0.5, 1])
 
 
-	def fit(self, W, X, y):
+	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
 		# check y is binary
 		if set(np.unique(y).tolist()) != set([0,1]):
 			raise ValueError(f"y must be binary; instead np.unique(y)={np.unique(y)}")
@@ -632,7 +636,7 @@ class BinaryDistReg(DistReg):
 		self.model.fit(features, y)
 
 	def predict_proba(
-		self, X, W=None
+		self, X: np.array, W: Optional[np.array]=None
 	):
 		"""
 		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
@@ -658,7 +662,7 @@ class BinaryDistReg(DistReg):
 				p1s[flags] = np.minimum(1-TOL, avg+TOL)
 			return p0s, p1s
 
-	def predict(self, X, W=None):
+	def predict(self, X: np.array, W: Optional[np.array]=None):
 		"""
 		If W is None, returns (y0_dists, y1_dists)
 		Else, returns (y_dists) 
@@ -686,7 +690,7 @@ class MonotoneLogisticReg:
 	def __init__(self):
 		pass
 
-	def fit(self, X, y, lmda=1):
+	def fit(self, X: np.array, y: np.array, lmda: float=1):
 		n, p = X.shape
 		sig1 = X[:, 0].std()
 		zeros = np.zeros(n)
@@ -703,7 +707,7 @@ class MonotoneLogisticReg:
 			problem.solve(solver='ECOS', max_iters=500)
 		self.beta = beta.value
 
-	def predict_proba(self, X):
+	def predict_proba(self, X: np.array):
 		mu = X @ self.beta
 		p1s = np.exp(mu) / (1 + np.exp(mu))
 		return np.stack([1 - p1s, p1s], axis=1)

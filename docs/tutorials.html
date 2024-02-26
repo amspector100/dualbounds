@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tutorials &mdash; dualbounds 0.1.0 documentation</title>
+  <title>Tutorials &mdash; dualbounds 0.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
@@ -17,7 +17,7 @@
   
         <script src="_static/jquery.js?v=5d32c60e"></script>
         <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=01f34227"></script>
+        <script src="_static/documentation_options.js?v=938c9ccc"></script>
         <script src="_static/doctools.js?v=888ff710"></script>
         <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -42,7 +42,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.1.0
+                0.2.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -66,6 +66,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#Choosing-the-propensity-score-model-for-observational-data">Choosing the propensity score model for observational data</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#Model-selection-with-the-multiplier-bootstrap-(highly-recommended)">Model selection with the multiplier bootstrap (highly recommended)</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Additional-estimands-and-extensions">Additional estimands and extensions</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#Variance-of-the-CATE">Variance of the CATE</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#Variance-of-the-ITE">Variance of the ITE</a></li>
@@ -120,25 +121,25 @@
 </div>
 <section id="Minimalist-review-of-dual-bounds">
 <h2>Minimalist review of dual bounds<a class="headerlink" href="#Minimalist-review-of-dual-bounds" title="Link to this heading"></a></h2>
-<p>In this section, we give a minimal review the dual bounds framework; a more complete review can be found in the first four pages of <a class="reference external" href="https://arxiv.org/abs/2310.08115">Ji et al. (2023)</a>. Users familiar with this content should skip this section.</p>
+<p>This section gives a minimal review of the dual bounds framework. A more complete review can be found in the first four pages of <a class="reference external" href="https://arxiv.org/abs/2310.08115">Ji et al. (2023)</a>. Users familiar with this content should skip this section.</p>
 <p>Given i.i.d. outcomes <span class="math notranslate nohighlight">\(Y_i \in \mathcal{Y}\)</span>, treatments <span class="math notranslate nohighlight">\(W_i \in \{0,1\}\)</span> and pre-treatment covariates <span class="math notranslate nohighlight">\(X_i \in \mathcal{Y}\)</span>, dual bounds allow analysts to use machine learning to perform inference on partially identified estimands of the form</p>
 <div class="math notranslate nohighlight">
 \[\theta = E[f(Y_i(0), Y_i(1), X_i)],\]</div>
 <p>where <span class="math notranslate nohighlight">\(Y_i(1), Y_i(0) \in \mathcal{Y}\)</span> denote potential outcomes. Such estimands are <em>partially identified</em> because we never observe the joint law of the potential outcomes, but the data still contains information on the law of <span class="math notranslate nohighlight">\((Y(0), X)\)</span> and <span class="math notranslate nohighlight">\((Y(1), X)\)</span> allowing us to <em>bound</em> <span class="math notranslate nohighlight">\(\theta\)</span>. (More generally, dual bounds can provde bounds on the solutions to generic optimization problems, but we defer discussion of this until later in the tutorial for simplicity).</p>
-<p>Thus, to bound <span class="math notranslate nohighlight">\(\theta\)</span>, one usually must estimate the laws of <span class="math notranslate nohighlight">\((Y(1), X)\)</span> and <span class="math notranslate nohighlight">\((Y(0), X)\)</span>, typically using sophisticated machine learning techniques. However, it is not clear if the resulting bounds on <span class="math notranslate nohighlight">\(\theta\)</span> will be valid if the learned machine learning models are misspecified or inaccurate. For example, if one models <span class="math notranslate nohighlight">\(Y\)</span> as having a linear relationship with <span class="math notranslate nohighlight">\((X,W)\)</span>, but in truth <span class="math notranslate nohighlight">\(Y\)</span> has a highly nonlinear relationship with <span class="math notranslate nohighlight">\((X,W\)</span>), naive
-approaches could lead to inaccurate inference.</p>
+<p>Thus, to bound <span class="math notranslate nohighlight">\(\theta\)</span>, one must estimate the laws of <span class="math notranslate nohighlight">\((Y(1), X)\)</span> and <span class="math notranslate nohighlight">\((Y(0), X)\)</span>, typically using sophisticated machine learning techniques. However, it is not clear if the resulting bounds on <span class="math notranslate nohighlight">\(\theta\)</span> will be valid if the learned machine learning models are misspecified or inaccurate. For example, if one models <span class="math notranslate nohighlight">\(Y\)</span> as having a linear relationship with <span class="math notranslate nohighlight">\((X,W)\)</span>, but in truth <span class="math notranslate nohighlight">\(Y\)</span> has a highly nonlinear relationship with <span class="math notranslate nohighlight">\((X,W\)</span>), naive approaches
+could lead to inaccurate inference.</p>
 <p>Dual bounds are designed to leverage the benefits of sophisticated ML models without sacrificing validity. This framework has three key properties:</p>
 <ol class="arabic simple">
 <li><p>Dual bounds can wrap on top of any ML model (e.g. generalized linear models, random forests, neural networks, etc).</p></li>
 <li><p>In randomized experiments, dual bounds yield provably valid confidence intervals on <span class="math notranslate nohighlight">\(\theta\)</span>, even if the underlying ML model is arbitrarily misspecified or inaccurate. In observational studies, they have remarkably strong double robustness properties (see Section 3.4 of <a class="reference external" href="https://arxiv.org/abs/2310.08115">Ji et al. (2023)</a>).</p></li>
-<li><p>On the other hand, if the underlying ML model is highly accurate, dual bounds yield extremely sharp confidence bounds in a formal sense (see Section 3.2 of <a class="reference external" href="https://arxiv.org/abs/2310.08115">Ji et al. (2023)</a>).</p></li>
+<li><p>On the other hand, if the underlying ML model is highly accurate, dual bounds yield tight confidence bounds in a formal sense (see Section 3.2 of <a class="reference external" href="https://arxiv.org/abs/2310.08115">Ji et al. (2023)</a>).</p></li>
 </ol>
 <p>We refer the reader to the original paper for more details on how dual bounds work. In the next section, we show how to use dual bounds to perform inference on a variety of estimands</p>
 </section>
 <section id="The-DualBounds-class">
 <h2>The <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class<a class="headerlink" href="#The-DualBounds-class" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class is the main class in the package. The main usage is as follows.</p>
-<p><strong>Step 1</strong>: one should initialize the <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class, which takes as an input (i) the data, (ii) the definition of the function <span class="math notranslate nohighlight">\(f\)</span> (which defines the estimand <span class="math notranslate nohighlight">\(\theta\)</span>), and (iii) a description of the outcome model to use as an input. The user can also input a vector of propensity scores if they are known; else they will be estimated from the data.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class is the main class in the package. Its usage is as follows.</p>
+<p><strong>Step 1</strong>: initialize the <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class, which takes as an input (i) the data, (ii) the definition of the function <span class="math notranslate nohighlight">\(f\)</span> (which defines the estimand <span class="math notranslate nohighlight">\(\theta\)</span>), and (iii) a description of the outcome model to use as an input. The user can also input a vector of propensity scores if they are known; else they will be estimated from the data.</p>
 <p>For example, below, we show how to compute <span class="math notranslate nohighlight">\(E[\mathbb{I}(Y(1) &gt; Y(0)]\)</span>, the probability that the treatment effect is positive.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
@@ -175,7 +176,8 @@ approaches could lead to inaccurate inference.</p>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute dual bounds and observe output</span>
 <span class="n">dbnd</span><span class="o">.</span><span class="n">compute_dual_bounds</span><span class="p">(</span>
     <span class="n">nfolds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="c1"># number of cross-fitting folds</span>
-    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span> <span class="c1"># nominal level</span>
+    <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="c1"># nominal level,</span>
+    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span> <span class="c1"># show progress bars</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -183,10 +185,30 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 828.69it/s]
+Cross-fitting the outcome model.
 </pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "76e07506168c43b89f571256d3c52246", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c388df80af2a487982889724c9d2b873", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
@@ -194,9 +216,9 @@ approaches could lead to inaccurate inference.</p>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.57745911, 0.92498299]),
- &#39;ses&#39;: array([0.02331765, 0.0129798 ]),
- &#39;cis&#39;: array([0.53175736, 0.95042292])}
+{&#39;estimates&#39;: array([0.58374648, 0.93389944]),
+ &#39;ses&#39;: array([0.02336725, 0.01422112]),
+ &#39;cis&#39;: array([0.5379475 , 0.96177232])}
 </pre></div></div>
 </div>
 <p>Note that there are two estimates—a lower and an upper estimate—because <span class="math notranslate nohighlight">\(\theta\)</span> is not identified.</p>
@@ -222,10 +244,30 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 579.67it/s]
+Cross-fitting the outcome model.
 </pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "7ee78bbb86fb452b8845fe5b53e04610", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "b50661c9185f4fd2a15ca10f1e0cbf7c", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
@@ -233,26 +275,26 @@ approaches could lead to inaccurate inference.</p>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([2.52594772, 4.27917408]),
- &#39;ses&#39;: array([0.18387067, 0.15829605]),
- &#39;cis&#39;: array([2.22350738, 4.5395479 ])}
+{&#39;estimates&#39;: array([2.65658511, 4.30910011]),
+ &#39;ses&#39;: array([0.18435337, 0.15765387]),
+ &#39;cis&#39;: array([2.3533508 , 4.56841764])}
 </pre></div></div>
 </div>
 </section>
 <section id="Choosing-the-outcome-model">
 <h2>Choosing the outcome model<a class="headerlink" href="#Choosing-the-outcome-model" title="Link to this heading"></a></h2>
-<p>Dual bounds wrap on top of an underlying model which estimates the conditional distributions of <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span>. To allow for maximum flexibility, <code class="docutils literal notranslate"><span class="pre">dualbounds</span></code> gives the user three ways to specify the underlying model, listed below in order of increasing flexibility.</p>
+<p>Dual bounds wrap on top of an underlying model which estimates the conditional distributions of <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span>. There are three ways to specify the underlying model, listed below in order of increasing flexibility.</p>
 <section id="Method-1:-String-identifiers">
 <h3>Method 1: String identifiers<a class="headerlink" href="#Method-1:-String-identifiers" title="Link to this heading"></a></h3>
-<p>The easiest way to choose the model is to use one of the string identifiers, such as <code class="docutils literal notranslate"><span class="pre">'ridge',</span> <span class="pre">'lasso',</span> <span class="pre">'elasticnet',</span> <span class="pre">'randomforest',</span> <span class="pre">'knn'</span></code> (see the API reference for a complete list), as demonstrated below.</p>
+<p>The easiest method is to use one of the string identifiers, such as <code class="docutils literal notranslate"><span class="pre">'ridge',</span> <span class="pre">'lasso',</span> <span class="pre">'elasticnet',</span> <span class="pre">'randomforest',</span> <span class="pre">'knn'</span></code> (see the API reference for a complete list):</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
-    <span class="n">Y_model</span><span class="o">=</span><span class="s1">&#39;randomforest&#39;</span><span class="p">,</span> <span class="c1"># use random forest model</span>
     <span class="n">f</span><span class="o">=</span><span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">y1</span><span class="o">-</span><span class="n">y0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="c1"># estimand</span>
     <span class="n">X</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;W&#39;</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">],</span> <span class="c1"># data</span>
+    <span class="n">Y_model</span><span class="o">=</span><span class="s1">&#39;randomforest&#39;</span><span class="p">,</span> <span class="c1"># use random forest model to predict E[Y | X]</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -262,21 +304,49 @@ approaches could lead to inaccurate inference.</p>
 <div class="math notranslate nohighlight">
 \[Y_i = \mu(X_i, W_i) + \epsilon_i\]</div>
 <p>where the conditional mean function <span class="math notranslate nohighlight">\(\mu(\cdot, \cdot)\)</span> is approximated using one of the models listed above (e.g., a random forest or k-nearest neighbors regressor). All methods automatically create interaction terms between the covariates and the treatment.</p>
-<p>By default, these string identifiers assume Gaussian homoskedastic residuals, i.e., <span class="math notranslate nohighlight">\(\epsilon_i \stackrel{\mathrm{i.i.d.}}{\sim} \mathcal{N}(0, \sigma^2)\)</span>. This lightweight approach may not be realistic, but nonetheless we have found that it yields reasonably tight confidence intervals even under misspecification. Of course, it provably yields valid confidence intervals even under arbitrary misspecification of the outcome model.</p>
+<p><strong>Default 1: Homoskedasticity.</strong> By default, these string identifiers estimate a homoskedastic model where the variance of <span class="math notranslate nohighlight">\(\epsilon_i\)</span> does not depend on <span class="math notranslate nohighlight">\(X_i\)</span>. However, one can also specify a model to use to estimate the heteroskedasticity pattern, as shown below:</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
+    <span class="n">f</span><span class="o">=</span><span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">y1</span><span class="o">-</span><span class="n">y0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="c1"># estimand</span>
+    <span class="n">X</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;W&#39;</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">],</span> <span class="c1"># data</span>
+    <span class="n">Y_model</span><span class="o">=</span><span class="s1">&#39;randomforest&#39;</span><span class="p">,</span> <span class="c1"># use random forest model to predict E[Y | X]</span>
+    <span class="n">heterosked_model</span><span class="o">=</span><span class="s1">&#39;lasso&#39;</span><span class="p">,</span> <span class="c1"># use lasso to predict Var(Y | X)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>That said, we emphasize that the default (homoskedastic) approach yields valid bounds even under arbitrary heteroskedasticity patterns.</p>
+<p><strong>Default 2: Nonparametric residual estimates.</strong> By default, these string identifiers estimate the law of <span class="math notranslate nohighlight">\(\epsilon_i\)</span> using the empirical law of the training residuals (or, for ridge estimators, the leave-one-out residuals). However, it is possible to change this by changing the <code class="docutils literal notranslate"><span class="pre">eps_dist</span></code> parameter.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
+    <span class="n">f</span><span class="o">=</span><span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">y1</span><span class="o">-</span><span class="n">y0</span><span class="p">,</span><span class="mi">0</span><span class="p">),</span> <span class="c1"># estimand</span>
+    <span class="n">X</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;W&#39;</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">],</span> <span class="c1"># data</span>
+    <span class="n">Y_model</span><span class="o">=</span><span class="s1">&#39;randomforest&#39;</span><span class="p">,</span> <span class="c1"># use random forest model to predict E[Y | X]</span>
+    <span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;laplace&#39;</span><span class="p">,</span> <span class="c1"># assume a parametric model for the residuals; the default is nonparametric</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
 </section>
 <section id="Method-2:-Input-a-class-inheriting-from-dist_reg.DistReg">
 <h3>Method 2: Input a class inheriting from <code class="docutils literal notranslate"><span class="pre">dist_reg.DistReg</span></code><a class="headerlink" href="#Method-2:-Input-a-class-inheriting-from-dist_reg.DistReg" title="Link to this heading"></a></h3>
-<p>By default, the string identifiers assume Gaussianity and homoskedasticity. Analysts can change these assumptions by initializing either a <code class="docutils literal notranslate"><span class="pre">CtsDistReg</span></code> or <code class="docutils literal notranslate"><span class="pre">BinaryDistReg</span></code> class and passing it into the <code class="docutils literal notranslate"><span class="pre">dualbounds</span></code> class instantiation.</p>
-<p>For example, below we initialize a class which assumes heavy-tailed Laplace errors and heteroskedasticity.</p>
+<p>Analysts can also specify the outcome model by passing in a model which inherits from <code class="docutils literal notranslate"><span class="pre">dualbounds.dist_reg.DistReg</span></code>, including the <code class="docutils literal notranslate"><span class="pre">CtsDistReg</span></code>, <code class="docutils literal notranslate"><span class="pre">QuantileDistReg</span></code>, or and <code class="docutils literal notranslate"><span class="pre">BinaryDistReg</span></code> classes in the <code class="docutils literal notranslate"><span class="pre">dualbounds.dist_reg</span></code> submodule. One example is given below:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">Y_model</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">dist_reg</span><span class="o">.</span><span class="n">CtsDistReg</span><span class="p">(</span>
     <span class="n">model_type</span><span class="o">=</span><span class="s1">&#39;elasticnet&#39;</span><span class="p">,</span>
-    <span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;laplace&#39;</span><span class="p">,</span>
+    <span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;empirical&#39;</span><span class="p">,</span>
     <span class="n">how_transform</span><span class="o">=</span><span class="s1">&#39;interactions&#39;</span><span class="p">,</span> <span class="c1"># create interactions btwn X and W</span>
-    <span class="n">heterosked</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">heterosked_model</span><span class="o">=</span><span class="s1">&#39;lasso&#39;</span><span class="p">,</span>
+    <span class="n">heterosked_kwargs</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">cv</span><span class="o">=</span><span class="mi">3</span><span class="p">),</span> <span class="c1"># kwargs for model for Var(Y|X)</span>
 <span class="p">)</span>
 <span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
     <span class="n">Y_model</span><span class="o">=</span><span class="n">Y_model</span><span class="p">,</span> <span class="c1"># use random forest model</span>
@@ -290,30 +360,51 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 611.70it/s]
+Cross-fitting the outcome model.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "b65ac14f0f314c02800ed5c5f3a67275", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "85f17278679a4f38b8b125abc2dff584", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([2.75821933, 3.3190261 ]),
- &#39;ses&#39;: array([0.23200022, 0.16681487]),
- &#39;cis&#39;: array([2.30350725, 3.64597724])}
+{&#39;estimates&#39;: array([2.92349584, 3.25358989]),
+ &#39;ses&#39;: array([0.12094459, 0.1081461 ]),
+ &#39;cis&#39;: array([2.68644881, 3.46555236])}
 </pre></div></div>
 </div>
-<p>One can also directly input <code class="docutils literal notranslate"><span class="pre">sklearn</span></code> classes. For example, below we show how to use the <code class="docutils literal notranslate"><span class="pre">AdaBoostClassifier</span></code> from sklearn for binary data.</p>
+<p>One can also directly input <code class="docutils literal notranslate"><span class="pre">sklearn</span></code> or <code class="docutils literal notranslate"><span class="pre">sklearn</span></code>-like classes. For example, below we show how to use the <code class="docutils literal notranslate"><span class="pre">AdaBoostClassifier</span></code> from sklearn for binary data.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sklearn.ensemble</span> <span class="k">as</span> <span class="nn">ensemble</span>
 <span class="n">Y_model</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">dist_reg</span><span class="o">.</span><span class="n">BinaryDistReg</span><span class="p">(</span>
     <span class="n">model_type</span><span class="o">=</span><span class="n">ensemble</span><span class="o">.</span><span class="n">AdaBoostClassifier</span><span class="p">,</span>
+    <span class="n">algorithm</span><span class="o">=</span><span class="s1">&#39;SAMME&#39;</span>
 <span class="p">)</span>
 <span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
     <span class="n">Y_model</span><span class="o">=</span><span class="n">Y_model</span><span class="p">,</span> <span class="c1"># use random forest model</span>
@@ -328,20 +419,40 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|███████████████████████████████████████████████████████| 900/900 [00:00&lt;00:00, 2645.23it/s]
+Cross-fitting the outcome model.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2d661126f015481fa88538f39cb3caef", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "521eac0005c94daeadb3791d7b1bb8c6", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.24130477, 0.37151485]),
- &#39;ses&#39;: array([0.02993697, 0.02251905]),
- &#39;cis&#39;: array([0.18262938, 0.41565138])}
+{&#39;estimates&#39;: array([0.24869847, 0.38173473]),
+ &#39;ses&#39;: array([0.02885673, 0.02221959]),
+ &#39;cis&#39;: array([0.19214033, 0.42528433])}
 </pre></div></div>
 </div>
 <p>Analysts can also create custom classes inheritting from <code class="docutils literal notranslate"><span class="pre">dualbounds.dist_reg.DistReg</span></code>, allowing analysts to use (e.g.) custom conditional variance estimators—see the API reference for more details.</p>
@@ -351,7 +462,7 @@ approaches could lead to inaccurate inference.</p>
 <p>For maximum flexibility, one can also directly input predicted conditional distributions of <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span>, in the form of a list of batched scipy distributions whose shapes sum to the number of datapoints.</p>
 <p>This is illustrated below, although for simplicity the inputs have nothing to do with the true distributions of <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span>. Note that in real applications, it is extremely important that the estimates of <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span> must be computed using cross-fitting, otherwise the dual bounds may not be valid.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
@@ -382,25 +493,31 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 733.14it/s]
+Estimating optimal dual variables.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "db93ce37bc1547dc833cbbc8946dabd8", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.29014241, 1.22454801]),
- &#39;ses&#39;: array([0.03908947, 0.02725067]),
- &#39;cis&#39;: array([0.21352846, 1.27795834])}
+{&#39;estimates&#39;: array([0.303238  , 1.22256972]),
+ &#39;ses&#39;: array([0.03884216, 0.02727235]),
+ &#39;cis&#39;: array([0.22710875, 1.27602255])}
 </pre></div></div>
 </div>
 <p>This syntax can be useful if in simulations one wants to compute an “oracle dual bound” which has perfect knowledge of the conditional distributions of <span class="math notranslate nohighlight">\(Y(0) \mid X\)</span> and <span class="math notranslate nohighlight">\(Y(1) \mid X\)</span>, as illustrated below.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compute oracle dual bounds using the true conditional dists of Y0/Y1</span>
@@ -415,20 +532,26 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 481.40it/s]
+Estimating optimal dual variables.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e93bdb5e40da488e83b5f13112bcdb8e", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.58061888, 0.92968078]),
- &#39;ses&#39;: array([0.02343839, 0.01286777]),
- &#39;cis&#39;: array([0.53468048, 0.95490115])}
+{&#39;estimates&#39;: array([0.58923196, 0.9276765 ]),
+ &#39;ses&#39;: array([0.0234632, 0.0128731]),
+ &#39;cis&#39;: array([0.54324494, 0.95290731])}
 </pre></div></div>
 </div>
 <p>Note that the output of the oracle dual bounds is extremely similar to the output of the initial dual bounds in the third cell.</p>
@@ -437,7 +560,7 @@ approaches could lead to inaccurate inference.</p>
 <h3>Choosing the propensity score model for observational data<a class="headerlink" href="#Choosing-the-propensity-score-model-for-observational-data" title="Link to this heading"></a></h3>
 <p>Dual bounds can also apply to observational data where the propensity scores must be estimated. In this case, analysts can specify the model used to estimate the propensity scores—the <code class="docutils literal notranslate"><span class="pre">W_model</span></code>—with one of three methods. First, one can use a string identifier:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
@@ -453,29 +576,63 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 568.16it/s]
+Fitting propensity scores.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "5cb928689c0544b292db37cf78eb779d", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cross-fitting the outcome model.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "5df1953bc4df44ea91fe3a8e901e509c", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f5b7c6ab471c4bfe9c8d800dde471ddc", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.58088302, 0.93676891]),
- &#39;ses&#39;: array([0.023641 , 0.0133706]),
- &#39;cis&#39;: array([0.53454751, 0.96297481])}
+{&#39;estimates&#39;: array([0.58610047, 0.93029166]),
+ &#39;ses&#39;: array([0.02375752, 0.0140871 ]),
+ &#39;cis&#39;: array([0.53953658, 0.95790187])}
 </pre></div></div>
 </div>
 <p>Second, one can directly input an sklearn classifier.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">dbnd</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
-    <span class="n">W_model</span><span class="o">=</span><span class="n">ensemble</span><span class="o">.</span><span class="n">AdaBoostClassifier</span><span class="p">(),</span>
+    <span class="n">W_model</span><span class="o">=</span><span class="n">ensemble</span><span class="o">.</span><span class="n">AdaBoostClassifier</span><span class="p">(</span><span class="n">algorithm</span><span class="o">=</span><span class="s1">&#39;SAMME&#39;</span><span class="p">),</span>
     <span class="n">f</span><span class="o">=</span><span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">y0</span> <span class="o">&lt;</span> <span class="n">y1</span><span class="p">,</span> <span class="c1"># estimand</span>
     <span class="n">X</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;W&#39;</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">],</span> <span class="c1"># data</span>
 <span class="p">)</span>
@@ -486,24 +643,177 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:01&lt;00:00, 614.49it/s]
+Fitting propensity scores.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "1f1f22f26c754d35bdfcb8344532c7b9", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cross-fitting the outcome model.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "92f9540e5aea49989386c82e9800d0c5", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9b01dd1647aa478390c719c3a4125cb7", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([0.5770192 , 0.92539417]),
- &#39;ses&#39;: array([0.02351094, 0.01315318]),
- &#39;cis&#39;: array([0.5309386 , 0.95117393])}
+{&#39;estimates&#39;: array([0.5839935 , 0.93530366]),
+ &#39;ses&#39;: array([0.02369072, 0.01440982]),
+ &#39;cis&#39;: array([0.53756055, 0.9635464 ])}
 </pre></div></div>
 </div>
 <p>Lastly, analysts can also directly estimate the vector propensity scores and input them, although analysts should ensure that they are correctly employing cross-fitting in this case to ensure validity.</p>
 </section>
+</section>
+<section id="Model-selection-with-the-multiplier-bootstrap-(highly-recommended)">
+<h2>Model selection with the multiplier bootstrap (highly recommended)<a class="headerlink" href="#Model-selection-with-the-multiplier-bootstrap-(highly-recommended)" title="Link to this heading"></a></h2>
+<p>In randomized experiments, the <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> object produces valid confidence intervals under arbitrary misspecification of the outcome model, meaning that the analyst can try many different outcome models to see which produces the tightest bounds. After fitting many outcome models and computing dual bounds based on each of them, the multiplier bootstrap provides a principled way to combine evidence across many different estimates while retaining rigorous coverage guarantees for the final
+confidence interval (i.e., accounting for multiplicity).</p>
+<p>Below, we show how to do this in challenging setting with heteroskedasticity.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generate synthetic data from a linear model with heteroskedasticity</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">gen_data</span><span class="o">.</span><span class="n">gen_regression_data</span><span class="p">(</span>
+    <span class="n">n</span><span class="o">=</span><span class="mi">900</span><span class="p">,</span> <span class="c1"># Num. datapoints</span>
+    <span class="n">p</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="c1"># Num. covariates</span>
+    <span class="n">r2</span><span class="o">=</span><span class="mf">0.95</span><span class="p">,</span> <span class="c1"># population R^2</span>
+    <span class="n">tau</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="c1"># average treatment effect</span>
+    <span class="n">tauv</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
+    <span class="n">interactions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="c1"># ensures treatment effect is heterogenous</span>
+    <span class="n">heterosked</span><span class="o">=</span><span class="s1">&#39;exp_linear&#39;</span><span class="p">,</span> <span class="c1"># Pattern of heteroskedasticity</span>
+    <span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;laplace&#39;</span><span class="p">,</span>
+    <span class="n">sample_seed</span><span class="o">=</span><span class="mi">123</span><span class="p">,</span> <span class="c1"># random seed</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<p>First, we compute dual bounds based on several different choices of outcome model.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Nominal level</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="c1"># List of dualbounds objects</span>
+<span class="n">db_objects</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">widths</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">Y_models</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ridge&#39;</span><span class="p">,</span> <span class="s1">&#39;rf&#39;</span><span class="p">]</span>
+<span class="n">heterosked_models</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;none&#39;</span><span class="p">,</span> <span class="s1">&#39;lasso&#39;</span><span class="p">,</span> <span class="s1">&#39;rf&#39;</span><span class="p">]</span>
+<span class="n">model_names</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">Y_model</span> <span class="ow">in</span> <span class="n">Y_models</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">heterosked_model</span> <span class="ow">in</span> <span class="n">heterosked_models</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fitting Y_model=</span><span class="si">{</span><span class="n">Y_model</span><span class="si">}</span><span class="s2">, heterosked_model=</span><span class="si">{</span><span class="n">heterosked_model</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">gdb</span> <span class="o">=</span> <span class="n">DualBounds</span><span class="p">(</span>
+            <span class="c1"># data</span>
+            <span class="n">X</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;W&#39;</span><span class="p">],</span> <span class="n">pis</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;pis&#39;</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s1">&#39;y&#39;</span><span class="p">],</span>
+            <span class="c1"># estimand</span>
+            <span class="n">f</span><span class="o">=</span><span class="k">lambda</span> <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">y0</span> <span class="o">&lt;</span> <span class="n">y1</span><span class="p">,</span>
+            <span class="c1"># models</span>
+            <span class="n">Y_model</span><span class="o">=</span><span class="n">Y_model</span><span class="p">,</span>
+            <span class="n">heterosked_model</span><span class="o">=</span><span class="n">heterosked_model</span><span class="p">,</span>
+            <span class="n">eps_dist</span><span class="o">=</span><span class="s1">&#39;laplace&#39;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">gdb</span><span class="o">.</span><span class="n">compute_dual_bounds</span><span class="p">(</span><span class="n">nfolds</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">db_objects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gdb</span><span class="p">)</span>
+        <span class="n">widths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gdb</span><span class="o">.</span><span class="n">cis</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">gdb</span><span class="o">.</span><span class="n">cis</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">model_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Y_model=</span><span class="si">{</span><span class="n">Y_model</span><span class="si">}</span><span class="se">\n</span><span class="s1">Heterosked=</span><span class="si">{</span><span class="n">heterosked_model</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Fitting Y_model=ridge, heterosked_model=none.
+Fitting Y_model=ridge, heterosked_model=lasso.
+Fitting Y_model=ridge, heterosked_model=rf.
+Fitting Y_model=rf, heterosked_model=none.
+Fitting Y_model=rf, heterosked_model=lasso.
+Fitting Y_model=rf, heterosked_model=rf.
+</pre></div></div>
+</div>
+<p>Second, we aggregate the bounds using the multiplier bootstrap.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">bootstrap_output</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">bootstrap</span><span class="o">.</span><span class="n">dualbound_multiplier_bootstrap</span><span class="p">(</span><span class="n">db_objects</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">)</span>
+<span class="n">bootstrap_output</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;estimates&#39;: array([0.6977678 , 0.87014996]),
+ &#39;cis&#39;: array([0.65149206, 0.90593943])}
+</pre></div></div>
+</div>
+<p>We can see that the bootstrap output width is nearly equal to the smallest width among all methods.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+<span class="n">bootstrap_width</span> <span class="o">=</span> <span class="n">bootstrap_output</span><span class="p">[</span><span class="s1">&#39;cis&#39;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">bootstrap_output</span><span class="p">[</span><span class="s1">&#39;cis&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">model_names</span><span class="p">,</span> <span class="n">widths</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;black&#39;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">axhline</span><span class="p">(</span>
+    <span class="n">bootstrap_width</span><span class="p">,</span>
+    <span class="n">label</span><span class="o">=</span><span class="s1">&#39;Width of Multiplier Boostrap Confidence Interval&#39;</span><span class="p">,</span>
+    <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">,</span>
+    <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;dashed&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Width of confidence interval&quot;</span><span class="p">)</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="_images/tutorials_60_0.png" src="_images/tutorials_60_0.png" />
+</div>
+</div>
 </section>
 <section id="Additional-estimands-and-extensions">
 <h2>Additional estimands and extensions<a class="headerlink" href="#Additional-estimands-and-extensions" title="Link to this heading"></a></h2>
@@ -512,7 +822,7 @@ approaches could lead to inaccurate inference.</p>
 <h3>Variance of the CATE<a class="headerlink" href="#Variance-of-the-CATE" title="Link to this heading"></a></h3>
 <p>Dual bounds can also be used to <em>lower-bound</em> the variance of the conditional average treatment effect <span class="math notranslate nohighlight">\(\theta = \text{Var}(E[Y(1) - Y(0) \mid X])\)</span>, as shown below.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">vdb</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">varcate</span><span class="o">.</span><span class="n">VarCATEDualBounds</span><span class="p">(</span>
@@ -526,15 +836,29 @@ approaches could lead to inaccurate inference.</p>
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cross-fitting the outcome model.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "263203cd8bd348369f64c07fb716b578", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimate&#39;: 7.271835000465313,
- &#39;se&#39;: 0.5761754092436733,
- &#39;lower_ci&#39;: 6.324110788810609}
+{&#39;estimate&#39;: 7.205186692749319,
+ &#39;se&#39;: 0.5280915920313564,
+ &#39;lower_ci&#39;: 6.336553322233965}
 </pre></div></div>
 </div>
 </section>
@@ -542,7 +866,7 @@ approaches could lead to inaccurate inference.</p>
 <h3>Variance of the ITE<a class="headerlink" href="#Variance-of-the-ITE" title="Link to this heading"></a></h3>
 <p>Dual bounds can also be used to upper and lower bound the variance of the individual treatment effect <span class="math notranslate nohighlight">\(\theta = \text{Var}(Y(1) - Y(0))\)</span>, as shown below.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">vdb</span> <span class="o">=</span> <span class="n">db</span><span class="o">.</span><span class="n">varite</span><span class="o">.</span><span class="n">VarITEDualBounds</span><span class="p">(</span>
@@ -559,20 +883,40 @@ approaches could lead to inaccurate inference.</p>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
-<div class="output_area stderr docutils container">
+<div class="output_area docutils container">
 <div class="highlight"><pre>
-100%|████████████████████████████████████████████████████████| 900/900 [00:02&lt;00:00, 338.36it/s]
+Cross-fitting the outcome model.
 </pre></div></div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "b7c3ab981490447aa42846454996e77f", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Estimating optimal dual variables.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9477112dc57e4b78ae247e369cc243f9", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([ 7.18208094, 16.10882366]),
- &#39;ses&#39;: array([0.56993296, 0.86895712]),
- &#39;cis&#39;: array([ 6.06503287, 17.81194832])}
+{&#39;estimates&#39;: array([ 8.742372  , 11.78466472]),
+ &#39;ses&#39;: array([0.57567097, 0.67486996]),
+ &#39;cis&#39;: array([ 7.61407763, 13.10738553])}
 </pre></div></div>
 </div>
 </section>
@@ -591,7 +935,7 @@ approaches could lead to inaccurate inference.</p>
 \[E[Y(1) - Y(0) \mid S(1) = S(0) = 1].\]</div>
 <p>Dual bounds can be used to bound this partially identified estimand under the <strong>monotonicity</strong> assumption that <span class="math notranslate nohighlight">\(S(1) \ge S(0)\)</span> a.s., as shown below.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># create data</span>
@@ -618,18 +962,52 @@ approaches could lead to inaccurate inference.</p>
 </pre></div>
 </div>
 </div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cross-fitting the selection model.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "1e3db45236a340f98929e55a3b8e8350", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Cross-fitting the outcome model.
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "29651cda2b6e4da484e02363db93f5b5", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "a529937d1c7048f49da8be0bea95fa84", "version_major": 2, "version_minor": 0}</script></div>
+</div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;estimates&#39;: array([2.08484643, 3.25616402]),
- &#39;ses&#39;: array([0.2094036 , 0.19805625]),
- &#39;cis&#39;: array([1.67442291, 3.64434714])}
+{&#39;estimates&#39;: array([2.08157437, 3.27107886]),
+ &#39;ses&#39;: array([0.21124576, 0.20098984]),
+ &#39;cis&#39;: array([1.66754028, 3.66501171])}
 </pre></div></div>
 </div>
-<p>It is also possible to bound this estimand without the monotonicity assumption using the generic <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class, although we caution that without any other assumptions the bounds might be too wide to be useful. Please see <a class="reference external" href="https://arxiv.org/pdf/2310.08115.pdf">Ji et al. (2023)</a>, Section 2.5 for details.</p>
+<p>It is also possible to bound this estimand without the monotonicity assumption using the generic <code class="docutils literal notranslate"><span class="pre">DualBounds</span></code> class, although we caution that without the monotonicity assumption, the bounds might be too wide to be useful. Please see <a class="reference external" href="https://arxiv.org/pdf/2310.08115.pdf">Ji et al. (2023)</a>, Section 2.5 for details.</p>
 </section>
 </section>
 </section>

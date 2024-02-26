@@ -6,6 +6,11 @@ Generic DualBounds
 .. automodule:: dualbounds.generic
   :members:
 
+Bootstrap methods
+-----------------
+.. automodule:: dualbounds.bootstrap
+  :members:
+
 Lee Bounds
 ----------
 .. automodule:: dualbounds.lee
@@ -26,8 +31,8 @@ Distributional regression classes
 .. automodule:: dualbounds.dist_reg
   :members:
 
-Quickly creating data-generating processes
-------------------------------------------
+Generate synthetic datasets
+---------------------------
 .. automodule:: dualbounds.gen_data
   :members:
 
