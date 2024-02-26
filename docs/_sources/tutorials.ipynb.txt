@@ -170,7 +170,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "76e07506168c43b89f571256d3c52246",
+       "model_id": "fd58fc72c97347849a123ff3f7310ffb",
        "version_major": 2,
        "version_minor": 0
       },
@@ -191,7 +191,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "c388df80af2a487982889724c9d2b873",
+       "model_id": "0479b411770c4067a5730a795d800ff9",
        "version_major": 2,
        "version_minor": 0
       },
@@ -256,7 +256,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "7ee78bbb86fb452b8845fe5b53e04610",
+       "model_id": "b4fb937633aa4864b84a0dadd989b5c3",
        "version_major": 2,
        "version_minor": 0
       },
@@ -277,7 +277,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "b50661c9185f4fd2a15ca10f1e0cbf7c",
+       "model_id": "698bb762d6664c80a16d5872724e646c",
        "version_major": 2,
        "version_minor": 0
       },
@@ -479,7 +479,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "b65ac14f0f314c02800ed5c5f3a67275",
+       "model_id": "1861a4548c42499b93807c0c33f9460f",
        "version_major": 2,
        "version_minor": 0
       },
@@ -500,7 +500,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "85f17278679a4f38b8b125abc2dff584",
+       "model_id": "3318258f7ee7484780d223354ca418db",
        "version_major": 2,
        "version_minor": 0
       },
@@ -564,7 +564,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "2d661126f015481fa88538f39cb3caef",
+       "model_id": "d719c400f25b4e3686ca8e0e59642e3a",
        "version_major": 2,
        "version_minor": 0
       },
@@ -585,7 +585,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "521eac0005c94daeadb3791d7b1bb8c6",
+       "model_id": "3bba36ad24374a0bb1e580e4408d2d21",
        "version_major": 2,
        "version_minor": 0
       },
@@ -672,7 +672,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "db93ce37bc1547dc833cbbc8946dabd8",
+       "model_id": "8d36323a98834c61a019b07b68dd3d86",
        "version_major": 2,
        "version_minor": 0
       },
@@ -745,7 +745,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "e93bdb5e40da488e83b5f13112bcdb8e",
+       "model_id": "58c7394b6448457f9af595ff732581e0",
        "version_major": 2,
        "version_minor": 0
       },
@@ -818,7 +818,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "5cb928689c0544b292db37cf78eb779d",
+       "model_id": "644187e4523546f6939edeeededea81d",
        "version_major": 2,
        "version_minor": 0
       },
@@ -839,7 +839,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "5df1953bc4df44ea91fe3a8e901e509c",
+       "model_id": "c326006b0456417c8bd4030e731277c7",
        "version_major": 2,
        "version_minor": 0
       },
@@ -860,7 +860,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "f5b7c6ab471c4bfe9c8d800dde471ddc",
+       "model_id": "b78f5c80bf514a0197239119139d6744",
        "version_major": 2,
        "version_minor": 0
       },
@@ -918,7 +918,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "1f1f22f26c754d35bdfcb8344532c7b9",
+       "model_id": "6a8c69e5bc9148ca8a8653f43cfc3100",
        "version_major": 2,
        "version_minor": 0
       },
@@ -939,7 +939,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "92f9540e5aea49989386c82e9800d0c5",
+       "model_id": "c600cea244e444fba4f7ae95d3f75d56",
        "version_major": 2,
        "version_minor": 0
       },
@@ -960,7 +960,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "9b01dd1647aa478390c719c3a4125cb7",
+       "model_id": "0d47bdd71b0a4b0da743d30753e61182",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1221,7 +1221,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "263203cd8bd348369f64c07fb716b578",
+       "model_id": "6571181b12e04ea4b9ec44ad9e291b5c",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1288,7 +1288,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "b7c3ab981490447aa42846454996e77f",
+       "model_id": "e0f0aa8b2e234e7ebb19b9a38daa48f1",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1309,7 +1309,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "9477112dc57e4b78ae247e369cc243f9",
+       "model_id": "a346181c10fe48f3a9d3d79510fc028d",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1342,6 +1342,131 @@
     "    Y_model='elasticnet',\n",
     ")\n",
     "vdb.compute_dual_bounds()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "67a5c08e-67fa-4abf-bb03-f4e49b59608f",
+   "metadata": {},
+   "source": [
+    "### Generic extensions via the delta method"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c641405a-1659-4d2a-8c3c-6d2529b7d1a8",
+   "metadata": {},
+   "source": [
+    "Using the delta method, dual bounds can also be used to upper and lower bound estimands of the form"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ff5a8f3e-ae68-4eb5-8711-d162120536fc",
+   "metadata": {},
+   "source": [
+    "$$\\theta = h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)]) $$"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "e504da88-dcdc-4c4c-b6f7-ab1572f121fd",
+   "metadata": {},
+   "source": [
+    "where $h$ is a continuous function that is nondecreasing in its first input, $f$ is a real-valued function, and $z_1$ and $z_0$ are potentially vector-valued functions. Using the ``dualbounds.delta.DeltaDualBounds`` class, one can directly input these functions to produce dual bounds:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "d3c2981c-5966-4a92-804e-7bc251623572",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Cross-fitting the outcome model.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "be040aae17724c78b83fc5a0ac9a5100",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/5 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Estimating optimal dual variables.\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "e9c368c30404467a95cb74b65b7b9c3a",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "  0%|          | 0/900 [00:00<?, ?it/s]"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "{'estimates': array([0.39474175, 0.40323923]),\n",
+       " 'ses': array([0.10067796, 0.10192533]),\n",
+       " 'cis': array([0.19741659, 0.60300921])}"
+      ]
+     },
+     "execution_count": 20,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "delta_db = db.delta.DeltaDualBounds(\n",
+    "    # input arbitrary functions\n",
+    "    h=lambda fval, z1, z0: fval / z0 + z1[0] * z1[1],\n",
+    "    z1=lambda y1, x: np.array([y1, x[0]]),\n",
+    "    z0=lambda y0, x: y0**2,\n",
+    "    f=lambda y0, y1, x: np.maximum(y1, y0),\n",
+    "    # input data\n",
+    "    y=data['y'],\n",
+    "    X=data['X'],\n",
+    "    W=data['W'],\n",
+    "    pis=data['pis'],\n",
+    ")\n",
+    "delta_db.compute_dual_bounds()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "35510998-5a1c-4130-a1f5-0047c58d047d",
+   "metadata": {},
+   "source": [
+    "Indeed, the above code yields bounds on the estimand"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b4528773-f21e-418c-80ff-e8295da330ca",
+   "metadata": {},
+   "source": [
+    "$$\\theta = \\frac{E[(Y(1)-Y(0))_+]}{E[Y(0)^2]} + E[Y(1)] \\cdot E[X_1].$$"
    ]
   },
   {
@@ -1396,7 +1521,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 20,
+   "execution_count": 21,
    "id": "cbcb8ec0-c90c-4ff1-bb32-5a34f10a86fe",
    "metadata": {},
    "outputs": [
@@ -1410,7 +1535,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "1e3db45236a340f98929e55a3b8e8350",
+       "model_id": "8ff368d1c76d4b0391fc9d88414e6690",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1431,7 +1556,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "29651cda2b6e4da484e02363db93f5b5",
+       "model_id": "56f42c63024a4239b7adc56c0c5f0318",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1445,7 +1570,7 @@
     {
      "data": {
       "application/vnd.jupyter.widget-view+json": {
-       "model_id": "a529937d1c7048f49da8be0bea95fa84",
+       "model_id": "d049cd330a43499789ea14cfe4fb42d2",
        "version_major": 2,
        "version_minor": 0
       },
@@ -1464,7 +1589,7 @@
        " 'cis': array([1.66754028, 3.66501171])}"
       ]
      },
-     "execution_count": 20,
+     "execution_count": 21,
      "metadata": {},
      "output_type": "execute_result"
     }

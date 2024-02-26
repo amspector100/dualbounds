@@ -11,6 +11,11 @@ Bootstrap methods
 .. automodule:: dualbounds.bootstrap
   :members:
 
+Generic DeltaDualBounds
+-----------------------
+.. automodule:: dualbounds.delta
+  :members:
+
 Lee Bounds
 ----------
 .. automodule:: dualbounds.lee

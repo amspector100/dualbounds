@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API Reference &mdash; dualbounds 0.2.0 documentation</title>
+  <title>API Reference &mdash; dualbounds 0.2.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=eafc0fe6" />
@@ -16,7 +16,7 @@
   
         <script src="_static/jquery.js?v=5d32c60e"></script>
         <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="_static/documentation_options.js?v=938c9ccc"></script>
+        <script src="_static/documentation_options.js?v=37f418d5"></script>
         <script src="_static/doctools.js?v=888ff710"></script>
         <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -38,7 +38,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.2.0
+                0.2.1
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
@@ -69,6 +69,13 @@
 <li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.bootstrap">Bootstrap methods</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.bootstrap.dualbound_multiplier_bootstrap"><code class="docutils literal notranslate"><span class="pre">dualbound_multiplier_bootstrap()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dualbounds.bootstrap.multiplier_bootstrap"><code class="docutils literal notranslate"><span class="pre">multiplier_bootstrap()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.delta">Generic DeltaDualBounds</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#dualbounds.delta.DeltaDualBounds"><code class="docutils literal notranslate"><span class="pre">DeltaDualBounds</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#dualbounds.delta.DeltaDualBounds.compute_final_bounds"><code class="docutils literal notranslate"><span class="pre">DeltaDualBounds.compute_final_bounds()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-dualbounds.lee">Lee Bounds</a><ul>
@@ -521,6 +528,115 @@ if <code class="docutils literal notranslate"><span class="pre">samples</span></
 </dl>
 </dd>
 </dl>
+</dd></dl>
+
+</section>
+<section id="module-dualbounds.delta">
+<span id="generic-deltadualbounds"></span><h2>Generic DeltaDualBounds<a class="headerlink" href="#module-dualbounds.delta" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="dualbounds.delta.DeltaDualBounds">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dualbounds.delta.</span></span><span class="sig-name descname"><span class="pre">DeltaDualBounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">h</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">callable</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/delta.html#DeltaDualBounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.delta.DeltaDualBounds" title="Link to this definition"></a></dt>
+<dd><p>Performs inference on</p>
+<p>h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])</p>
+<p>where h is monotone increasing in its first argument.
+This wraps <code class="docutils literal notranslate"><span class="pre">dualbounds.generic.DualBounds</span></code> and applies
+the bootstrap or delta method.</p>
+<dl class="field-list">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl>
+<dt><strong>h</strong><span class="classifier">function</span></dt><dd><p>real-valued function of fval, z0, z1, e.g.,
+<code class="docutils literal notranslate"><span class="pre">h</span> <span class="pre">=</span> <span class="pre">lambda</span> <span class="pre">fval,</span> <span class="pre">z0,</span> <span class="pre">z1</span> <span class="pre">:</span> <span class="pre">fval</span> <span class="pre">/</span> <span class="pre">z0</span> <span class="pre">+</span> <span class="pre">z1</span></code>.</p>
+</dd>
+<dt><strong>z0</strong><span class="classifier">function</span></dt><dd><p>potentially vector-valued function of y0, x.</p>
+</dd>
+<dt><strong>z1</strong><span class="classifier">function</span></dt><dd><p>potentially vector-valued function of y1, x.</p>
+</dd>
+<dt><strong>f</strong><span class="classifier">function</span></dt><dd><p>Function which defines the partially identified estimand.
+Must be a function of three arguments: y0, y1, x 
+(in that order). E.g.,
+<code class="docutils literal notranslate"><span class="pre">f</span> <span class="pre">=</span> <span class="pre">lambda</span> <span class="pre">y0,</span> <span class="pre">y1,</span> <span class="pre">x</span> <span class="pre">:</span> <span class="pre">y0</span> <span class="pre">&lt;=</span> <span class="pre">y1</span></code></p>
+</dd>
+<dt><strong>X</strong><span class="classifier">np.array</span></dt><dd><p>(n, p)-shaped array of covariates.</p>
+</dd>
+<dt><strong>W</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of binary treatment indicators.</p>
+</dd>
+<dt><strong>Y</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of outcome measurements.</p>
+</dd>
+<dt><strong>pis</strong><span class="classifier">np.array</span></dt><dd><p>n-length array of propensity scores P(W=1 | X). 
+If <code class="docutils literal notranslate"><span class="pre">None</span></code>, will be estimated from the data.</p>
+</dd>
+<dt><strong>Y_model</strong><span class="classifier">str or dist_reg.DistReg</span></dt><dd><p>One of [‘ridge’, ‘lasso’, ‘elasticnet’, ‘randomforest’, ‘knn’].
+Alternatively, a distributional regression class inheriting 
+from <code class="docutils literal notranslate"><span class="pre">dist_reg.DistReg</span></code>. E.g., when <code class="docutils literal notranslate"><span class="pre">y</span></code> is continuous,
+defaults to
+<a href="#id3"><span class="problematic" id="id4">``</span></a>Y_model=dist_reg.CtsDistReg(</p>
+<blockquote>
+<div><p>model_type=’ridge’, heterosked_model=None</p>
+</div></blockquote>
+<p>)``.</p>
+</dd>
+<dt><strong>W_model</strong><span class="classifier">str or sklearn classifier</span></dt><dd><p>Specifies how to estimate the propensity scores if <code class="docutils literal notranslate"><span class="pre">pis</span></code> is
+not known.  Either a str identifier as above or an sklearn
+classifier—see the tutorial for examples.</p>
+</dd>
+<dt><strong>discrete</strong><span class="classifier">bool</span></dt><dd><p>If True, treats y as a discrete variable. 
+Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (inferred from the data).</p>
+</dd>
+<dt><strong>support</strong><span class="classifier">np.array</span></dt><dd><p>Optinal support of y, if known.
+Defaults to <code class="docutils literal notranslate"><span class="pre">None</span></code> (inferred from the data).</p>
+</dd>
+<dt><strong>**model_kwargs</strong><span class="classifier">dict</span></dt><dd><p>Additional kwargs for the <code class="docutils literal notranslate"><span class="pre">DistReg</span></code> outcome model,
+e.g., <code class="docutils literal notranslate"><span class="pre">eps_dist</span></code> (for cts. y) or <code class="docutils literal notranslate"><span class="pre">feature_transform</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_dual_bounds</span></code>([nfolds, aipw, alpha, ...])</p></td>
+<td><p>Main function which computes dual bounds in three steps: (1) cross-fitting, (2) computing optimal dual variables, and (3) computing final dual bounds.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_dual_variables</span></code>([y0_dists, y0_vals, ...])</p></td>
+<td><p>Uses the estimated outcome model to solve the dual optimal transport problem to obtain optimal dual variables.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#dualbounds.delta.DeltaDualBounds.compute_final_bounds" title="dualbounds.delta.DeltaDualBounds.compute_final_bounds"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_final_bounds</span></code></a>([aipw, alpha, B])</p></td>
+<td><p>Computes final bounds based on (A)IPW summands, using the delta method or the bootstrap.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cross_fit</span></code>([nfolds, suppress_warning, verbose])</p></td>
+<td><p>Performs cross-fitting to fit the outcome model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_propensity_scores</span></code>(nfolds[, clip, verbose])</p></td>
+<td><p>Performs cross-fitting to fit the propensity scores.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><strong>compute_oos_r2</strong></p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="dualbounds.delta.DeltaDualBounds.compute_final_bounds">
+<span class="sig-name descname"><span class="pre">compute_final_bounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">aipw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/dualbounds/delta.html#DeltaDualBounds.compute_final_bounds"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dualbounds.delta.DeltaDualBounds.compute_final_bounds" title="Link to this definition"></a></dt>
+<dd><p>Computes final bounds based on (A)IPW summands,
+using the delta method or the bootstrap.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>aipw</strong><span class="classifier">bool</span></dt><dd><p>If True, uses AIPW estimation.</p>
+</dd>
+<dt><strong>alpha</strong><span class="classifier">float</span></dt><dd><p>Nominal level.</p>
+</dd>
+<dt><strong>B</strong><span class="classifier">int</span></dt><dd><p>Number of bootstrap replications. Default: 1000.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 </section>
