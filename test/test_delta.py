@@ -33,7 +33,7 @@ class TestDeltaDualBounds(unittest.TestCase):
 			W=data['W'],
 			pis=data['pis'],
 		)
-		deltadb.compute_dual_bounds()
+		deltadb.fit().summary()
 		# Analytical variant
 		vdb = db.varite.VarITEDualBounds(
 			X=data['X'],
@@ -41,11 +41,11 @@ class TestDeltaDualBounds(unittest.TestCase):
 			W=data['W'],
 			pis=data['pis'],
 		)
-		vdb.compute_dual_bounds(
+		vdb.fit(
 			y0_dists=deltadb.y0_dists,
 			y1_dists=deltadb.y1_dists,
 			suppress_warning=True,
-		)
+		).summary()
 		for out, expected, name in zip(
 			[deltadb.estimates, deltadb.cis],
 			[vdb.estimates, vdb.cis],

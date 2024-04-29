@@ -38,6 +38,7 @@ setuptools.setup(
         "numpy>=1.17.4",
         "scipy>=1.12.0",
         "scikit-learn>=1.4.1",
+        "pandas",
         "POT",
         "cvxpy",
         "tqdm",

@@ -5,6 +5,7 @@ import ot
 from scipy import stats
 from . import utilities, dist_reg, interpolation
 from .utilities import BatchedCategorical
+import pandas as pd
 # typing
 from scipy.stats._distn_infrastructure import rv_generic
 import sklearn.base
@@ -149,9 +150,7 @@ class DualBounds:
 		)
 
 		# Compute dual bounds and observe output
-		dbnd.compute_dual_bounds(
-			alpha=0.05 # nominal level
-		)
+		dbnd.fit(alpha=0.05 # nominal level).summary()
 	"""
 	def __init__(
 		self, 
@@ -817,26 +816,28 @@ class DualBounds:
 				model=self.Y_model,
 				verbose=verbose,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = y_out
+			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = y_out
 		elif not suppress_warning:
 			warnings.warn(CROSSFIT_WARNING)
 
 		return self.y0_dists, self.y1_dists
 
-	def compute_oos_r2(self):
-		if not isinstance(self.oos_preds, list):
-			raise NotImplementedError("Only implemented for settings where self.oos_preds is a list of dists")
+	def _compute_oos_resids(self):
+		if not isinstance(self.oos_dist_preds, list):
+			raise NotImplementedError("Only implemented for settings where self.oos_dist_preds is a list of dists")
 		starts, ends = dist_reg.create_folds(
 			n=self.n,
-			nfolds=len(self.oos_preds)
+			nfolds=len(self.oos_dist_preds)
 		)
 		self.oos_resids = np.zeros(self.n)
-		for start, end, oos_preds in zip(starts, ends, self.oos_preds):
-			self.oos_resids[start:end] = self.y[start:end] - oos_preds.mean()
-		return 1 - np.mean(self.oos_resids**2) / np.std(self.y)**2
+		self.oos_preds = np.zeros(self.n)
+		for start, end, oos_dist_preds in zip(starts, ends, self.oos_dist_preds):
+			self.oos_preds[start:end] = oos_dist_preds.mean()
+			self.oos_resids[start:end] = self.y[start:end] - self.oos_preds[start:end]
+		return self.oos_resids
 
 
-	def compute_dual_bounds(
+	def fit(
 		self,
 		nfolds: int = 5,
 		aipw: bool = True,
@@ -881,12 +882,7 @@ class DualBounds:
 
 		Returns
 		-------
-		estimates : np.array
-			2-length array, estimates of lower/upper partial ident. bound
-		ses : np.array
-			Standard errors of ests
-		cis : np.array
-			Confidence bounds based on ests and ses. 
+		self : object
 		"""
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
@@ -902,7 +898,84 @@ class DualBounds:
 			**solve_kwargs,
 		)
 		# compute dual bounds
-		return self.compute_final_bounds(aipw=aipw, alpha=alpha)
+		self.alpha = alpha
+		self.compute_final_bounds(aipw=aipw, alpha=alpha)
+		return self
+
+	# def _plug_in_results(self):
+	# 	pests, pses, pcis = utilities.compute_est_bounds(
+	# 		summands=self.objvals,
+	# 		alpha=self.alpha
+	# 	)
+	# 	return pd.DataFrame(
+	# 		np.stack(
+	# 			[pests, pses, pcis], 
+	# 			axis=0
+	# 		),
+	# 		index=['Estimate', 'SE', 'Conf. Int.'],
+	# 		columns=['Lower', 'Upper']
+	# 	)
+
+	def results(self, minval=-np.inf, maxval=np.inf):
+		"""
+		Produces a dataframe of key inferential results.
+
+		Parameters
+		----------
+		minval : float
+			Analytical lower bound on estimand used to clip results. 
+			Defaults to -np.inf.
+		maxval : float
+			Analytical upper bound on estimand used to clip results.
+			Defaults to np.inf.
+		"""
+		self.results_ = pd.DataFrame(
+			np.stack(
+				[
+					np.clip(self.estimates, minval, maxval), 
+					self.ses,
+					np.clip(self.cis, minval, maxval),
+				], 
+				axis=0
+			),
+			index=['Estimate', 'SE', 'Conf. Int.'],
+			columns=['Lower', 'Upper']
+		)
+		return self.results_
+
+	def summary(self, minval=-np.inf, maxval=np.inf):
+		"""
+		Prints a summary of main results from the class.
+
+		Parameters
+		----------
+		minval : float
+			Analytical lower bound on estimand used to clip results. 
+			Defaults to -np.inf.
+		maxval : float
+			Analytical upper bound on estimand used to clip results.
+			Defaults to np.inf.
+		"""
+		print("___________________Inference_____________________")
+		print(self.results(minval=minval, maxval=maxval))
+		print()
+		print("_________________Outcome model___________________")
+		self._compute_oos_resids()
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.y, haty=self.oos_preds
+		)
+		print(sumstats)
+		print()
+		print("_________________Treatment model_________________")
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.W, haty=self.pis
+		)
+		print(sumstats)
+		print()
+		# print("-----------Nonrobust plug-in bounds-----------")
+		# print(self._plug_in_results())
+		# print()
+
 
 def plug_in_no_covariates(
 	y, W, f, pis=None, B=0, verbose=True, alpha=0.1, max_nvals=1000):

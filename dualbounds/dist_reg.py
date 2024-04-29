@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import pandas as pd
 import cvxpy as cp
 from scipy import stats
 import sklearn.linear_model as lm
@@ -56,6 +57,58 @@ def create_folds(n, nfolds):
 	starts = splits[0:-1]
 	ends = splits[1:]
 	return starts, ends
+
+def _evaluate_model_predictions(y, haty, tol=1e-9):
+	# Preliminaries
+	n = len(y)
+	resids = y - haty
+	ybar_loo = (n * y.mean() - y) / (n-1)
+	resids_null = y - ybar_loo
+	# RMSE calculations
+	rmse = np.sqrt(np.mean(resids**2))
+	rmse_null = np.sqrt(np.mean(resids_null**2))
+	oos_r2 = 1 - rmse**2 / rmse_null**2
+	# Accuracy/likelihood/MAE calculations
+	if set(list(np.unique(y))) == set([0,1]):
+		y = y.astype(int)
+		# accuracy
+		haty_round = np.round(np.clip(haty, 0, 1)).astype(int)
+		accuracy = (haty_round == y).astype(float)
+		accuracy[haty == 0.5] = 0.5
+		accuracy = np.mean(accuracy)
+		# null model accuracy
+		null_accuracy = (np.round(ybar_loo).astype(int) == y).astype(float)
+		null_accuracy[ybar_loo == 0.5] = 0.5
+		null_accuracy = np.mean(null_accuracy)
+		# likelihood
+		haty = np.clip(haty, tol, 1-tol)
+		lls = np.log(haty) * y + np.log(1-haty) * (1 - y)
+		ybar_loo = np.clip(ybar_loo, tol, 1-tol)
+		null_lls = np.log(ybar_loo) * y + np.log(1-ybar_loo) * (1-y)
+		# take geometric mean
+		likelihood_geom = np.exp(lls.mean())
+		null_likelihood_geom = np.exp(null_lls.mean())
+		return pd.DataFrame(
+			np.array([
+				[oos_r2, 0],
+				[accuracy, null_accuracy],
+				[likelihood_geom, null_likelihood_geom]
+			]),
+			index=['Out-of-sample R^2', 'Accuracy', 'Likelihood (geom. mean)'],
+			columns=['Model', 'No covariates'],
+		)
+	else:   
+		mae = np.mean(np.abs(resids))
+		mae_null = np.mean(np.abs(resids_null))
+		return pd.DataFrame(
+			np.array([
+				[oos_r2, 0],
+				[rmse, rmse_null],
+				[mae, mae_null]
+			]),
+			index=['Out-of-sample R^2', 'RMSE', 'MAE'],
+			columns=['Model', 'No covariates'],
+		)
 
 def ridge_loo_resids(
 	features, y, ridge_cv_model

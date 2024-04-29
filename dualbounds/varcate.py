@@ -129,7 +129,7 @@ class VarCATEDualBounds(generic.DualBounds):
 		self.sy0 = self.sy0 / (1 - self.pis) + self.mu0
 		# 6. AIPW terms for h(X)^2
 		self.shx2 = self.cates**2
-		self.estimate, self.se = varcate_delta_method_se(
+		estimate, se = varcate_delta_method_se(
 			shxy1=self.shxy1, 
 			shxy0=self.shxy0, 
 			shx=self.shx, 
@@ -138,9 +138,7 @@ class VarCATEDualBounds(generic.DualBounds):
 			shx2=self.shx2,
 		)
 		scale = stats.norm.ppf(1-alpha)
-		self.lower_ci = self.estimate - scale * self.se
-		return dict(
-			estimate=self.estimate,
-			se=self.se,
-			lower_ci=self.lower_ci
-		)
+		lower_ci = estimate - scale * se
+		self.estimates = np.array([estimate, np.nan])
+		self.ses = np.array([se, np.nan])
+		self.cis = np.array([lower_ci, np.nan])

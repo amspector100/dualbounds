@@ -71,7 +71,7 @@ class TestMultiplierBootstrap(unittest.TestCase):
 				Y_model=Y_model,
 				f=lambda y0, y1, x: (y1 < y0).astype(float) 
 			)
-			gdb.compute_dual_bounds(nfolds=2)
+			gdb.fit(nfolds=2)
 			db_objects.append(gdb)
 
 		# Run mult bootstrap

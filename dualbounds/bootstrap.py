@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy import stats
 from .utilities import vrange
 from .generic import DualBounds
@@ -151,7 +152,8 @@ def dualbound_multiplier_bootstrap(
 	# Return
 	estimates = np.array([lower_est, upper_est])
 	cis = np.array([lower_ci, upper_ci])
-	return dict(
-		estimates=estimates,
-		cis=cis,
+	return pd.DataFrame(
+		np.stack([estimates, cis], axis=0),
+		index=['Estimate', 'Conf. Int'],
+		columns=['Lower', 'Upper'],
 	)
