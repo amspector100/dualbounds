@@ -1,10 +1,7 @@
-API Reference
-=============
-
 Generic DualBounds
 ==================
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/generic/
    :template: autosummary/class.rst
 
    ~dualbounds.generic.DualBounds
@@ -16,7 +13,7 @@ Generic DualBounds
 Bootstrap methods
 =================
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/bootstrap/
    :template:
 
    ~dualbounds.bootstrap.dualbound_multiplier_bootstrap
@@ -25,7 +22,7 @@ Bootstrap methods
 Lee bounds
 ==========
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/lee/
    :template: autosummary/class.rst
 
    ~dualbounds.lee.LeeDualBounds
@@ -38,7 +35,7 @@ Lee bounds
 Variance bounds
 ===============
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/varbounds/
    :template: autosummary/class.rst
 
    ~dualbounds.varite.VarITEDualBounds
@@ -47,10 +44,20 @@ Variance bounds
 Utility functions
 =================
 
+Synthetic data generation
+-------------------------
+.. autosummary::
+   :toctree: generated/gen_data/
+   
+   :template:
+   ~dualbounds.gen_data.gen_regression_data
+   ~dualbounds.gen_data.gen_lee_bound_data
+
+
 Interpolation
 -------------
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/interp/
    
    :template:
    ~dualbounds.interpolation.adaptive_interpolate
@@ -60,7 +67,7 @@ Interpolation
 Miscallaneous
 -------------
 .. autosummary::
-   :toctree: generated/
+   :toctree: generated/misc/
    :template: autosummary/class.rst
 
    ~dualbounds.utilities.BatchedCategorical

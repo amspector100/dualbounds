@@ -47,9 +47,9 @@ def gen_regression_data(
 	eps_dist='gaussian',
 	heterosked='constant',
 	tauv=1, # Var(Y(1) | X ) / Var(Y(0) | X)
-	r2=0,
+	r2=0.95,
 	interactions=True,
-	tau=0,
+	tau=3,
 	betaW_norm=0,
 	covmethod='identity',
 	dgp_seed=1,

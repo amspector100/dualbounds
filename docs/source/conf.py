@@ -14,13 +14,11 @@ author = 'Asher Spector'
 # Import the right package!
 import sys
 import os
-sys.path.insert(0, os.path.abspath('../'))
+import sphinx_rtd_theme
 sys.path.insert(0, os.path.abspath('../../'))
-
 
 # The full version, including alpha/beta/rc tags
 import dualbounds
-# for autodoc
 release = dualbounds.__version__
 version = release
 
@@ -67,14 +65,14 @@ exclude_patterns = ['_build', '**.ipynb_checkpoints']
 
 # Theme
 html_theme = 'sphinx_immaterial'
-# Sphinx Immaterial theme option
-shtml_theme_options = {
+# Sphinx Immaterial theme options
+html_theme_options = {
     # "icon": {
     #     "repo": "fontawesome/brands/github",
     # },
     # "site_url": "https://galois.readthedocs.io/",
     "repo_url": "https://github.com/amspector100/dualbounds",
-    "repo_name": "dualbounds",
+    "repo_name": "amspector100/dualbounds",
     # "social": [
     #     {
     #         "icon": "fontawesome/brands/github",
@@ -90,7 +88,7 @@ shtml_theme_options = {
     #     },
     # ],
     "edit_uri": "",
-    "globaltoc_collapse": True,
+    "globaltoc_collapse": False,
     "features": [
         # "navigation.expand",
         "navigation.tabs",
@@ -101,35 +99,30 @@ shtml_theme_options = {
         # "header.autohide",
         "navigation.top",
         "navigation.tracking",
-        "navigation.prune",
         "toc.follow",
-        ## This is an important one to think about
-        #"toc.integrate",
-        # "toc.sticky",
+        "toc.sticky",
         "content.tabs.link",
         "announce.dismiss",
     ],
-    "palette": { "primary": "blue" }
-    # "palette": [
-    #     {
-    #         "media": "(prefers-color-scheme: light)",
-    #         "scheme": "default",
-    #         "toggle": {
-    #             "icon": "material/weather-night",
-    #             "name": "Switch to dark mode",
-    #         },
-    #     },
-    #     {
-    #         "media": "(prefers-color-scheme: dark)",
-    #         "scheme": "slate",
-    #         "toggle": {
-    #             "icon": "material/weather-sunny",
-    #             "name": "Switch to light mode",
-    #         },
-    #     },
-    # ],
-    # "version_dropdown": True,
-    # "version_json": "../versions.json",
+    #"palette": { "primary": "blue" },
+    "palette": [
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "toggle": {
+                "icon": "material/weather-night",
+                "name": "Switch to dark mode",
+            },
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "toggle": {
+                "icon": "material/weather-sunny",
+                "name": "Switch to light mode",
+            },
+        },
+    ],
 }
 
 html_last_updated_fmt = ""
@@ -137,6 +130,4 @@ html_use_index = True
 html_domain_indices = True
 html_logo = "images/smalllogo.svg"
 html_favicon = "images/favicon.svg"
-
-python_module_names_to_strip_from_xrefs = ["dualbounds"]
 html_static_path = ['_static']

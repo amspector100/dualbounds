@@ -28,10 +28,15 @@ Bibtex entry::
 
 
 .. toctree::
-   :caption: Getting started
+   :caption: Installation
    :hidden:
 
    installation.rst
+
+.. toctree::
+   :caption: Quickstart
+   :hidden:
+
    quickstart.ipynb
 
 
@@ -46,7 +51,12 @@ Bibtex entry::
    :hidden:
 
    apiref.rst
-   api_bootstrap.rst
+
+.. toctree::
+   :caption: arXiv
+   :hidden:
+   
+   https://arxiv.org/abs/2310.08115
 
 
 Index
