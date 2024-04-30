@@ -147,6 +147,8 @@ def apply_pool(func, constant_inputs={}, num_processes=1, **kwargs):
 
 def compute_est_bounds(summands, alpha=0.05):
 	"""
+	Helper function to compute confidence intervals.
+
 	Parameters
 	----------
 	summands : np.array
@@ -233,6 +235,19 @@ class BatchedCategorical:
 			flags = self.cumprobs[i].reshape(self.nvals, 1) >= q[:, i]
 			qvals[:, i] = self.vals[i][np.argmax(flags, axis=0)]
 		return qvals
+
+	def rvs(self):
+		"""
+		Returns
+		-------
+		y : array
+			n-length array of a single RV drawn from each categorical.
+		"""
+		u = np.random.uniform(size=(self.n, 1))
+		inds = (u < self.cumprobs).argmax(axis=1)
+		return self.vals[(np.arange(self.n), inds)]
+
+
 
 def _convert_to_cat(bern_dist, n):
 	"""
@@ -328,6 +343,7 @@ def adjust_support_size(
 			vals[i], probs[i], new_nvals, ymin=ymin, ymax=ymax,
 		)
 	return new_vals, new_probs
+
 def weighted_quantile(values, weights, quantiles, old_style=True):
 	"""
 	Very close to numpy.percentile, but supports weights.

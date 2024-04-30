@@ -1,5 +1,5 @@
-from . import bootstrap, dist_reg, gen_data, lee, utilities, varcate, varite
+from . import bootstrap, delta, dist_reg, gen_data, generic, lee, utilities, varcate, varite
 
 name = 'dualbounds'
 
-__version__ = "0.2.0"
+__version__ = "1.0.0"

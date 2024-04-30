@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dualbounds.generic &mdash; dualbounds 0.2.0 documentation</title>
+  <title>dualbounds.generic &mdash; dualbounds 0.2.1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
@@ -15,7 +15,7 @@
   
         <script src="../../_static/jquery.js?v=5d32c60e"></script>
         <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
+        <script src="../../_static/documentation_options.js?v=37f418d5"></script>
         <script src="../../_static/doctools.js?v=888ff710"></script>
         <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
@@ -36,7 +36,7 @@
             dualbounds
           </a>
               <div class="version">
-                0.2.0
+                0.2.1
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -689,16 +689,6 @@
 				<span class="p">)</span></div>
 
 
-		<span class="c1"># # Compute realized dual variables</span>
-		<span class="c1"># self._compute_realized_dual_variables(</span>
-		<span class="c1"># 	y=self.y, </span>
-		<span class="c1"># 	y0_min=y0_min, </span>
-		<span class="c1"># 	y0_max=y0_max,</span>
-		<span class="c1"># 	y1_min=y1_min,</span>
-		<span class="c1"># 	y1_max=y1_max,</span>
-		<span class="c1"># 	**kwargs</span>
-		<span class="c1"># )</span>
-
 	<span class="k">def</span> <span class="nf">_interpolate_and_ensure_feas</span><span class="p">(</span>
 		<span class="bp">self</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">lower</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">y0_min</span><span class="p">,</span> <span class="n">y1_min</span><span class="p">,</span> <span class="n">y0_max</span><span class="p">,</span> <span class="n">y1_max</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
 	<span class="p">):</span>	
@@ -761,26 +751,6 @@
 					<span class="n">y1_max</span><span class="o">=</span><span class="n">y1_max</span><span class="p">,</span>
 					<span class="o">**</span><span class="n">kwargs</span>
 				<span class="p">)</span>
-				<span class="c1"># nu0x = self.nu0s[1-lower, i]</span>
-				<span class="c1"># nu1x = self.nu1s[1-lower, i]</span>
-				<span class="c1"># if not self.discrete:</span>
-				<span class="c1"># 	# Ensure feasibility</span>
-				<span class="c1"># 	y0v, nu0adj, y1v, nu1adj, odx = self._ensure_feasibility(</span>
-				<span class="c1"># 		i=i, nu0=nu0x, nu1=nu1x, lower=lower, **kwargs</span>
-				<span class="c1"># 	)</span>
-				<span class="c1"># 	self.objdiffs[1-lower, i] = odx</span>
-				<span class="c1"># 	# interpolate to find realized values </span>
-				<span class="c1"># 	self.hatnu0s[1 - lower, i] = self.interp_fn(</span>
-				<span class="c1"># 		x=y0v, y=nu0adj, newx=y[i],</span>
-				<span class="c1"># 	)[0]</span>
-				<span class="c1"># 	self.hatnu1s[1 - lower, i] = self.interp_fn(</span>
-				<span class="c1"># 		x=y1v, y=nu1adj, newx=y[i],</span>
-				<span class="c1"># 	)[0]</span>
-				<span class="c1"># else:</span>
-				<span class="c1"># 	j0 = np.where(self.y0_vals[i] == y[i])[0][0]</span>
-				<span class="c1"># 	j1 = np.where(self.y1_vals[i] == y[i])[0][0]</span>
-				<span class="c1"># 	self.hatnu0s[1 - lower, i] = nu0x[j0]</span>
-				<span class="c1"># 	self.hatnu1s[1 - lower, i] = nu1x[j1]</span>
 
 	<span class="k">def</span> <span class="nf">_compute_ipw_summands</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">		</span><span class="sd">&quot;&quot;&quot;</span>

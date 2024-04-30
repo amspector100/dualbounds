@@ -331,7 +331,7 @@ class TestDualLeeBounds(unittest.TestCase):
 				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=pis,
 				Y_model=Y_model, S_model=S_model, W_model=W_model,
 			)
-			ldb.compute_dual_bounds(nfolds=3)
+			ldb.fit(nfolds=3).summary()
 			# Test y-model is correct
 			Ym = ldb.model_fits[0].model
 			Y_exp = db.dist_reg.parse_model_type(Y_model, discrete=False)
@@ -379,12 +379,12 @@ class TestDualLeeBounds(unittest.TestCase):
 			ldb_oracle = lee.LeeDualBounds(
 				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
-			est_oracle = ldb_oracle.compute_dual_bounds(**oracle_args, suppress_warning=True)['estimates']
+			est_oracle = ldb_oracle.fit(**oracle_args, suppress_warning=True).estimates
 			## Actual dual bounds
 			ldb = lee.LeeDualBounds(
 				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
 			)
-			est_actual = ldb.compute_dual_bounds(nfolds=3)['estimates']
+			est_actual = ldb.fit(nfolds=3).estimates
 			for est, name in zip([est_oracle, est_actual], ['Oracle', 'Dual']):
 				np.testing.assert_array_almost_equal(
 					est,

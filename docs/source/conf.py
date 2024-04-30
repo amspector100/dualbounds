@@ -30,8 +30,10 @@ version = release
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx_automodapi.automodapi',
-    'numpydoc',
+    'sphinx.ext.autosummary',
+    #'sphinx_automodapi.automodapi',
+    #'numpydoc',
+    'sphinx.ext.napoleon',
     'nbsphinx',
     'sphinx.ext.doctest',
     'sphinx.ext.todo',
@@ -39,8 +41,14 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx_immaterial',
+    # this conflicts with nbsphinx
+    #"sphinx_immaterial.apidoc.python.apigen",
     #'sphinx_multiversion',
 ]
+
+# autosummary generates stub articles for each class
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -55,9 +63,71 @@ exclude_patterns = ['_build', '**.ipynb_checkpoints']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-## Change to Furo, sphinx_rtd_theme, or pydata_sphinx_theme?
-html_theme = 'sphinx_rtd_theme'
+# Theme
+html_theme = 'sphinx_immaterial'
+# Sphinx Immaterial theme options
 html_theme_options = {
-    'display_version':True,
+    # "icon": {
+    #     "repo": "fontawesome/brands/github",
+    # },
+    # "site_url": "https://galois.readthedocs.io/",
+    "repo_url": "https://github.com/amspector100/dualbounds",
+    "repo_name": "amspector100/dualbounds",
+    # "social": [
+    #     {
+    #         "icon": "fontawesome/brands/github",
+    #         "link": "https://github.com/mhostetter/galois",
+    #     },
+    #     {
+    #         "icon": "fontawesome/brands/python",
+    #         "link": "https://pypi.org/project/galois/",
+    #     },
+    #     {
+    #         "icon": "fontawesome/brands/twitter",
+    #         "link": "https://twitter.com/galois_py",
+    #     },
+    # ],
+    "edit_uri": "",
+    "globaltoc_collapse": False,
+    "features": [
+        # "navigation.expand",
+        "navigation.tabs",
+        "navigation.tabs.sticky",
+        # "toc.integrate",
+        # "navigation.sections",
+        # "navigation.instant",
+        # "header.autohide",
+        "navigation.top",
+        "navigation.tracking",
+        "toc.follow",
+        "toc.sticky",
+        "content.tabs.link",
+        "announce.dismiss",
+    ],
+    #"palette": { "primary": "blue" },
+    "palette": [
+        {
+            "media": "(prefers-color-scheme: light)",
+            "scheme": "default",
+            "toggle": {
+                "icon": "material/weather-night",
+                "name": "Switch to dark mode",
+            },
+        },
+        {
+            "media": "(prefers-color-scheme: dark)",
+            "scheme": "slate",
+            "toggle": {
+                "icon": "material/weather-sunny",
+                "name": "Switch to light mode",
+            },
+        },
+    ],
 }
+
+html_last_updated_fmt = ""
+html_use_index = True
+html_domain_indices = True
+html_logo = "images/smalllogo.svg"
+html_favicon = "images/favicon.svg"
 html_static_path = ['_static']

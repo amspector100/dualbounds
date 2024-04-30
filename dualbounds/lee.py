@@ -539,7 +539,7 @@ class LeeDualBounds(generic.DualBounds):
 				model=self.Y_model,
 				verbose=verbose,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits, self.oos_preds = yout
+			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = yout
 		elif not suppress_warning:
 			warnings.warn(generic.CROSSFIT_WARNING)
 
@@ -547,7 +547,7 @@ class LeeDualBounds(generic.DualBounds):
 		return self.s0_probs, self.s1_probs, self.y0_dists, self.y1_dists
 
 
-	def compute_dual_bounds(
+	def fit(
 		self,
 		nfolds=5,
 		alpha=0.05,
@@ -590,6 +590,10 @@ class LeeDualBounds(generic.DualBounds):
 		solve_kwargs : dict
 			kwargs to self.compute_dual_variables(), 
 			e.g., ``verbose``, ``nvals``, ``grid_size``
+
+		Returns
+		-------
+		self : object
 		"""
 		# Save data
 		self.s0_probs, self.s1_probs = s0_probs, s1_probs
@@ -616,8 +620,8 @@ class LeeDualBounds(generic.DualBounds):
 		)
 
 		# compute dual bounds
-		return self.compute_final_bounds(aipw=aipw, alpha=alpha)
-
+		self.compute_final_bounds(aipw=aipw, alpha=alpha)
+		return self
 
 	def compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
@@ -628,6 +632,8 @@ class LeeDualBounds(generic.DualBounds):
 		summands = self.aipw_summands if aipw else self.ipw_summands
 		self._compute_cond_means()
 		self.y0s0_cond_means = self.mu0 * self.s0_probs
+		self.s_probs = self.s0_probs.copy()
+		self.s_probs[self.W == 1] = self.s1_probs[self.W == 1]
 		ests = []
 		ses = []
 		bounds = []
@@ -662,3 +668,39 @@ class LeeDualBounds(generic.DualBounds):
 			ses=self.ses,
 			cis=self.cis
 		)
+
+	def summary(self, minval=-np.inf, maxval=np.inf):
+		"""
+		Prints a summary of main results from the class.
+
+		Parameters
+		----------
+		minval : float
+			Analytical lower bound on estimand used to clip results. 
+			Defaults to -np.inf.
+		maxval : float
+			Analytical upper bound on estimand used to clip results.
+			Defaults to np.inf.
+		"""
+		print("___________________Inference_____________________")
+		print(self.results(minval=minval, maxval=maxval))
+		print()
+		print("________________Selection model__________________")
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.S, haty=self.s_probs
+		)
+		print(sumstats)
+		print()
+		print("_________________Outcome model___________________")
+		self._compute_oos_resids()
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.y[self.S == 1], haty=self.oos_preds[self.S == 1],
+		)
+		print(sumstats)
+		print()
+		print("________________Treatment model__________________")
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.W, haty=self.pis
+		)
+		print(sumstats)
+		print()

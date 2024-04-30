@@ -37,7 +37,7 @@ class TestVarITE(unittest.TestCase):
 			vdb = db.varite.VarITEDualBounds(
 				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
-			ests = vdb.compute_dual_bounds(nfolds=3)['estimates']
+			ests = vdb.fit(nfolds=3).estimates
 
 			# test accuracy
 			np.testing.assert_array_almost_equal(
@@ -66,7 +66,8 @@ class TestVarITE(unittest.TestCase):
 			vdb = db.varite.VarITEDualBounds(
 				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
-			output = vdb.compute_dual_bounds(nfolds=3)
+			vdb.fit(nfolds=3).summary()
+
 
 class TestVarCATE(unittest.TestCase):
 
@@ -93,7 +94,7 @@ class TestVarCATE(unittest.TestCase):
 		vdb = db.varcate.VarCATEDualBounds(
 			X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 		)
-		vdb.compute_dual_bounds(nfolds=3)
+		vdb.fit(nfolds=3).summary()
 
 
 	def test_varcate_consistency(self):
@@ -110,16 +111,16 @@ class TestVarCATE(unittest.TestCase):
 			vdb_oracle = db.varcate.VarCATEDualBounds(
 				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 			)
-			est_oracle = vdb_oracle.compute_dual_bounds(
+			est_oracle = vdb_oracle.fit(
 				y0_dists=data['y0_dists'], y1_dists=data['y1_dists'], 
 				suppress_warning=True,
-			)['estimate']
+			).estimates[0]
 			## Actual
 			vdb = db.varcate.VarCATEDualBounds(
 				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
 				Y_model=db.dist_reg.CtsDistReg(eps_dist='gaussian')
 			)
-			est_actual = vdb.compute_dual_bounds(nfolds=3)['estimate']
+			est_actual = vdb.fit(nfolds=3).estimates[0]
 			for est, name in zip([est_oracle, est_actual], ['oracle', 'est']):
 				np.testing.assert_array_almost_equal(
 					est,

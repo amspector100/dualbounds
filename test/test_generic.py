@@ -170,7 +170,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				heterosked_model=sigma_model,
 				eps_dist=eps_dist,
 			)
-			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
+			gdb.fit(nfolds=3, alpha=0.05).summary()
 			# Check the correct class for the main model
 			Ym = gdb.model_fits[0].model
 			self.assertTrue(
@@ -208,7 +208,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				y=data['y'], pis=data['pis'], 
 				Y_model=model_type,
 			)
-			gdb.compute_dual_bounds(nfolds=3, alpha=0.05)
+			gdb.fit(nfolds=3, alpha=0.05).summary()
 			# Check the correct model type
 			Ym = gdb.model_fits[0].model
 			self.assertTrue(
@@ -237,7 +237,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				Y_model='ridge',
 				W_model=W_model,
 			)
-			gdb.compute_dual_bounds(nfolds=3)
+			gdb.fit(nfolds=3).summary()
 			# Check the correct class
 			Wm = gdb.W_model_fits[0]
 			self.assertTrue(
