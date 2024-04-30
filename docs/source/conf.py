@@ -14,11 +14,13 @@ author = 'Asher Spector'
 # Import the right package!
 import sys
 import os
-import sphinx_rtd_theme
+sys.path.insert(0, os.path.abspath('../'))
 sys.path.insert(0, os.path.abspath('../../'))
+
 
 # The full version, including alpha/beta/rc tags
 import dualbounds
+# for autodoc
 release = dualbounds.__version__
 version = release
 
@@ -30,8 +32,10 @@ version = release
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx_automodapi.automodapi',
-    'numpydoc',
+    'sphinx.ext.autosummary',
+    #'sphinx_automodapi.automodapi',
+    #'numpydoc',
+    'sphinx.ext.napoleon',
     'nbsphinx',
     'sphinx.ext.doctest',
     'sphinx.ext.todo',
@@ -39,8 +43,14 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'sphinx_immaterial',
+    # this conflicts with nbsphinx
+    #"sphinx_immaterial.apidoc.python.apigen",
     #'sphinx_multiversion',
 ]
+
+# autosummary generates stub articles for each class
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -55,9 +65,78 @@ exclude_patterns = ['_build', '**.ipynb_checkpoints']
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-## Change to Furo, sphinx_rtd_theme, or pydata_sphinx_theme?
-html_theme = 'sphinx_rtd_theme'
-html_theme_options = {
-    'display_version':True,
+# Theme
+html_theme = 'sphinx_immaterial'
+# Sphinx Immaterial theme option
+shtml_theme_options = {
+    # "icon": {
+    #     "repo": "fontawesome/brands/github",
+    # },
+    # "site_url": "https://galois.readthedocs.io/",
+    "repo_url": "https://github.com/amspector100/dualbounds",
+    "repo_name": "dualbounds",
+    # "social": [
+    #     {
+    #         "icon": "fontawesome/brands/github",
+    #         "link": "https://github.com/mhostetter/galois",
+    #     },
+    #     {
+    #         "icon": "fontawesome/brands/python",
+    #         "link": "https://pypi.org/project/galois/",
+    #     },
+    #     {
+    #         "icon": "fontawesome/brands/twitter",
+    #         "link": "https://twitter.com/galois_py",
+    #     },
+    # ],
+    "edit_uri": "",
+    "globaltoc_collapse": True,
+    "features": [
+        # "navigation.expand",
+        "navigation.tabs",
+        "navigation.tabs.sticky",
+        # "toc.integrate",
+        # "navigation.sections",
+        # "navigation.instant",
+        # "header.autohide",
+        "navigation.top",
+        "navigation.tracking",
+        "navigation.prune",
+        "toc.follow",
+        ## This is an important one to think about
+        #"toc.integrate",
+        # "toc.sticky",
+        "content.tabs.link",
+        "announce.dismiss",
+    ],
+    "palette": { "primary": "blue" }
+    # "palette": [
+    #     {
+    #         "media": "(prefers-color-scheme: light)",
+    #         "scheme": "default",
+    #         "toggle": {
+    #             "icon": "material/weather-night",
+    #             "name": "Switch to dark mode",
+    #         },
+    #     },
+    #     {
+    #         "media": "(prefers-color-scheme: dark)",
+    #         "scheme": "slate",
+    #         "toggle": {
+    #             "icon": "material/weather-sunny",
+    #             "name": "Switch to light mode",
+    #         },
+    #     },
+    # ],
+    # "version_dropdown": True,
+    # "version_json": "../versions.json",
 }
+
+html_last_updated_fmt = ""
+html_use_index = True
+html_domain_indices = True
+html_logo = "images/smalllogo.svg"
+html_favicon = "images/favicon.svg"
+
+python_module_names_to_strip_from_xrefs = ["dualbounds"]
 html_static_path = ['_static']

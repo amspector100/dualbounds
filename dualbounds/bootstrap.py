@@ -5,12 +5,12 @@ from .utilities import vrange
 from .generic import DualBounds
 
 def multiplier_bootstrap(
-	samples, 
-	alpha,
-	B=1000, 
-	maxarrsize=int(1e10),
-	param='max',
-	verbose=False,
+	samples: np.array, 
+	alpha: float,
+	B: int=1000, 
+	maxarrsize: int=int(1e10),
+	param: str='max',
+	verbose: int=False,
 ):
 	"""
 	Computes a lower confidence bound on the max(mu),
@@ -99,7 +99,7 @@ def dualbound_multiplier_bootstrap(
 	aipw: bool=True,
 	alpha: float=0.1,
 	**kwargs,
-) -> dict:
+) -> pd.DataFrame:
 	"""
 	Combines evidence across multiple DualBounds classes
 	using the multiplier bootstrap.

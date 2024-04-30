@@ -2,49 +2,71 @@ API Reference
 =============
 
 Generic DualBounds
-------------------
-.. automodule:: dualbounds.generic
-  :members:
+==================
+.. autosummary::
+   :toctree: generated/
+   :template: autosummary/class.rst
+
+   ~dualbounds.generic.DualBounds
+   ~dualbounds.delta.DeltaDualBounds
+
+   :template:
+   ~dualbounds.generic.plug_in_no_covariates
 
 Bootstrap methods
------------------
-.. automodule:: dualbounds.bootstrap
-  :members:
+=================
+.. autosummary::
+   :toctree: generated/
+   :template:
 
-Generic DeltaDualBounds
------------------------
-.. automodule:: dualbounds.delta
-  :members:
+   ~dualbounds.bootstrap.dualbound_multiplier_bootstrap
+   ~dualbounds.bootstrap.multiplier_bootstrap
 
-Lee Bounds
-----------
-.. automodule:: dualbounds.lee
-  :members:
+Lee bounds
+==========
+.. autosummary::
+   :toctree: generated/
+   :template: autosummary/class.rst
 
-Variance of the CATE
---------------------
-.. automodule:: dualbounds.varcate
-  :members:
+   ~dualbounds.lee.LeeDualBounds
 
-Variance of the ITE
--------------------
-.. automodule:: dualbounds.varite
-  :members:
+   :template:
+   ~dualbounds.lee.lee_bound_no_covariates
+   ~dualbounds.lee.compute_analytical_lee_bound
+   ~dualbounds.lee.compute_cvar
 
-Distributional regression classes
----------------------------------
-.. automodule:: dualbounds.dist_reg
-  :members:
+Variance bounds
+===============
+.. autosummary::
+   :toctree: generated/
+   :template: autosummary/class.rst
 
-Generate synthetic datasets
----------------------------
-.. automodule:: dualbounds.gen_data
-  :members:
+   ~dualbounds.varite.VarITEDualBounds
+   ~dualbounds.varcate.VarCATEDualBounds
 
 Utility functions
------------------
-.. automodule:: dualbounds.utilities
-  :members:
+=================
 
-.. automodule:: dualbounds.interpolation
-  :members:
+Interpolation
+-------------
+.. autosummary::
+   :toctree: generated/
+   
+   :template:
+   ~dualbounds.interpolation.adaptive_interpolate
+   ~dualbounds.interpolation.nn_interpolate
+   ~dualbounds.interpolation.linear_interpolate
+
+Miscallaneous
+-------------
+.. autosummary::
+   :toctree: generated/
+   :template: autosummary/class.rst
+
+   ~dualbounds.utilities.BatchedCategorical
+
+   :template:
+   ~dualbounds.utilities.compute_est_bounds
+   ~dualbounds.utilities.weighted_quantile
+   ~dualbounds.utilities.adjust_support_size
+   ~dualbounds.utilities.apply_pool_factorial

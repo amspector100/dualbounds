@@ -65,7 +65,7 @@ def compute_analytical_lee_bound(
 
 	E[Y(1) - Y(0) | S(0) = S(1) = 1]
 	
-	Ulike dual bounds, this function is not at all
+	Unlike dual bounds, this function is not at all
 	robust to model misspecification,
 
 	Parameters

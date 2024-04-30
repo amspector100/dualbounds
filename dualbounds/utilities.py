@@ -147,6 +147,8 @@ def apply_pool(func, constant_inputs={}, num_processes=1, **kwargs):
 
 def compute_est_bounds(summands, alpha=0.05):
 	"""
+	Helper function to compute confidence intervals.
+
 	Parameters
 	----------
 	summands : np.array
@@ -341,6 +343,7 @@ def adjust_support_size(
 			vals[i], probs[i], new_nvals, ymin=ymin, ymax=ymax,
 		)
 	return new_vals, new_probs
+
 def weighted_quantile(values, weights, quantiles, old_style=True):
 	"""
 	Very close to numpy.percentile, but supports weights.

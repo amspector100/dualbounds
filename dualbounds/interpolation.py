@@ -35,7 +35,7 @@ def adaptive_interpolate(x, y, newx):
 
 def nn_interpolate(x, y, newx):
 	"""
-	nearest-neighbor interpolation.
+	Nearest-neighbor interpolation.
 
 	Parameters
 	----------
@@ -67,6 +67,8 @@ def nn_interpolate(x, y, newx):
 
 def linear_interpolate(x, y, newx):
 	"""
+	Linear interpolation.
+
 	Parameters
 	----------
 	x : np.array

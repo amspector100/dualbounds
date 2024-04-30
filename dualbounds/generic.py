@@ -79,7 +79,6 @@ def _default_ylims(
 		y1_max = 1.5 * y.max() - y.min() / 2
 	return y0_min, y1_min, y0_max, y1_max
 
-
 class DualBounds:
 	"""
 	Computes dual bounds on E[f(Y(0),Y(1), X)].
@@ -104,10 +103,7 @@ class DualBounds:
 		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
 		Alternatively, a distributional regression class inheriting 
 		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to
-		``Y_model=dist_reg.CtsDistReg(
-			model_type='ridge', heterosked_model=None
-		)``.
+		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
 	W_model : str or sklearn classifier
 		Specifies how to estimate the propensity scores if ``pis`` is
 		not known.  Either a str identifier as above or an sklearn
@@ -604,7 +600,7 @@ class DualBounds:
 
 	def _interpolate_and_ensure_feas(
 		self, yi, lower, i, y0_min, y1_min, y0_max, y1_max, **kwargs
-	):	
+	):  
 		"""
 		This is used in two places:
 		1. _compute_realized_dual_variables
@@ -632,7 +628,7 @@ class DualBounds:
 			j0 = np.where(self.y0_vals[i] == yi)[0][0]
 			j1 = np.where(self.y1_vals[i] == yi)[0][0]
 			self.hatnu0s[1 - lower, i] = nu0x[j0]
-			self.hatnu1s[1 - lower, i] = nu1x[j1]	
+			self.hatnu1s[1 - lower, i] = nu1x[j1]   
 
 
 
@@ -731,7 +727,7 @@ class DualBounds:
 		self.mu1 = np.concatenate([x.mean() for x in y1_dists])
 
 	def fit_propensity_scores(
-		self, nfolds, clip=1e-2, verbose=True,
+		self, nfolds: int, clip: float=1e-2, verbose: bool=True,
 	):
 		"""
 		Performs cross-fitting to fit the propensity scores.
@@ -774,9 +770,9 @@ class DualBounds:
 
 	def cross_fit(
 		self,
-		nfolds=5,
-		suppress_warning=False,
-		verbose=True,
+		nfolds: int=5,
+		suppress_warning: bool=False,
+		verbose: bool=True,
 	):
 		"""
 		Performs cross-fitting to fit the outcome model.
@@ -854,7 +850,7 @@ class DualBounds:
 		and (3) computing final dual bounds.
 
 		Parameters
-		----------	
+		----------  
 		nfolds : int
 			Number of folds to use when cross-fitting. Defaults to 5.
 		alpha : float
@@ -903,20 +899,20 @@ class DualBounds:
 		return self
 
 	# def _plug_in_results(self):
-	# 	pests, pses, pcis = utilities.compute_est_bounds(
-	# 		summands=self.objvals,
-	# 		alpha=self.alpha
-	# 	)
-	# 	return pd.DataFrame(
-	# 		np.stack(
-	# 			[pests, pses, pcis], 
-	# 			axis=0
-	# 		),
-	# 		index=['Estimate', 'SE', 'Conf. Int.'],
-	# 		columns=['Lower', 'Upper']
-	# 	)
+	#   pests, pses, pcis = utilities.compute_est_bounds(
+	#       summands=self.objvals,
+	#       alpha=self.alpha
+	#   )
+	#   return pd.DataFrame(
+	#       np.stack(
+	#           [pests, pses, pcis], 
+	#           axis=0
+	#       ),
+	#       index=['Estimate', 'SE', 'Conf. Int.'],
+	#       columns=['Lower', 'Upper']
+	#   )
 
-	def results(self, minval=-np.inf, maxval=np.inf):
+	def results(self, minval: float=-np.inf, maxval: float=np.inf):
 		"""
 		Produces a dataframe of key inferential results.
 
@@ -943,7 +939,7 @@ class DualBounds:
 		)
 		return self.results_
 
-	def summary(self, minval=-np.inf, maxval=np.inf):
+	def summary(self, minval: float=-np.inf, maxval: float=np.inf):
 		"""
 		Prints a summary of main results from the class.
 
@@ -978,7 +974,15 @@ class DualBounds:
 
 
 def plug_in_no_covariates(
-	y, W, f, pis=None, B=0, verbose=True, alpha=0.1, max_nvals=1000):
+	y: np.array, 
+	W: np.array, 
+	f: np.array, 
+	pis: Optional[np.array]=None,
+	B: int=0,
+	verbose: bool=True,
+	alpha: float=0.05,
+	max_nvals: int=1000,
+):
 	"""
 	Computes plug-in bounds on E[f(Y(0),Y(1))] without using covariates.
 

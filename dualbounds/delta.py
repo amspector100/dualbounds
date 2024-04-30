@@ -8,10 +8,7 @@ from .generic import DualBounds
 
 class DeltaDualBounds(DualBounds):
 	"""
-	Performs inference on
-
-	h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])
-
+	Performs inference on h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])
 	where h is monotone increasing in its first argument.
 	This wraps ``dualbounds.generic.DualBounds`` and applies
 	the bootstrap or delta method. 
