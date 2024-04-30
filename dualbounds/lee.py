@@ -6,10 +6,11 @@ from . import utilities
 from . import dist_reg
 from .utilities import BatchedCategorical
 from . import interpolation, generic
+from typing import Optional
 
-"""
-Helper functions
-"""
+
+### Helper functions ###
+
 def compute_cvar(dists, n, alpha, lower=True, m=1000):
 	"""
 	Computes cvar using quantile approximation with m values.
@@ -65,7 +66,7 @@ def compute_analytical_lee_bound(
 
 	E[Y(1) - Y(0) | S(0) = S(1) = 1]
 	
-	Ulike dual bounds, this function is not at all
+	Unlike dual bounds, this function is not at all
 	robust to model misspecification,
 
 	Parameters
@@ -124,22 +125,26 @@ def compute_analytical_lee_bound(
 	cvars_lower = compute_cvar(y1_dists, n, alpha=alphas, lower=True, m=m)
 	cvars_upper = compute_cvar(y1_dists, n, alpha=1-alphas, lower=False, m=m)
 	y0ms = y0_dists.mean()
-	cond_bounds = np.stack([cvars_lower - y0ms, cvars_upper - y0ms], axis=0)
-	agg_bounds = np.mean(cond_bounds * s0_probs, axis=1) / np.mean(s0_probs)
+	cond_bounds = np.stack([cvars_lower - y0ms, cvars_upper - y0ms], axis=0) # per-X bounds
+	agg_bounds = np.mean(cond_bounds * s0_probs, axis=1) / np.mean(s0_probs) # aggregated bounds
 	return agg_bounds, cond_bounds
 
 def lee_bound_no_covariates(
-	W, S, Y,
+	W, S, y, B=200, alpha=0.05,
 ):
+	"""
+	B : int
+		Number of bootstrap replications for standard error.
+	"""
 	n = len(W)
 	# compute P(S | W)
 	s0_prob = np.array([np.mean(S[W == 0])])
 	s1_prob = np.array([np.mean(S[W == 1])])
 	s1_prob = np.maximum(s0_prob, s1_prob)
 	# compute P(Y(0)) and P(Y(1))
-	y0_vals = np.sort(Y[(W == 0) & (S == 1)])
+	y0_vals = np.sort(y[(W == 0) & (S == 1)])
 	y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
-	y1_vals = np.sort(Y[(W == 1) & (S == 1)])
+	y1_vals = np.sort(y[(W == 1) & (S == 1)])
 	y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
 	args = dict(
 		s0_probs=s0_prob,
@@ -150,8 +155,24 @@ def lee_bound_no_covariates(
 		y1_vals=y1_vals.reshape(1, -1)
 	)
 	# compute lower, upper bounds
-	abnds = compute_analytical_lee_bound(**args)[1][:, 0]
-	return abnds
+	ests = compute_analytical_lee_bound(**args)[1][:, 0]
+	if B > 0:
+		bs_ests = np.zeros((B, 2))
+		for b in range(B):
+			inds = np.random.choice(n, n, replace=True)
+			bs_ests[b] = lee_bound_no_covariates(W[inds], S[inds], y[inds], B=0)
+		bias = bs_ests.mean(axis=0) - ests
+		ses = bs_ests.std(axis=0)
+		cis = ests - bias
+		cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
+		cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
+		return dict(
+			estimates=ests,
+			ses=ses,
+			cis=cis,
+		)
+	else:
+		return ests
 
 def lee_delta_method_se(
 	sbetas, skappas, sgammas
@@ -192,7 +213,7 @@ class LeeDualBounds(generic.DualBounds):
 		(n, p)-shaped array of covariates.
 	W : np.array
 		n-length array of treatment indicators.
-	Y : np.array
+	y : np.array
 		n-length array of outcome measurements
 	pis : np.array
 		n-length array of propensity scores P(W=1 | X). 
@@ -220,9 +241,9 @@ class LeeDualBounds(generic.DualBounds):
 
 	def __init__(
 		self,
-		S,
+		S: np.array,
 		*args, 
-		S_model=None,
+		S_model: Optional[str]=None,
 		**kwargs
 	):
 		self.S = S
@@ -329,6 +350,8 @@ class LeeDualBounds(generic.DualBounds):
 			Includes ymin, ymax, grid_size.
 		"""
 		# Constants for solver
+		if verbose:
+			print("Estimating optimal dual variables.")
 		n = s0_probs.shape[0]
 		self.nvals0 = 2 # because S is binary
 		if self.discrete:
@@ -397,7 +420,7 @@ class LeeDualBounds(generic.DualBounds):
 			# constraints. this provably has no effect compared
 			# to using np.inf, but allows the use of ot instead
 			# of cvxpy, leading to a substantial speedup.
-			max_fval = np.abs(fvals).max() * 1e5
+			max_fval = np.abs(fvals).max() * 1e7
 			# helpful concatenation
 			probs0 = np.array([1 - s0_probs[i], s0_probs[i]])
 			# solve 
@@ -480,8 +503,13 @@ class LeeDualBounds(generic.DualBounds):
 			if self.S_model is None:
 				self.S_model = 'monotone_logistic'
 			self.S_model = generic.get_default_model(
-				Y_model=self.S_model, support=set([0,1]), 
-				discrete=True, monotonicity=True, 
+				Y_model=self.S_model, 
+				# the following args are ignored if S_model already
+				# inherits from dist_reg.DistReg class
+				support=set([0,1]), 
+				discrete=True,
+				monotonicity=True, 
+				how_transform='intercept',
 			)
 			if verbose:
 				print("Cross-fitting the selection model.")

@@ -90,7 +90,7 @@ def cross_fit_predictions(
 	y,
 	S=None,
 	nfolds=2,
-	train_on_selections=False,
+	train_on_selections=True,
 	model=None,
 	model_cls=None, 
 	probs_only=False,
@@ -197,6 +197,7 @@ class DistReg:
 		the underlying model. One of several options:
 
 		- 'identity': does not transform the features
+		- 'intercept': adds an intercept
 		- 'interactions' : interaction terms btwn. the treatment/covariates
 
 		The default is ``interactions``.
@@ -239,6 +240,8 @@ class DistReg:
 		"""
 		if self.how_transform in ['none', 'identity']:
 			return np.concatenate([W.reshape(-1, 1), X],axis=1)
+		elif self.how_transform in ['intercept']:
+			return np.concatenate([W.reshape(-1, 1), np.ones((len(X), 1)), X],axis=1)
 		elif self.how_transform in [
 			'int', 'interaction', 'interactions'
 		]:
@@ -636,7 +639,7 @@ class BinaryDistReg(DistReg):
 		self.model.fit(features, y)
 
 	def predict_proba(
-		self, X: np.array, W: Optional[np.array]=None
+		self, X: np.array, W: Optional[np.array]=None, margin=0.005,
 	):
 		"""
 		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
@@ -656,10 +659,10 @@ class BinaryDistReg(DistReg):
 			p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
 			# enforce monotonicity
 			if self.monotonicity:
-				flags = p0s > p1s
+				flags = p0s > p1s - margin
 				avg = (p0s[flags] + p1s[flags]) / 2
-				p0s[flags] = np.maximum(TOL, avg-TOL)
-				p1s[flags] = np.minimum(1-TOL, avg+TOL)
+				p0s[flags] = np.maximum(TOL, avg-margin)
+				p1s[flags] = np.minimum(1-TOL, avg+margin)
 			return p0s, p1s
 
 	def predict(self, X: np.array, W: Optional[np.array]=None):
@@ -687,10 +690,11 @@ class MonotoneLogisticReg:
 	A logistic regression solver which ensures that beta[0] >= 0.
 	Useful for computing Lee bounds which assume monotonicity.
 	"""
-	def __init__(self):
-		pass
+	def __init__(self, lmda: float=0.001):
+		self.lmda = lmda
 
-	def fit(self, X: np.array, y: np.array, lmda: float=1):
+	def fit(self, X: np.array, y: np.array):
+		# Set up data and losses
 		n, p = X.shape
 		sig1 = X[:, 0].std()
 		zeros = np.zeros(n)
@@ -698,9 +702,10 @@ class MonotoneLogisticReg:
 		X1beta = X @ beta
 		term1 = cp.multiply(y, X1beta)
 		term2 = cp.log_sum_exp(cp.vstack([zeros, X1beta]), axis=0)
-		term3 = lmda * cp.sum(cp.power(beta, 2))
+		term3 = n * self.lmda * cp.sum(cp.power(beta[1:], 2))
+		# Objective and problem
 		obj = cp.Maximize(cp.sum(term1 - term2) - term3)
-		problem = cp.Problem(objective=obj, constraints=[beta[0] >= 0.1 / sig1])
+		problem = cp.Problem(objective=obj, constraints=[beta[0] >= 0])
 		try:
 			problem.solve(solver='ECOS', max_iters=100)
 		except cp.error.SolverError:

@@ -517,6 +517,8 @@ class DualBounds:
 		"""
 		### Key quantities for optimizer
 		# to ensure numerical stability, we add extra quantiles
+		if verbose:
+			print("Estimating optimal dual variables.")
 		if min([nvals0, nvals1]) <= MIN_NVALS:
 			raise ValueError(f"nvals0={nvals0}, nvals1={nvals1} must be larger than {MIN_NVALS}")
 		if self.discrete:
@@ -568,8 +570,6 @@ class DualBounds:
 		self.dxs = np.zeros((2, self.n)) # ignored, only for backward compatability
 		self.objdiffs = np.zeros((2, self.n))
 		# loop through
-		if verbose:
-			print("Estimating optimal dual variables.")
 		for i in utilities.vrange(self.n, verbose=verbose):
 			# set parameter values
 			fx = lambda y0, y1: self.f(y0=y0, y1=y1, x=self.X[i])
