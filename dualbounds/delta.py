@@ -72,6 +72,73 @@ class DeltaDualBounds(DualBounds):
 		#self.h_grad = h_grad
 		super().__init__(*args, **kwargs)
 
+	@classmethod
+	def from_pd(
+		cls,
+		h: callable,
+		z1: callable,
+		z0: callable,
+		*args,
+		**kwargs,
+	):
+		"""
+		Initializes ``DeltaDualBounds`` from a pandas dataframe.
+
+		Parameters
+		----------
+		h : function
+			real-valued function of fval, z0, z1, e.g.,
+			``h = lambda fval, z0, z1 : fval / z0 + z1``.
+		z0 : function
+			potentially vector-valued function of y0, x.
+		z1 : function
+			potentially vector-valued function of y1, x.
+		f : function
+			Function which defines the partially identified estimand.
+			Must be a function of three arguments: y0, y1, x 
+			(in that order). E.g.,
+			``f = lambda y0, y1, x : y0 <= y1``
+		data : pd.DataFrame
+			pd.DataFrame of the data.
+		outcome : str
+			The outcome variable in ``data``.
+		treatment : str
+			The treatment variable in ``data``.
+			Must take at most two values.
+		propensity : str
+			Optional variable in ``data`` which contains the 
+			propensity scores P(treatment | covariates). If 
+			``None``, these are estimated from the data.
+		covariates : list
+			List of covariates in ``data.columns``. If ``None``,
+			uses all columns which are not the outcome/treatment.
+		Y_model : str or dist_reg.DistReg
+			One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
+			Alternatively, a distributional regression class inheriting 
+			from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+			defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
+		W_model : str or sklearn classifier
+			Specifies how to estimate the propensity scores if ``pis`` is
+			not known.  Either a str identifier as above or an sklearn
+			classifier---see the tutorial for examples.
+		discrete : bool
+			If True, treats y as a discrete variable. 
+			Defaults to ``None`` (inferred from the data).
+		support : np.array
+			Optinal support of y, if known.
+			Defaults to ``None`` (inferred from the data).
+		model_kwargs : dict
+			Additional kwargs for the ``DistReg`` outcome model,
+			e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
+		"""
+		return super(DeltaDualBounds, cls).from_pd(
+			h=h,
+			z1=z1,
+			z0=z0,
+			*args,
+			**kwargs,
+		)
+
 	def compute_final_bounds(
 		self, 
 		aipw: bool=True,

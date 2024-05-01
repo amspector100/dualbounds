@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pandas as pd
 import scipy as sp
 from scipy import stats
 import unittest
@@ -21,7 +22,7 @@ class TestDeltaDualBounds(unittest.TestCase):
 
 	def test_deltadb_and_varite(self):
 		""" This tests that DeltaDualBounds and VarITEDualBounds give the same answer. """
-		data = gen_data.gen_regression_data(n=500, p=5, dgp_seed=1, sample_seed=1)
+		data = gen_data.gen_regression_data(n=1000, p=5, dgp_seed=1, sample_seed=1)
 		# Bootstrap variant
 		deltadb  = delta.DeltaDualBounds(
 			h=lambda f, z1, z0: f - (z1-z0)**2,
@@ -52,11 +53,60 @@ class TestDeltaDualBounds(unittest.TestCase):
 			['estimates', 'cis'] 
 		):
 			np.testing.assert_array_almost_equal(
-				3*out,
-				3*expected,
+				out,
+				expected,
 				decimal=1,
 				err_msg=f"VarITEDualBounds and DeltaDualBounds give different {name}"
 			)
+
+	def test_delta_from_pd(self):
+		data = gen_data.gen_regression_data(n=50, p=5, eps_dist='bernoulli', r2=0)
+		df = pd.DataFrame(data['X'])
+		df['outcome'] = data['y']
+		df['pis'] = data['pis']
+		df['treatment'] = data['W']
+
+		# Method 1
+		fn_args = dict(
+			f=lambda y0, y1, x: y1 - y0,
+			h=lambda fval, z1, z0: fval,
+			z0=lambda y0, x: y0,
+			z1=lambda y1, x: y1, 
+		)
+		ddb1 = db.delta.DeltaDualBounds.from_pd(
+			**fn_args,
+			data=df,
+			outcome='outcome',
+			propensity='pis',
+			treatment='treatment',
+		)
+		# Method 2
+		ddb2 = db.delta.DeltaDualBounds(
+			**fn_args,
+			X=data['X'],
+			y=data['y'],
+			W=data['W'],
+			pis=data['pis'],
+		)
+
+		# Test equality
+		self.assertTrue(
+			ddb1.X.shape == ddb2.X.shape,
+			"from_pd changes the shape of the covariates"
+		)
+		for expected, out, name in zip(
+			[ddb2.y, ddb2.W, ddb2.pis],
+			[ddb1.y, ddb1.W, ddb1.pis],
+			['y', 'W', 'pis'],
+		):
+			np.testing.assert_array_almost_equal(
+				expected,
+				out,
+				decimal=8,
+				err_msg=f"DeltaDualBounds.from_pd() changes {name} values."
+			)
+
+
 
 
 if __name__ == "__main__":

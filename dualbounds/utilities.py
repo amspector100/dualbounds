@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import numpy as np
+import pandas as pd
 from scipy import stats
 from multiprocessing import Pool
 from functools import partial
@@ -20,6 +21,13 @@ def vrange(n, verbose=False):
 def haslength(x):
 	try:
 		len(x)
+		return True
+	except:
+		return False
+
+def floatable(x):
+	try:
+		float(x)
 		return True
 	except:
 		return False

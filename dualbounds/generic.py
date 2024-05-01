@@ -60,6 +60,20 @@ def infer_discrete(discrete, support, y):
 		support = None
 	return discrete, support
 
+def _binarize_variable(x: np.array, var_name: str):
+	"""
+	Converts x to a binary r.v. and raises an error
+	if it contains more than 2 values.
+	"""
+	if np.any(np.isnan(x)):
+		raise ValueError(f"{var_name} has missing values.")
+	vals = set(list(np.unique(x)))
+	if vals == set([0,1]):
+		return x.astype(int)
+	elif len(vals) != 2:
+		raise ValueError(f"{var_name} is not binary and takes {len(vals)} values.")
+	return (x == list(vals)[0]).astype(int)	
+
 def _default_ylims(
 	y, 
 	y0_min=None,
@@ -114,7 +128,7 @@ class DualBounds:
 	support : np.array
 		Optinal support of y, if known.
 		Defaults to ``None`` (inferred from the data).
-	**model_kwargs : dict
+	model_kwargs : dict
 		Additional kwargs for the ``DistReg`` outcome model,
 		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
 
@@ -124,16 +138,8 @@ class DualBounds:
 	synthetic regression data: ::
 		import dualbounds as db
 
-		# Generate synthetic data from a heavy-tailed linear model
-		data = db.gen_data.gen_regression_data(
-			n=900, # Num. datapoints
-			p=30, # Num. covariates
-			r2=0.95, # population R^2
-			tau=3, # average treatment effect
-			interactions=True, # ensures treatment effect is heterogenous
-			eps_dist='laplace', # heavy-tailed residuals
-			sample_seed=123, # random seed
-		)
+		# Generate synthetic data
+		data = db.gen_data.gen_regression_data(n=900, p=30)
 
 		# Initialize dual bounds object
 		dbnd = db.generic.DualBounds(
@@ -146,14 +152,14 @@ class DualBounds:
 		)
 
 		# Compute dual bounds and observe output
-		dbnd.fit(alpha=0.05 # nominal level).summary()
+		dbnd.fit(alpha=0.05).summary()
 	"""
 	def __init__(
 		self, 
 		f: callable,
-		X: np.array,
 		W: np.array,
 		y: np.array,
+		X: Optional[np.array]=None,
 		pis: Optional[np.array]=None,
 		Y_model: Union[str, dist_reg.DistReg]='ridge',
 		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
@@ -165,6 +171,8 @@ class DualBounds:
 		self.f = f
 		self.X = X
 		self.y = y
+		if self.X is None:
+			self.X = np.zeros((len(self.y), 1))
 		self.W = W
 		self.pis = pis
 		self.n = len(self.y)
@@ -180,6 +188,139 @@ class DualBounds:
 		# Initialize
 		self.y0_dists = None
 		self.y1_dists = None
+		self.oos_dist_preds = None
+
+	@classmethod
+	def from_pd(
+		cls,
+		f: callable,
+		data: pd.DataFrame,
+		outcome: str,
+		treatment: str,
+		propensity: Optional[str]=None,
+		covariates: Optional[list]=None,
+		Y_model: Union[str, dist_reg.DistReg]='ridge',
+		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
+		discrete: Optional[np.array]=None,
+		support: Optional[np.array]=None,
+		**model_kwargs
+	) -> None:
+		"""
+		Initializes ``DualBounds`` from a pandas dataframe.
+
+		Parameters
+		----------
+		f : function
+			Function which defines the partially identified estimand.
+			Must be a function of three arguments: y0, y1, x 
+			(in that order). E.g.,
+			``f = lambda y0, y1, x : y0 <= y1``
+		data : pd.DataFrame
+			pd.DataFrame of the data.
+		outcome : str
+			The outcome variable in ``data``.
+		treatment : str
+			The treatment variable in ``data``.
+			Must take at most two values.
+		propensity : str
+			Optional variable in ``data`` which contains the 
+			propensity scores P(treatment | covariates). If 
+			``None``, these are estimated from the data.
+		covariates : list
+			List of covariates in ``data.columns``. If ``None``,
+			uses all columns which are not the outcome/treatment.
+		Y_model : str or dist_reg.DistReg
+			One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
+			Alternatively, a distributional regression class inheriting 
+			from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
+			defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
+		W_model : str or sklearn classifier
+			Specifies how to estimate the propensity scores if ``pis`` is
+			not known.  Either a str identifier as above or an sklearn
+			classifier---see the tutorial for examples.
+		discrete : bool
+			If True, treats y as a discrete variable. 
+			Defaults to ``None`` (inferred from the data).
+		support : np.array
+			Optinal support of y, if known.
+			Defaults to ``None`` (inferred from the data).
+		model_kwargs : dict
+			Additional kwargs for the ``DistReg`` outcome model,
+			e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
+
+		Notes
+		-----
+		This function will do limited preprocessing to (e.g.) create 
+		dummies for discrete covariates. However, in real applications,
+		the user is recommended to do their own preprocessing to ensure
+		optimal results.
+		"""
+		## 1. Parse outcome
+		y = data[outcome].values
+		# convert to binary if needed
+		if len(np.unique(y)) == 2:
+			y = _binarize_variable(y, var_name=outcome)
+		
+		## 2. Parse treatment
+		W = _binarize_variable(data[treatment].values, var_name=treatment)
+
+		## 3. Parse propensities
+		if propensity is None:
+			pis = None
+		else:
+			pis = data[propensity].values.astype(float)
+			if np.any(np.isnan(pis)):
+				raise ValueError(f"{propensity} is provided but contains missing values")
+			if np.any(pis < 0) or np.any(pis > 1):
+				raise ValueError(f"{propensity} does not lie within [0,1]")
+
+		## 4. Parse covariates
+		if covariates is None:
+			covariates = [
+				c for c in data.columns if c not in [propensity, treatment, outcome]
+			]
+		if len(covariates) == 0:
+			X = np.ones((len(y), 1))
+		else:
+			# infer discrete vs. continuous covariates
+			cts_covs = []
+			discrete_covs = []
+			for c in covariates:
+				if np.all(data[c].apply(utilities.floatable)):
+					cts_covs.append(c)
+				else:
+					discrete_covs.append(c)
+
+			# get dummies
+			Xdf = pd.get_dummies(
+				data[discrete_covs + cts_covs],
+				columns=discrete_covs,
+				dummy_na=True,
+				drop_first=True,
+			).astype(float)
+			Xdf = Xdf.fillna(0) # zero imputation
+			Xcols = Xdf.columns
+			X = Xdf.values
+
+			# Center and standardize
+			X -= X.mean(axis=0)
+			sds = X.std(axis=0)
+			sds[sds == 0] = 1
+			X = X / sds
+
+		return cls(
+			f=f,
+			y=y,
+			X=X,
+			W=W,
+			pis=pis,
+			Y_model=Y_model,
+			W_model=W_model,
+			discrete=discrete,
+			support=support,
+			**model_kwargs
+		)
+
 
 	def _discretize(
 		self, 
@@ -439,36 +580,35 @@ class DualBounds:
 
 	def compute_dual_variables(
 		self,
-		y0_dists=None,
-		y0_vals=None,
-		y0_probs=None,
-		y1_dists=None,
-		y1_vals=None,
-		y1_probs=None,
-		verbose=True,
-		alpha=None,
-		ninterp=None,
-		nvals0=100,
-		nvals1=100,
-		interp_fn=interpolation.adaptive_interpolate,
-		y0_min=None,
-		y0_max=None,
-		y1_min=None,
-		y1_max=None,
+		y0_dists: Optional[list]=None,
+		y0_vals: Optional[np.array]=None,
+		y0_probs: Optional[np.array]=None,
+		y1_dists: Optional[list]=None,
+		y1_vals: Optional[np.array]=None,
+		y1_probs: Optional[np.array]=None,
+		verbose: bool=True,
+		alpha: Optional[float]=None,
+		ninterp: Optional[int]=None,
+		nvals0: int=100,
+		nvals1: int=100,
+		interp_fn: callable=interpolation.adaptive_interpolate,
+		y0_min: Optional[float]=None,
+		y0_max: Optional[float]=None,
+		y1_min: Optional[float]=None,
+		y1_max: Optional[float]=None,
 		**kwargs,
 	):
 		"""
-		Uses the estimated outcome model to solve the dual optimal
-		transport problem to obtain optimal dual variables.
+		Estimates optimal dual variables based on the outcome model.
 
 		Parameters
 		----------
-		y0_dists : np.array
+		y0_dists : list
 			batched scipy distribution of shape (n,) where the ith
 			distribution is the conditional law of Yi(0) | Xi
 			OR 
 			list of scipy dists whose shapes add up to n.
-		y0_vals : np.array
+		y0_vals : list
 			(n, nvals0)-length array of values y0 can take.
 		y0_probs : np.array
 			(n, nvals0)-length array where
@@ -685,8 +825,7 @@ class DualBounds:
 
 	def compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
-		Computes final estimators/ses based on the estimated
-		dual variables.
+		Computes final results from the estimated dual variables.
 		"""
 		self._compute_ipw_summands()
 		self.estimates, self.ses, self.cis = utilities.compute_est_bounds(
@@ -819,19 +958,13 @@ class DualBounds:
 		return self.y0_dists, self.y1_dists
 
 	def _compute_oos_resids(self):
-		if not isinstance(self.oos_dist_preds, list):
-			raise NotImplementedError("Only implemented for settings where self.oos_dist_preds is a list of dists")
-		starts, ends = dist_reg.create_folds(
-			n=self.n,
-			nfolds=len(self.oos_dist_preds)
-		)
-		self.oos_resids = np.zeros(self.n)
-		self.oos_preds = np.zeros(self.n)
-		for start, end, oos_dist_preds in zip(starts, ends, self.oos_dist_preds):
-			self.oos_preds[start:end] = oos_dist_preds.mean()
-			self.oos_resids[start:end] = self.y[start:end] - self.oos_preds[start:end]
+		# compute out-of-sample predictions
+		self._compute_cond_means()
+		self.oos_preds = self.mu0.copy()
+		self.oos_preds[self.W == 1] = self.mu1[self.W == 1]
+		# residuals and return
+		self.oos_resids = self.y - self.oos_preds
 		return self.oos_resids
-
 
 	def fit(
 		self,
@@ -845,9 +978,8 @@ class DualBounds:
 		**solve_kwargs,
 	) -> dict:
 		"""
-		Main function which computes dual bounds in three steps:
-		(1) cross-fitting, (2) computing optimal dual variables,
-		and (3) computing final dual bounds.
+		Main function which (1) performs cross-fitting, (2) computes 
+		optimal dual variables, and (3) computes final dual bounds.
 
 		Parameters
 		----------  

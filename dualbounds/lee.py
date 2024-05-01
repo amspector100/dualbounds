@@ -1,5 +1,6 @@
 import warnings
 import numpy as np
+import pandas as pd
 import cvxpy as cp
 from scipy import stats
 from . import utilities
@@ -197,7 +198,9 @@ def lee_delta_method_se(
 
 class LeeDualBounds(generic.DualBounds):
 	"""
-	Computes dual bounds on
+	Computes dual bounds on the ATE under selection bias.
+
+	Precisely, this class bounds 
 
 	E[Y(1) - Y(0) | S(1) = S(0) = 1]
 
@@ -250,6 +253,18 @@ class LeeDualBounds(generic.DualBounds):
 		self.S_model = S_model
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
+
+	@classmethod
+	def from_pd(
+		cls,
+		data: pd.DataFrame,
+		selection: str,
+		*args,
+		S_model: Optional[str]=None,
+		**kwargs,
+	):
+		raise NotImplementedError("need to think about how inheritence works")
+
 
 	def _ensure_feasibility(
 		self,

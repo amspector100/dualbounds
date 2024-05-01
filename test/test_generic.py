@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pandas as pd
 import scipy as sp
 from scipy import stats
 import unittest
@@ -244,6 +245,52 @@ class TestGenericDualBounds(unittest.TestCase):
 				isinstance(Wm, expected),
 				f"fit W_model {Wm} with W_model={W_model} is not of type {expected}"
 			)
+
+	def test_from_pd(self):
+		# Sample data
+		for eps_dist in ['gaussian', 'bernoulli']:
+			data = gen_data.gen_regression_data(n=50, p=5, eps_dist='bernoulli', r2=0)
+			df = pd.DataFrame(data['X'])
+			df['outcome'] = data['y']
+			df['pis'] = data['pis']
+			df['treatment'] = data['W']
+
+			# Method 1
+			f = lambda y0, y1, x: y1 - y0
+			gdb1 = db.generic.DualBounds.from_pd(
+				f=f,
+				data=df,
+				outcome='outcome',
+				propensity='pis',
+				treatment='treatment',
+			)
+
+			# Method 2
+			gdb2 = db.generic.DualBounds(
+				f=f,
+				X=data['X'],
+				y=data['y'],
+				W=data['W'],
+				pis=data['pis'],
+			)
+
+			# Test equality
+			self.assertTrue(
+				gdb1.X.shape == gdb2.X.shape,
+				"from_pd changes the shape of the covariates"
+			)
+			for expected, out, name in zip(
+				[gdb2.y, gdb2.W, gdb2.pis],
+				[gdb1.y, gdb1.W, gdb1.pis],
+				['y', 'W', 'pis'],
+			):
+				np.testing.assert_array_almost_equal(
+					expected,
+					out,
+					decimal=8,
+					err_msg=f"DualBounds.from_pd() changes {name} values."
+				)
+
 
 	def test_plug_in_no_covariates(self):
 		np.random.seed(123)
