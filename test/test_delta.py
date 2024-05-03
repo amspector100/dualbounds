@@ -73,12 +73,12 @@ class TestDeltaDualBounds(unittest.TestCase):
 			z0=lambda y0, x: y0,
 			z1=lambda y1, x: y1, 
 		)
-		ddb1 = db.delta.DeltaDualBounds.from_pd(
+		ddb1 = db.delta.DeltaDualBounds(
 			**fn_args,
-			data=df,
-			outcome='outcome',
-			propensity='pis',
-			treatment='treatment',
+			X=pd.DataFrame(data['X']),
+			y=pd.DataFrame(data['y']),
+			W=pd.DataFrame(data['W']),
+			pis=pd.DataFrame(data['pis']),
 		)
 		# Method 2
 		ddb2 = db.delta.DeltaDualBounds(
@@ -92,7 +92,7 @@ class TestDeltaDualBounds(unittest.TestCase):
 		# Test equality
 		self.assertTrue(
 			ddb1.X.shape == ddb2.X.shape,
-			"from_pd changes the shape of the covariates"
+			"initialization using pandas changes the shape of the covariates"
 		)
 		for expected, out, name in zip(
 			[ddb2.y, ddb2.W, ddb2.pis],
@@ -103,7 +103,7 @@ class TestDeltaDualBounds(unittest.TestCase):
 				expected,
 				out,
 				decimal=8,
-				err_msg=f"DeltaDualBounds.from_pd() changes {name} values."
+				err_msg=f"DeltaDualBounds pandas init. changes {name} values."
 			)
 
 

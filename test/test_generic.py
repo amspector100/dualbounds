@@ -250,20 +250,16 @@ class TestGenericDualBounds(unittest.TestCase):
 		# Sample data
 		for eps_dist in ['gaussian', 'bernoulli']:
 			data = gen_data.gen_regression_data(n=50, p=5, eps_dist='bernoulli', r2=0)
-			df = pd.DataFrame(data['X'])
-			df['outcome'] = data['y']
-			df['pis'] = data['pis']
-			df['treatment'] = data['W']
 
 			# Method 1
 			f = lambda y0, y1, x: y1 - y0
-			gdb1 = db.generic.DualBounds.from_pd(
+			gdb1 = db.generic.DualBounds(
 				f=f,
-				data=df,
-				outcome='outcome',
-				propensity='pis',
-				treatment='treatment',
-			)
+				y=pd.Series(data['y']),
+				X=pd.DataFrame(data['X']),
+				W=pd.Series(data['W']),
+				pis=pd.Series(data['pis']),
+			).fit()
 
 			# Method 2
 			gdb2 = db.generic.DualBounds(
@@ -277,7 +273,7 @@ class TestGenericDualBounds(unittest.TestCase):
 			# Test equality
 			self.assertTrue(
 				gdb1.X.shape == gdb2.X.shape,
-				"from_pd changes the shape of the covariates"
+				"using pandas changes the shape of the covariates"
 			)
 			for expected, out, name in zip(
 				[gdb2.y, gdb2.W, gdb2.pis],
@@ -288,7 +284,7 @@ class TestGenericDualBounds(unittest.TestCase):
 					expected,
 					out,
 					decimal=8,
-					err_msg=f"DualBounds.from_pd() changes {name} values."
+					err_msg=f"Using pandas initialization changes {name} values."
 				)
 
 

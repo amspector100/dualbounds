@@ -8,6 +8,7 @@ from multiprocessing import Pool
 from functools import partial
 from itertools import product
 from tqdm.auto import tqdm
+from typing import Optional, Union
 
 def elapsed(t0):
 	return np.around(time.time() - t0, 2)
@@ -31,6 +32,56 @@ def floatable(x):
 		return True
 	except:
 		return False
+
+### For processing data
+def _binarize_variable(x: np.array, var_name: str):
+	"""
+	Converts x to a binary r.v. and raises an error
+	if it contains more than 2 values.
+	"""
+	# Check if nans
+	if np.any(np.isnan(x)):
+		raise ValueError(f"{var_name} has missing values.")
+
+	# Check if binary
+	vals = set(list(np.unique(x)))
+	if len(vals) > 2:
+		raise ValueError(f"{var_name} is not binary and takes {len(vals)} values.")
+	elif len(vals - set([0,1])) == 0:
+		return x.astype(int)
+	else:
+		print(f"For {var_name}, replacing {vals[0]} with 0 and {vals[1]} with 1.")
+		return (x == list(vals)[1]).astype(int)
+
+def process_covariates(data: pd.DataFrame):
+	"""
+	Performs rudimentary pre-processing of covariates.
+
+	Parameters
+	----------
+	data : pd.DataFrame
+		Dataframe of covariates.
+
+	Returns
+	-------
+	processed : pd.DataFrame
+		DataFrame of preprocessed covariates.
+	"""
+	cts_covs = []
+	discrete_covs = []
+	for c in data.columns:
+		if np.all(data[c].apply(floatable)):
+			cts_covs.append(c)
+		else:
+			discrete_covs.append(c)
+
+	# Get dummies and return
+	return pd.get_dummies(
+		data[discrete_covs + cts_covs],
+		columns=discrete_covs,
+		dummy_na=True,
+		drop_first=True,
+	).astype(float)
 
 ### Multiprocessing helper
 def _one_arg_function(list_of_inputs, args, func, kwargs):

@@ -60,20 +60,6 @@ def infer_discrete(discrete, support, y):
 		support = None
 	return discrete, support
 
-def _binarize_variable(x: np.array, var_name: str):
-	"""
-	Converts x to a binary r.v. and raises an error
-	if it contains more than 2 values.
-	"""
-	if np.any(np.isnan(x)):
-		raise ValueError(f"{var_name} has missing values.")
-	vals = set(list(np.unique(x)))
-	if vals == set([0,1]):
-		return x.astype(int)
-	elif len(vals) != 2:
-		raise ValueError(f"{var_name} is not binary and takes {len(vals)} values.")
-	return (x == list(vals)[0]).astype(int)	
-
 def _default_ylims(
 	y, 
 	y0_min=None,
@@ -104,14 +90,14 @@ class DualBounds:
 		Must be a function of three arguments: y0, y1, x 
 		(in that order). E.g.,
 		``f = lambda y0, y1, x : y0 <= y1``
-	X : np.array
-		(n, p)-shaped array of covariates.
+	y : np.array
+		n-length array/Series of outcome measurements.
 	W : np.array
-		n-length array of binary treatment indicators.
-	Y : np.array
-		n-length array of outcome measurements.
+		n-length array/Series of binary treatment indicators.
+	X : np.array
+		(n, p)-shaped array/DataFrame of covariates.
 	pis : np.array
-		n-length array of propensity scores P(W=1 | X). 
+		n-length array/Series of propensity scores P(W=1 | X). 
 		If ``None``, will be estimated from the data.
 	Y_model : str or dist_reg.DistReg
 		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
@@ -131,6 +117,12 @@ class DualBounds:
 	model_kwargs : dict
 		Additional kwargs for the ``DistReg`` outcome model,
 		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
+
+	Notes
+	-----
+	``DualBounds`` will do limited preprocessing to (e.g.) create 
+	dummies for discrete covariates. However, we recommended doing
+	custom preprocessing for optimal results.
 
 	Examples
 	--------
@@ -157,25 +149,66 @@ class DualBounds:
 	def __init__(
 		self, 
 		f: callable,
-		W: np.array,
-		y: np.array,
-		X: Optional[np.array]=None,
-		pis: Optional[np.array]=None,
+		y: Union[np.array, pd.Series],
+		W: Union[np.array, pd.Series],
+		X: Optional[Union[np.array, pd.DataFrame]]=None,
+		pis: Optional[Union[np.array, pd.Series]]=None,
 		Y_model: Union[str, dist_reg.DistReg]='ridge',
 		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
 		discrete: Optional[np.array]=None,
 		support: Optional[np.array]=None,
 		**model_kwargs,
 	) -> None:
-		### Data
+		# Estimand
 		self.f = f
-		self.X = X
+
+		### Process outcome
 		self.y = y
-		if self.X is None:
-			self.X = np.zeros((len(self.y), 1))
-		self.W = W
-		self.pis = pis
+		if isinstance(self.y, pd.Series) or isinstance(self.y, pd.DataFrame):
+			self.y = self.y.values
+		if np.any(np.isnan(self.y)):
+			raise ValueError("outcome (y) contains nans")
+		if len(self.y.shape) > 1:
+			if len(self.y.shape) == 2 and self.y.shape[1] == 1:
+				self.y = self.y.flatten()
+			else:
+				raise ValueError("outcome (y) should be a flat array not a matrix")
 		self.n = len(self.y)
+
+		### Treatment
+		if isinstance(W, pd.Series) or isinstance(W, pd.DataFrame):
+			W = W.values.reshape(self.n)
+		print("HERE", W)
+		self.W = utilities._binarize_variable(W, var_name='treatment (W)')
+
+		### Process covariates
+		self.X = X
+		if self.X is None:
+			self.X = np.zeros((self.n, 1))
+		# limited preprocessing of covariates
+		if isinstance(self.X, pd.DataFrame):
+			self.X = utilities.process_covariates(self.X)
+			self.cov_names = self.X.columns
+			self.X = self.X.values
+		else:
+			if len(self.X.shape) == 1:
+				self.X = self.X.reshape(-1, 1)
+			self.cov_names = np.arange(self.X.shape[1])
+		# fill NAs if existing
+		if np.any(np.isnan(self.X)):
+			self.X = self.X.copy()
+			naninds = np.where(np.isnan(self.X))
+			self.X[naninds] = np.take(np.nanmean(self.X, axis=0), naninds[1])
+
+		### process propensities
+		self.pis = pis
+		if isinstance(self.pis, pd.Series) or isinstance(self.pis, pd.DataFrame):
+			self.pis = self.pis.values.reshape(self.n)
+		if self.pis is not None:
+			if np.any(np.isnan(self.pis)):
+				raise ValueError(f"propensities (pis) are provided but contains missing values")
+			if np.any(pis < 0) or np.any(pis > 1):
+				raise ValueError(f"propensities (pis) do not lie within [0,1]")
 
 		### Check if discrete
 		self.discrete, self.support = infer_discrete(
@@ -185,142 +218,10 @@ class DualBounds:
 		self.W_model = W_model
 		self.model_kwargs = model_kwargs
 
-		# Initialize
+		## Initialize core objects
 		self.y0_dists = None
 		self.y1_dists = None
 		self.oos_dist_preds = None
-
-	@classmethod
-	def from_pd(
-		cls,
-		f: callable,
-		data: pd.DataFrame,
-		outcome: str,
-		treatment: str,
-		propensity: Optional[str]=None,
-		covariates: Optional[list]=None,
-		Y_model: Union[str, dist_reg.DistReg]='ridge',
-		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
-		discrete: Optional[np.array]=None,
-		support: Optional[np.array]=None,
-		**model_kwargs
-	) -> None:
-		"""
-		Initializes ``DualBounds`` from a pandas dataframe.
-
-		Parameters
-		----------
-		f : function
-			Function which defines the partially identified estimand.
-			Must be a function of three arguments: y0, y1, x 
-			(in that order). E.g.,
-			``f = lambda y0, y1, x : y0 <= y1``
-		data : pd.DataFrame
-			pd.DataFrame of the data.
-		outcome : str
-			The outcome variable in ``data``.
-		treatment : str
-			The treatment variable in ``data``.
-			Must take at most two values.
-		propensity : str
-			Optional variable in ``data`` which contains the 
-			propensity scores P(treatment | covariates). If 
-			``None``, these are estimated from the data.
-		covariates : list
-			List of covariates in ``data.columns``. If ``None``,
-			uses all columns which are not the outcome/treatment.
-		Y_model : str or dist_reg.DistReg
-			One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
-			Alternatively, a distributional regression class inheriting 
-			from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-			defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
-		W_model : str or sklearn classifier
-			Specifies how to estimate the propensity scores if ``pis`` is
-			not known.  Either a str identifier as above or an sklearn
-			classifier---see the tutorial for examples.
-		discrete : bool
-			If True, treats y as a discrete variable. 
-			Defaults to ``None`` (inferred from the data).
-		support : np.array
-			Optinal support of y, if known.
-			Defaults to ``None`` (inferred from the data).
-		model_kwargs : dict
-			Additional kwargs for the ``DistReg`` outcome model,
-			e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
-
-		Notes
-		-----
-		This function will do limited preprocessing to (e.g.) create 
-		dummies for discrete covariates. However, in real applications,
-		the user is recommended to do their own preprocessing to ensure
-		optimal results.
-		"""
-		## 1. Parse outcome
-		y = data[outcome].values
-		# convert to binary if needed
-		if len(np.unique(y)) == 2:
-			y = _binarize_variable(y, var_name=outcome)
-		
-		## 2. Parse treatment
-		W = _binarize_variable(data[treatment].values, var_name=treatment)
-
-		## 3. Parse propensities
-		if propensity is None:
-			pis = None
-		else:
-			pis = data[propensity].values.astype(float)
-			if np.any(np.isnan(pis)):
-				raise ValueError(f"{propensity} is provided but contains missing values")
-			if np.any(pis < 0) or np.any(pis > 1):
-				raise ValueError(f"{propensity} does not lie within [0,1]")
-
-		## 4. Parse covariates
-		if covariates is None:
-			covariates = [
-				c for c in data.columns if c not in [propensity, treatment, outcome]
-			]
-		if len(covariates) == 0:
-			X = np.ones((len(y), 1))
-		else:
-			# infer discrete vs. continuous covariates
-			cts_covs = []
-			discrete_covs = []
-			for c in covariates:
-				if np.all(data[c].apply(utilities.floatable)):
-					cts_covs.append(c)
-				else:
-					discrete_covs.append(c)
-
-			# get dummies
-			Xdf = pd.get_dummies(
-				data[discrete_covs + cts_covs],
-				columns=discrete_covs,
-				dummy_na=True,
-				drop_first=True,
-			).astype(float)
-			Xdf = Xdf.fillna(0) # zero imputation
-			Xcols = Xdf.columns
-			X = Xdf.values
-
-			# Center and standardize
-			X -= X.mean(axis=0)
-			sds = X.std(axis=0)
-			sds[sds == 0] = 1
-			X = X / sds
-
-		return cls(
-			f=f,
-			y=y,
-			X=X,
-			W=W,
-			pis=pis,
-			Y_model=Y_model,
-			W_model=W_model,
-			discrete=discrete,
-			support=support,
-			**model_kwargs
-		)
-
 
 	def _discretize(
 		self, 

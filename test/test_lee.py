@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pandas as pd
 import scipy as sp
 from scipy import stats
 import unittest
@@ -220,7 +221,7 @@ class TestDualLeeBounds(unittest.TestCase):
 		_, expected = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
 		# analytical bounds based on linear programming
 		ldb = lee.LeeDualBounds(
-			y=y, X=None, W=None, S=np.random.binomial(1, 0.5, n),
+			y=y, X=None, W=np.ones(n), S=np.random.binomial(1, 0.5, n),
 		)
 		ldb.compute_dual_variables(
 			**args, ymin=-10, ymax=10, nvals=nvals
@@ -311,6 +312,46 @@ class TestDualLeeBounds(unittest.TestCase):
 					decimal=2,
 					err_msg=f"{method} bounds do not agree with analytical bounds",
 				)
+
+	def test_from_pd(self):
+		# Sample data
+		data = db.gen_data.gen_lee_bound_data(n=50, p=5, eps_dist='bernoulli', r2=0)
+
+		# Method 1
+		ldb1 = db.lee.LeeDualBounds(
+			X=pd.DataFrame(data['X']),
+			y=pd.Series(data['y']),
+			W=pd.Series(data['W']),
+			S=pd.Series(data['S']),
+			pis=pd.DataFrame(data['pis']),
+		)
+
+		# Method 2
+		ldb2 = db.lee.LeeDualBounds(
+			X=data['X'],
+			y=data['y'],
+			W=data['W'],
+			S=data['S'],
+			pis=data['pis'],
+		)
+
+		# Test equality
+		self.assertTrue(
+			ldb1.X.shape == ldb2.X.shape,
+			"LeeDualBounds init. from pandas changes the shape of the covariates"
+		)
+		for expected, out, name in zip(
+			[ldb2.y, ldb2.W, ldb2.pis, ldb2.S],
+			[ldb1.y, ldb1.W, ldb1.pis, ldb1.S],
+			['y', 'W', 'pis', 'S'],
+		):
+			np.testing.assert_array_almost_equal(
+				expected,
+				out,
+				decimal=8,
+				err_msg=f"LeeDualBounds init. from pandas changes {name} values."
+			)
+
 
 	def test_model_type_inputs(self):
 		"""

@@ -249,23 +249,15 @@ class LeeDualBounds(generic.DualBounds):
 		S_model: Optional[str]=None,
 		**kwargs
 	):
-		self.S = S
-		self.S_model = S_model
+		# Main initialization
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
-
-	@classmethod
-	def from_pd(
-		cls,
-		data: pd.DataFrame,
-		selection: str,
-		*args,
-		S_model: Optional[str]=None,
-		**kwargs,
-	):
-		raise NotImplementedError("need to think about how inheritence works")
-
-
+		# Initialization for S
+		self.S_model = S_model
+		if isinstance(S, pd.Series) or isinstance(S, pd.DataFrame):
+			S = S.values.reshape(self.n)
+		self.S = utilities._binarize_variable(S, var_name='selections')
+	
 	def _ensure_feasibility(
 		self,
 		i,
