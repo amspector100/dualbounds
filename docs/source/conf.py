@@ -14,7 +14,6 @@ author = 'Asher Spector'
 # Import the right package!
 import sys
 import os
-import sphinx_rtd_theme
 sys.path.insert(0, os.path.abspath('../../'))
 
 # The full version, including alpha/beta/rc tags
