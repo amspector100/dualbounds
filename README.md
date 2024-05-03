@@ -1,4 +1,4 @@
-A python implementation of the dual bounds framework for inference on partially identified estimands (and the solutions to optimization problems more generally). See https://amspector100.github.io/dualbounds/ for detailed documentation and tutorials.
+A python implementation of the dual bounds framework for inference on partially identified estimands (and the solutions to optimization problems more generally). See https://dualbounds.readthedocs.io/en/latest/ for detailed documentation and tutorials.
 
 ## Installation
 
@@ -8,7 +8,7 @@ To install ``dualbounds``, just use pip:
 
 ## Documentation
 
-Documentation and tutorials are available at https://amspector100.github.io/dualbounds/.
+Documentation and tutorials are available at https://dualbounds.readthedocs.io/en/latest/.
 
 ## Quickstart
 
