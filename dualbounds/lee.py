@@ -7,12 +7,12 @@ from . import utilities
 from . import dist_reg
 from .utilities import BatchedCategorical
 from . import interpolation, generic
-from typing import Optional
+from typing import Optional, Union
 
 
 ### Helper functions ###
 
-def compute_cvar(dists, n, alpha, lower=True, m=1000):
+def compute_cvar(dists, n: int, alpha: float, lower: bool=True, m: int=1000):
 	"""
 	Computes cvar using quantile approximation with m values.
 
@@ -25,6 +25,8 @@ def compute_cvar(dists, n, alpha, lower=True, m=1000):
 	alpha : array or float	
 		float or n-length array
 	lower : bool
+		If true, computes the lower CVAR. 
+		Else computes the upper CVAR.
 	m : int
 		Number of interpolation points
 	
@@ -63,12 +65,16 @@ def compute_analytical_lee_bound(
 	m=1000,
 ):
 	"""
-	Computes semi-analytical partial ident. bounds on 
+	Helper function to compute semi-analytical Lee Bounds.
 
-	E[Y(1) - Y(0) | S(0) = S(1) = 1]
-	
+
 	Unlike dual bounds, this function is not at all
-	robust to model misspecification,
+	robust to model misspecification. The estimand is 
+
+	:math:`E[Y(1) - Y(0) | S(0) = S(1) = 1]`
+
+	where :math:`Y(1), Y(0)` are potential outcomes and 
+	:math:`S(1), S(0)` are post-treatment selection events.
 
 	Parameters
 	----------
@@ -103,7 +109,8 @@ def compute_analytical_lee_bound(
 		across all n y0_dists/y1_dists, etc.
 	cond_bounds : np.array
 		(2, n)-length array where bounds[0,i] is the ith lower bound
-		and bounds[1,i] is the ith upper bound.
+		and bounds[1,i] is the ith upper bound conditional on 
+		:math:`X_i`.
 	"""
 	# Parse arguments
 	n = s0_probs.shape[0]
@@ -131,22 +138,73 @@ def compute_analytical_lee_bound(
 	return agg_bounds, cond_bounds
 
 def lee_bound_no_covariates(
-	W, S, y, B=200, alpha=0.05,
+	outcome: np.array, 
+	treatment: np.array, 
+	selections: np.array, 
+	propensities: Optional[np.array]=None,
+	B: int=200,
+	alpha: float=0.05,
 ):
 	"""
+	Computes plug-in Lee bounds without using covariates.
+
+	Parameters
+	----------
+	outcome : np.array
+		n-length array of outcomes (y)
+	treatment : np.array
+		n-length array of treatments (W).
+	selections : np.array
+		n-length array of selection indicators (S).
+	propensities : np.array
+		n-length array of propensity scores (pis).
+		Default: all equal to treatment.mean().
 	B : int
-		Number of bootstrap replications for standard error.
+		Number of bootstrap replications to compute standard errors.
+		Defaults to 0 (no standard errors).
+	verbose : bool
+		Show progress bar while bootstrapping if verbose=True.
+	alpha : float
+		nominal Type I error level.
+
+	Returns
+	-------
+	results : dict
+		Dictionary containing up to three keys:
+
+		- estimates: 2-length array of lower/upper estimates.
+		- ses: 2-length array of lower/upper standard errors.
+		- cis: 2-length array of lower/upper confidence intervals.
 	"""
+	# Rename for simplicity
+	y = outcome
+	W = treatment
+	S = selections
+	pis = propensities
+	if pis is None:
+		pis = np.ones(n) * treatment.mean()
 	n = len(W)
+
 	# compute P(S | W)
 	s0_prob = np.array([np.mean(S[W == 0])])
 	s1_prob = np.array([np.mean(S[W == 1])])
 	s1_prob = np.maximum(s0_prob, s1_prob)
-	# compute P(Y(0)) and P(Y(1))
-	y0_vals = np.sort(y[(W == 0) & (S == 1)])
-	y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
-	y1_vals = np.sort(y[(W == 1) & (S == 1)])
-	y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+
+	# compute P(Y(0))
+	flags0 = (W == 0) & (S == 1)
+	y0_vals = y[flags0]
+	y0_probs = 1 / (1-pis[flags0]); y0_probs /= y0_probs.sum()
+	inds0 = np.argsort(y0_vals)
+	y0_vals = y0_vals[inds0]; y0_probs = y0_probs[inds0]
+
+	# compute P(Y(1))
+	flags1 = (W == 1) & (S == 1)
+	y1_vals = y[flags1]
+	y1_probs = 1 / (1-pis[flags1]); y1_probs /= y1_probs.sum()
+	inds1 = np.argsort(y1_vals)
+	y1_vals = y1_vals[inds1]; y1_probs = y1_probs[inds1]
+
+	# Construct argument list
 	args = dict(
 		s0_probs=s0_prob,
 		s1_probs=s1_prob,
@@ -161,7 +219,9 @@ def lee_bound_no_covariates(
 		bs_ests = np.zeros((B, 2))
 		for b in range(B):
 			inds = np.random.choice(n, n, replace=True)
-			bs_ests[b] = lee_bound_no_covariates(W[inds], S[inds], y[inds], B=0)
+			bs_ests[b] = lee_bound_no_covariates(
+				treatment=W[inds], selections=S[inds], outcome=y[inds], B=0
+			)['estimates']
 		bias = bs_ests.mean(axis=0) - ests
 		ses = bs_ests.std(axis=0)
 		cis = ests - bias
@@ -173,7 +233,7 @@ def lee_bound_no_covariates(
 			cis=cis,
 		)
 	else:
-		return ests
+		return dict(estimates=ests)
 
 def lee_delta_method_se(
 	sbetas, skappas, sgammas
@@ -202,61 +262,74 @@ class LeeDualBounds(generic.DualBounds):
 
 	Precisely, this class bounds 
 
-	E[Y(1) - Y(0) | S(1) = S(0) = 1]
+	:math:`E[Y(1) - Y(0) | S(0) = S(1) = 1]`
 
-	for an outcome Y and a binary post-treatment
-	selection event S. These bounds assume monotonicity,
-	i.e., S(1) >= S(0) a.s. (see Lee 2009).
+	where :math:`Y(1), Y(0)` are potential outcomes and 
+	:math:`S(1), S(0)` are post-treatment selection events.
+	These bounds assume monotonicity, i.e., 
+	:math:`S(1) \ge S(0)` a.s. (see Lee 2009).
 
 	Parameters
 	----------
-	S : np.array
-		n-length array of binary selection indicators
-	X : np.array
-		(n, p)-shaped array of covariates.
-	W : np.array
-		n-length array of treatment indicators.
-	y : np.array
-		n-length array of outcome measurements
-	pis : np.array
-		n-length array of propensity scores P(W=1 | X). 
-		If ``None``, will be estimated from the data itself.
-	Y_model : str or dist_reg.DistReg
-		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
-		Alternatively, a distributional regression class inheriting 
-		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.	
-	S_model : str or dist_reg.DistReg
-		One of ['logistic', 'monotone_logistic', 'randomforest', 'knn'],
-		or a class inheriting from ``dist_reg.DistReg``. Defaults to
-		``monotone_logistic``. 
-	W_model : str or sklearn classifier
-		Specifies how to estimate the propensity scores if ``pis`` is
-		not known.  Either a str identifier as above or an sklearn
-		classifier---see the tutorial for examples.
-	discrete : bool
-		If True, treats y as a discrete variable. 
-		Defaults to None (inferred from the data).
+	selections : np.array
+		n-length array-like of binary selection indicators
+	outcome : np.array | pd.Series
+		n-length array of outcome measurements (Y).
+	treatment : np.array | pd.Series
+		n-length array of binary treatment (W).
+	covariates : np.array | pd.Series
+		(n, p)-shaped array of covariates (X).
+	propensities : np.array | pd.Series
+		n-length array-like of propensity scores :math:`P(W=1 | X)`. 
+		If ``None``, will be estimated from the data.
+	outcome_model : str | dist_reg.DistReg
+		The model for estimating the law of :math:`Y \mid X, W`.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An object inheriting from ``dist_reg.DistReg``. 
+
+		E.g., when ``outcome`` is continuous, the default is
+		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
+	propensity_model : str | sklearn classifier
+		How to estimate the propensity scores if they are not provided.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
+	selection_model : str | dist_reg.BinaryDistReg
+		How to estimate the selection probabilities :math:`P(S =1 | W, X)`.
+		Two options:
+
+		- A str identifier, i.e., 'monotone_logistic', 'ridge', 'lasso'.
+		- An object inheriting from ``dist_reg.BinaryDistReg``.
+
+		The default is ``monotone_logistic``. 
 	support : np.array
-		Optinal support of y, if known.
+		Optional support of the outcome, if known and discrete.
 		Defaults to ``None`` (inferred from the data).
+	model_kwargs : dict
+		Additional kwargs for the ``outcome_model``, e.g.,
+		``feature_transform``. See 
+		:class:`dualbounds.dist_reg.CtsDistReg` or 
+		:class:`dualbounds.dist_reg.BinaryDistReg` for more kwargs.
 	"""	
 
 	def __init__(
 		self,
-		S: np.array,
+		selections: Union[np.array, pd.Series],
 		*args, 
-		S_model: Optional[str]=None,
+		selection_model: Optional[Union[str, dist_reg.BinaryDistReg]]=None,
 		**kwargs
 	):
 		# Main initialization
 		kwargs['f'] = None
 		super().__init__(*args, **kwargs)
 		# Initialization for S
-		self.S_model = S_model
-		if isinstance(S, pd.Series) or isinstance(S, pd.DataFrame):
-			S = S.values.reshape(self.n)
-		self.S = utilities._binarize_variable(S, var_name='selections')
+		self.selection_model = selection_model
+		if isinstance(selections, pd.Series) or isinstance(selections, pd.DataFrame):
+			selections = selections.values.reshape(self.n)
+		self.S = utilities._binarize_variable(selections, var_name='selections')
 	
 	def _ensure_feasibility(
 		self,
@@ -334,24 +407,39 @@ class LeeDualBounds(generic.DualBounds):
 		**kwargs,
 	):
 		"""
+		Estimates dual variables using the outcome model.
+
+		We generally recommend that the user call .fit() instead of 
+		calling this function directly.
+
 		Parameters
 		----------
 		s0_probs : np.array
-			n-length array where s0_probs[i] = P(S(0) = 1 | Xi)
+			n-length array where s0_probs[i] = :math:`P(S_i(0) = 1 | X_i)`.
 		s1_probs : np.array
-			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
-		y1_dists : np.array
-			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(1) | S(1) = 1, Xi
-			OR 
-			list of scipy dists whose shapes add up to n.
+			n-length array where s1_probs[i] = :math:`P(S_i(1) = 1 | X_i)`.
+		y1_dists : list
+			The ith distribution of y1_dists represents the conditional
+			law of :math:`Y_i(1) | X_i, S_i(1) =1`. There are two input formats:
+
+			- batched scipy distribution of shape (n,)
+			- list of scipy dists whose shapes add up to n.
+
 		y1_vals : np.array
-			Optional (n, nvals1)-length array of values y1 can take.
-			Ignored if ``y1_dists`` is provided.
+			(n, nvals1)-length array where ``y1_vals[i]`` is the support 
+			of :math:`Y_i(1)`.	Ignored if ``y1_dists`` is provided.
 		y1_probs : np.array
-			Optional (n, nvals1)-length array where
-			y1_probs[i, j] = P(Y(1) = yvals1[j] | S(1) = 1, Xi).
-			Ignored if ``y1_dists`` is provided.
+			(n, nvals1)-length array where ``y1_probs[i, j]``
+			is the estimated probability that :math:`Y_i(1)`
+			equals ``y1_vals[i, j].``
+		verbose : bool
+			If True, prints progress reports.
+		nvals : int
+			Number of values to use when discretizing Y(1).
+		ymin : float
+			Minimum value of Y(1) to use numerically.
+		ymax : float
+			Maximum value of Y(1) to use numerically.
 		kwargs : dict
 			kwargs for _ensure_feasibility method.
 			Includes ymin, ymax, grid_size.
@@ -483,35 +571,42 @@ class LeeDualBounds(generic.DualBounds):
 
 	def cross_fit(
 		self,
-		nfolds=5,
-		suppress_warning=False,
-		verbose=True,
+		nfolds: int=5,
+		suppress_warning: bool=False,
+		verbose: bool=True,
 	):
 		"""
-		Performs cross-fitting to estimate the outcome and selection models.
+		Cross-fits the outcome and selection models.
+
+		Parameters
+		----------
+		nfolds : int
+			Number of folds to use in cross-fitting.
+		suppress_warning : bool
+			If True, suppresses the warning about manual crossfitting.
+		verbose : bool
+			If True, prints progress reports.
 
 		Returns
 		-------
 		s0_probs : np.array
-			n-length array where s0_probs[i] = P(S(0) = 1 | Xi)
+			n-length array where s0_probs[i] = :math:`P(S_i(0) = 1 | X_i)`.
 		s1_probs : np.array
-			n-length array where s1_probs[i] = P(S(1) = 1 | Xi)
+			n-length array where s1_probs[i] = :math:`P(S_i(1) = 1 | X_i)`.
 		y0_dists : np.array
 			list of batched scipy distributions whose shapes sum to n.
-			the ith dist. is the conditional law of Yi(0) | S(0) = 1, Xi
-		y1_dists : np.array
+			the ith dist. is the conditional law of :math:`Y_i(0) | S_i(0) = 1, X_i`.
+		y1_dists : list
 			list of batched scipy distributions whose shapes sum to n.
-			the ith dist. is the conditional law of Yi(1) | S(1) = 1, Xi
-		suppress_warning : bool
-			If True, suppresses the warning about manual crossfitting.
+			the ith dist. is the conditional law of :math:`Y_i(1) | S_i(1) = 1, X_i`.
 		"""
 		# estimate selection probs
 		if self.s0_probs is None or self.s1_probs is None:
-			if self.S_model is None:
-				self.S_model = 'monotone_logistic'
-			self.S_model = generic.get_default_model(
-				Y_model=self.S_model, 
-				# the following args are ignored if S_model already
+			if self.selection_model is None:
+				self.selection_model = 'monotone_logistic'
+			self.selection_model = generic.get_default_model(
+				outcome_model=self.selection_model, 
+				# the following args are ignored if selection_model already
 				# inherits from dist_reg.DistReg class
 				support=set([0,1]), 
 				discrete=True,
@@ -523,11 +618,11 @@ class LeeDualBounds(generic.DualBounds):
 			sout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.S, 
 				nfolds=nfolds, 
-				model=self.S_model,
+				model=self.selection_model,
 				verbose=verbose,
 				probs_only=True,
 			)
-			self.s0_probs, self.s1_probs, self.S_model_fits, self.S_oos_preds = sout
+			self.s0_probs, self.s1_probs, self.selection_model_fits, self.S_oos_preds = sout
 		elif not suppress_warning:
 			warnings.warn(
 				generic.CROSSFIT_WARNING.replace("y0_", "s0_").replace("y1_", "s1_")
@@ -535,15 +630,15 @@ class LeeDualBounds(generic.DualBounds):
 
 		# Estimate outcome model
 		if self.y0_dists is None or self.y1_dists is None:
-			self.Y_model = generic.get_default_model(
-				discrete=self.discrete, support=self.support, Y_model=self.Y_model,
+			self.outcome_model = generic.get_default_model(
+				discrete=self.discrete, support=self.support, outcome_model=self.outcome_model,
 			)
 			if verbose:
 				print("Cross-fitting the outcome model.")
 			yout = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, S=self.S, y=self.y, 
 				nfolds=nfolds, 
-				model=self.Y_model,
+				model=self.outcome_model,
 				verbose=verbose,
 			)
 			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = yout
@@ -568,6 +663,9 @@ class LeeDualBounds(generic.DualBounds):
 		**solve_kwargs,
 	):
 		"""
+		Main function which (1) performs cross-fitting, (2) computes 
+		optimal dual variables, and (3) computes final dual bounds.
+
 		Parameters
 		----------
 		nfolds : int
@@ -577,18 +675,22 @@ class LeeDualBounds(generic.DualBounds):
 		aipw : bool
 			If true, returns AIPW estimator.
 		s0_probs : np.array
-			Optional n-length array where s0_probs[i] = P(S(0) = 1 | Xi).
+			Optional n-length array where s0_probs[i] = 
+			:math:`P(S_i(0) = 1 | X_i)`.
 			If not provided, will be estimated from the data.
 		s1_probs : np.array
-			Optional n-length array where s1_probs[i] = P(S(1) = 1 | Xi).
+			Optional n-length array where s1_probs[i] = 
+			:math:`P(S_i(1) = 1 | X_i)`.
 			If not provided, will be estimated from the data.
-		y0_dists : list
-			Optional list of n scipy distributions, where the ith
-			distribution is the conditional law of Yi(0) | S(0) = 1, Xi.
+		y0_dists : np.array
+			Optional list of batched scipy distributions whose shapes sum to n.
+			the ith dist. is the conditional law of 
+			:math:`Y_i(0) | S_i(0) = 1, X_i`.
 			If not provided, will be estimated from the data.
 		y1_dists : np.array
-			Optional list of n scipy distributions, where  the ith
-			distribution is the conditional law of Yi(1) | S(1) = 1, Xi.
+			Optional list of batched scipy distributions whose shapes sum to n.
+			The ith dist. is the conditional law of 
+			:math:`Y_i(1) | S_i(1) = 1, X_i`.
 			If not provided, will be estimated from the data.
 		suppress_warning : bool
 			If True, suppresses warning about cross-fitting.
@@ -627,10 +729,10 @@ class LeeDualBounds(generic.DualBounds):
 		)
 
 		# compute dual bounds
-		self.compute_final_bounds(aipw=aipw, alpha=alpha)
+		self._compute_final_bounds(aipw=aipw, alpha=alpha)
 		return self
 
-	def compute_final_bounds(self, aipw=True, alpha=0.05):
+	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].

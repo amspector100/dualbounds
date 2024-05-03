@@ -72,14 +72,11 @@ def varcate_delta_method_se(
 
 class VarCATEDualBounds(generic.DualBounds):
 	"""
-	Class for computing lower bounds on 
-	
-	Var(E[Y(1) - Y(0) | X]).
+	Computes lower bounds on :math:`Var(E[Y(1) - Y(0) | X]).`
 
-	This class has the same signature as 
-	``generic.DualBounds`` except it only
-	provides lower bounds and the input
-	``f`` will be ignored.
+	This class has the same signature as ``generic.DualBounds``
+	except it only provides lower bounds and the input ``f``
+	will be ignored.
 	"""
 
 	def __init__(self, *args, **kwargs):
@@ -102,14 +99,14 @@ class VarCATEDualBounds(generic.DualBounds):
 	def compute_dual_variables(self, *args, **kwargs):
 		""" 
 		In this case, the optimal dual variables are simply 
-		the estimated CATE.
+		the estimated CATE, so this function does nothing.
 		"""
 		pass
 
 	def _compute_ipw_summands(self):
 		pass
 
-	def compute_final_bounds(self, aipw=True, alpha=0.05):
+	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		self._compute_cond_means()
 		self.cates = self.mu1 - self.mu0 
 		#### We have to use the 6-d delta method

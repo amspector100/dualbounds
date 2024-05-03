@@ -35,7 +35,10 @@ class TestVarITE(unittest.TestCase):
 
 			# Compute vdb
 			vdb = db.varite.VarITEDualBounds(
-				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
+				covariates=data['X'],
+				outcome=data['y'],
+				treatment=data['W'],
+				propensities=data['pis'],
 			)
 			ests = vdb.fit(nfolds=3).estimates
 
@@ -64,7 +67,10 @@ class TestVarITE(unittest.TestCase):
 				n=200, p=10, eps_dist=eps_dist, sample_seed=123
 			)
 			vdb = db.varite.VarITEDualBounds(
-				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
+				covariates=data['X'],
+				outcome=data['y'],
+				treatment=data['W'],
+				propensities=data['pis'],
 			)
 			vdb.fit(nfolds=3).summary()
 
@@ -92,7 +98,7 @@ class TestVarCATE(unittest.TestCase):
 			n=200, p=5, eps_dist='bernoulli',
 		)
 		vdb = db.varcate.VarCATEDualBounds(
-			X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
+			covariates=data['X'], outcome=data['y'], treatment=data['W'], propensities=data['pis'],
 		)
 		vdb.fit(nfolds=3).summary()
 
@@ -109,7 +115,7 @@ class TestVarCATE(unittest.TestCase):
 			expected = data['cates'].std()**2
 			## Oracle
 			vdb_oracle = db.varcate.VarCATEDualBounds(
-				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
+				covariates=data['X'], outcome=data['y'], treatment=data['W'], propensities=data['pis'],
 			)
 			est_oracle = vdb_oracle.fit(
 				y0_dists=data['y0_dists'], y1_dists=data['y1_dists'], 
@@ -117,8 +123,8 @@ class TestVarCATE(unittest.TestCase):
 			).estimates[0]
 			## Actual
 			vdb = db.varcate.VarCATEDualBounds(
-				X=data['X'], y=data['y'], W=data['W'], pis=data['pis'],
-				Y_model=db.dist_reg.CtsDistReg(eps_dist='gaussian')
+				covariates=data['X'], outcome=data['y'], treatment=data['W'], propensities=data['pis'],
+				outcome_model=db.dist_reg.CtsDistReg(eps_dist='gaussian')
 			)
 			est_actual = vdb.fit(nfolds=3).estimates[0]
 			for est, name in zip([est_oracle, est_actual], ['oracle', 'est']):

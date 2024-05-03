@@ -13,12 +13,10 @@ def compute_analytical_varite_bound(
 	reps=100,
 ):
 	"""
-	Computes semi-analytical bounds on
-
-	Var(Y(0) - Y(1)).
+	Semi-analytical bounds on :math:`Var(Y(0) - Y(1))`.
 
 	Unlike dual bounds, this function is not
-	robust to model misspecification, 
+	robust to model misspecification.
 	
 	Parameters
 	----------
@@ -72,9 +70,7 @@ def varite_delta_method_se(
 
 class VarITEDualBounds(DualBounds):
 	"""
-	Computes dual bounds on 
-
-	Var(Y(1) - Y(0)).
+	Computes dual bounds on :math:`Var(Y(1) - Y(0)).`
 
 	The signature of this class is identical to 
 	the ``generic.DualBounds`` class.  However, 
@@ -86,7 +82,7 @@ class VarITEDualBounds(DualBounds):
 		kwargs['f'] = lambda y0, y1, x: (y0-y1)**2
 		super().__init__(*args, **kwargs)
 
-	def compute_final_bounds(self, aipw=True, alpha=0.05):
+	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for Var(Y(1) - Y(0)).

@@ -6,6 +6,7 @@ import numpy as np
 from scipy import stats
 from scipy.special import logsumexp
 from .utilities import parse_dist, _convert_to_cat
+from typing import Optional, Union
 
 def heteroskedastic_scale(X, heterosked='constant'):
 	n, p = X.shape
@@ -41,19 +42,19 @@ def _sample_norm_vector(dim, norm):
 	return x / np.sqrt(np.power(x, 2).sum() / norm)
 
 def gen_regression_data(
-	n,
-	p,
-	lmda_dist='constant',
-	eps_dist='gaussian',
-	heterosked='constant',
-	tauv=1, # Var(Y(1) | X ) / Var(Y(0) | X)
-	r2=0.95,
-	interactions=True,
-	tau=3,
-	betaW_norm=0,
-	covmethod='identity',
-	dgp_seed=1,
-	sample_seed=None,
+	n: int,
+	p: int,
+	lmda_dist: str='constant',
+	eps_dist: str='gaussian',
+	heterosked: str='constant',
+	tauv: float=1, # Var(Y(1) | X ) / Var(Y(0) | X)
+	r2: float=0.95,
+	interactions: bool=True,
+	tau: float=3,
+	betaW_norm: float=0,
+	covmethod: str='identity',
+	dgp_seed: int=1,
+	sample_seed: Optional[int]=None,
 ):
 	"""
 	Samples a synthetic regression dataset.
@@ -90,6 +91,8 @@ def gen_regression_data(
 		E[W | X] = logistic(X @ betaW). This parameter
 		controls the norm of betaW and thus the 
 		variance of the propensity scores.
+	covmethod : str
+		str identifier for how to generate the covariance matrix.
 	dgp_seed : int
 		Random seed for the data-generating parameters.
 	sample_seed : int
@@ -186,8 +189,20 @@ def gen_regression_data(
 	return out
 
 def gen_lee_bound_data(
-	stau=1, betaS_norm=1, **kwargs
+	stau: float=1, betaS_norm: float=1, **kwargs
 ):
+	"""
+	Generates synthetic datasets with selection bias.
+
+	Parameters
+	----------
+	stau : float
+		In the logistic regression of S on W and X,
+		stau is the coefficient on W.
+	betaS_norm : float
+		norm of coefficients in logistic regression of S 
+		on W and X.
+	"""
 	# Generate regression data
 	output = gen_regression_data(**kwargs)
 	X, W = output['X'], output['W']
@@ -211,132 +226,3 @@ def gen_lee_bound_data(
 	):
 		output[key] = val
 	return output
-
-
-# def gen_trial_data(
-# 	tau=0,
-# 	**kwargs,
-# ):
-# 	X, y, beta, Sigma = gen_regression_data(**kwargs)
-# 	n, p = X.shape
-# 	# create treatment
-# 	W = np.arange(n) % 2
-# 	# create treatment effect
-# 	y += tau * W
-# 	return X, W, y, beta, Sigma
-
-# def compute_yprobs(
-# 	yvals,
-# 	mu,
-# 	scales,
-# 	eps_dist,
-# ):
-# 	"""
-# 	Suppose y ~ mu + scales * eps_dist
-# 	but restricted to the support specified by yvals.
-
-# 	Returns
-# 	-------
-# 	probs : np.array
-# 		n x nvals array.
-# 		probs[i, j] = P(y(i) = yvals[j])
-# 	"""
-# 	log_probs = parse_dist(
-# 		eps_dist, loc=mu, scale=scales, 
-# 	).logpdf(yvals.reshape(-1, 1)).T
-# 	log_probs = np.maximum(-500, log_probs)
-# 	log_probs -= logsumexp(log_probs, axis=1).reshape(-1, 1)
-# 	return np.exp(log_probs)
-
-# def sample_disc_y(
-# 	yvals,
-# 	mu,
-# 	scales,
-# 	eps_dist,
-# ):
-# 	"""
-# 	Suppose y ~ mu + scales * eps_dist
-# 	but restricted to the support specified by yvals.
-
-# 	Returns
-# 	-------
-# 	y : np.array
-# 		n shaped array of y values sampled according to this
-# 		model.
-# 	"""
-# 	n = mu.shape[0]
-# 	probs = compute_yprobs(yvals, mu, scales, eps_dist)
-# 	U = np.random.uniform(size=(n,1))
-# 	inds = np.argmax(
-# 		U <= np.cumsum(probs, axis=-1), axis=1
-# 	)
-# 	return yvals[inds]
-
-
-# def gen_discrete_trial_data(
-# 	n,
-# 	p,
-# 	lmda_dist='constant',
-# 	eps_dist='gaussian',
-# 	heterosked='constant',
-# 	r2=0,
-# 	tau=0,
-# 	covmethod='identity',
-# 	dgp_seed=1,
-# 	sample_seed=None,
-# 	Sigma=None,
-# 	beta=None,
-# 	nvals=21,
-# 	yrange=20,
-# ):
-# 	# create parameters
-# 	np.random.seed(dgp_seed)
-# 	if Sigma is None:
-# 		Sigma = create_cov(p=p, covmethod=covmethod)
-# 	if beta is None:
-# 		if r2 > 0:
-# 			beta = np.random.randn(p)
-# 			target = r2 / (1 - r2)
-# 			beta /= np.sqrt(np.power(beta, 2).sum() / target)
-# 		else:
-# 			beta = np.zeros(p)
-
-# 	# create y-values
-# 	yvals = np.linspace(-yrange/2, yrange/2, nvals)
-
-# 	# sample X
-# 	np.random.seed(sample_seed)
-# 	X = np.random.randn(n, p)
-# 	L = np.linalg.cholesky(Sigma)
-# 	X = X @ L.T
-# 	lmdas = parse_dist(lmda_dist).rvs(size=n)
-# 	lmdas /= np.sqrt(np.power(lmdas, 2).mean())
-# 	X = X * lmdas.reshape(-1, 1)
-
-# 	# create treatment
-# 	W = np.arange(n) % 2
-
-# 	# create final probabilities
-# 	mu = X @ beta + W * tau
-# 	scales = heteroskedastic_scale(X, W, heterosked=heterosked)
-# 	y = sample_disc_y(
-# 		yvals=yvals, mu=mu, scales=scales, eps_dist=eps_dist
-# 	)
-
-# 	# sample Y
-# 	return X, W, y, beta, Sigma, yvals
-
-# def compute_lee_logistic_probs(X, W, beta, gamma, stau):
-# 	denom = np.sqrt(np.power(beta, 2).sum())
-# 	if denom == 0:
-# 		denom = 1
-# 	beta = gamma * beta / denom
-# 	Smu = stau * W + X @ beta
-# 	return np.exp(Smu) / (1 + np.exp(Smu))
-
-# def gen_lee_bound_data(stau, gamma, **kwargs):
-# 	X, W, y, beta, Sigma, yvals = gen_discrete_trial_data(**kwargs)
-# 	# sample S
-# 	Sprobs = compute_lee_logistic_probs(X=X, W=W, beta=beta, gamma=gamma, stau=stau)
-# 	S = np.random.binomial(1, Sprobs)
-# 	return X, W, S, y, beta, Sigma, yvals 

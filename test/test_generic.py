@@ -53,10 +53,10 @@ class TestGenericDualBounds(unittest.TestCase):
 			nvals = 2000
 			vdb = db.generic.DualBounds(
 				f=lambda y0, y1, x: (y0-y1)**2,
-				X=np.zeros(1),
-				W=np.zeros(1),
-				pis=np.ones(1) * 1/2,
-				y=np.zeros(1),
+				covariates=np.zeros(1),
+				treatment=np.zeros(1),
+				propensities=np.ones(1) * 1/2,
+				outcome=np.zeros(1),
 				discrete=discrete,
 				support=support,
 			)
@@ -104,10 +104,10 @@ class TestGenericDualBounds(unittest.TestCase):
 		for f in fs:
 			gdb = db.generic.DualBounds(
 				f=f,
-				X=X,
-				W=W,
-				pis=pis,
-				y=Y,
+				covariates=X,
+				treatment=W,
+				propensities=pis,
+				outcome=Y,
 			)
 			gdb.compute_dual_variables(
 				y0_dists=y0_dists, 
@@ -165,9 +165,11 @@ class TestGenericDualBounds(unittest.TestCase):
 		):
 			gdb = db.generic.DualBounds(
 				f=f, 
-				X=data['X'], W=data['W'], 
-				y=data['y'], pis=data['pis'], 
-				Y_model=model,
+				covariates=data['X'], 
+				treatment=data['W'], 
+				outcome=data['y'],
+				propensities=data['pis'], 
+				outcome_model=model,
 				heterosked_model=sigma_model,
 				eps_dist=eps_dist,
 			)
@@ -176,7 +178,7 @@ class TestGenericDualBounds(unittest.TestCase):
 			Ym = gdb.model_fits[0].model
 			self.assertTrue(
 				isinstance(Ym, mt_exp),
-				f"fit Y_model {Ym} with W_model={model} is not of type {mt_exp}"
+				f"fit outcome_model {Ym} with propensity_model={model} is not of type {mt_exp}"
 			)
 			# Check correct class for the heteroskedastic model
 			if sigma_model_exp is not None:
@@ -205,45 +207,47 @@ class TestGenericDualBounds(unittest.TestCase):
 		for model_type, mt_exp in zip(model_types, expected_mts):
 			gdb = db.generic.DualBounds(
 				f=f, 
-				X=data['X'], W=data['W'], 
-				y=data['y'], pis=data['pis'], 
-				Y_model=model_type,
+				covariates=data['X'], 
+				treatment=data['W'], 
+				outcome=data['y'],
+				propensities=data['pis'], 
+				outcome_model=model_type,
 			)
 			gdb.fit(nfolds=3, alpha=0.05).summary()
 			# Check the correct model type
 			Ym = gdb.model_fits[0].model
 			self.assertTrue(
 				isinstance(Ym, mt_exp),
-				f"fit model {mt_exp} with Y_model={model_type} is not of type {mt_exp}"
+				f"fit model {mt_exp} with outcome_model={model_type} is not of type {mt_exp}"
 			)
 
 
 	def test_fit_propensity_scores(self):
 		"""
-		Same as above but for W_model
+		Same as above but for propensity_model
 		"""
 		data = gen_data.gen_regression_data(n=300, p=3, eps_dist='gaussian', r2=0)
 		f = lambda y0, y1, x : y0 <= y1
-		W_models = ['ridge', 'lasso', 'knn', 'rf']
+		propensity_models = ['ridge', 'lasso', 'knn', 'rf']
 		expecteds = [
-			db.dist_reg.parse_model_type(wm, discrete=True) for wm in W_models
+			db.dist_reg.parse_model_type(wm, discrete=True) for wm in propensity_models
 		]
-		W_models.append(sklearn.ensemble.AdaBoostClassifier(algorithm='SAMME'))
+		propensity_models.append(sklearn.ensemble.AdaBoostClassifier(algorithm='SAMME'))
 		expecteds.append(sklearn.ensemble.AdaBoostClassifier)
-		for W_model, expected in zip(W_models, expecteds):
+		for propensity_model, expected in zip(propensity_models, expecteds):
 			gdb = db.generic.DualBounds(
 				f=f,
-				X=data['X'], W=data['W'], y=data['y'],
-				pis=None, # to be estimated 
-				Y_model='ridge',
-				W_model=W_model,
+				covariates=data['X'], treatment=data['W'], outcome=data['y'],
+				propensities=None, # to be estimated 
+				outcome_model='ridge',
+				propensity_model=propensity_model,
 			)
 			gdb.fit(nfolds=3).summary()
 			# Check the correct class
-			Wm = gdb.W_model_fits[0]
+			Wm = gdb.propensity_model_fits[0]
 			self.assertTrue(
 				isinstance(Wm, expected),
-				f"fit W_model {Wm} with W_model={W_model} is not of type {expected}"
+				f"fit propensity_model {Wm} with propensity_model={propensity_model} is not of type {expected}"
 			)
 
 	def test_from_pd(self):
@@ -255,19 +259,19 @@ class TestGenericDualBounds(unittest.TestCase):
 			f = lambda y0, y1, x: y1 - y0
 			gdb1 = db.generic.DualBounds(
 				f=f,
-				y=pd.Series(data['y']),
-				X=pd.DataFrame(data['X']),
-				W=pd.Series(data['W']),
-				pis=pd.Series(data['pis']),
+				outcome=pd.Series(data['y']),
+				treatment=pd.Series(data['W']),
+				covariates=pd.DataFrame(data['X']),
+				propensities=pd.Series(data['pis']),
 			).fit()
 
 			# Method 2
 			gdb2 = db.generic.DualBounds(
 				f=f,
-				X=data['X'],
-				y=data['y'],
-				W=data['W'],
-				pis=data['pis'],
+				covariates=data['X'],
+				outcome=data['y'],
+				treatment=data['W'],
+				propensities=data['pis'],
 			)
 
 			# Test equality
@@ -312,20 +316,20 @@ class TestGenericDualBounds(unittest.TestCase):
 			y = y1.copy(); y[W == 0] = y0[W==0]
 			# Naive estimator
 			naive[r] = db.generic.plug_in_no_covariates(
-				y=y, W=W, f=f, pis=None, max_nvals=n
-			)
+				outcome=y, treatment=W, f=f, propensities=None, max_nvals=n
+			)['estimates']
 			# Oracle estimator
 			oracles[r] = db.generic.plug_in_no_covariates(
-				y=np.concatenate([y1, y0]), 
-				W=np.concatenate([np.ones(n), np.zeros(n)]), 
+				outcome=np.concatenate([y1, y0]), 
+				treatment=np.concatenate([np.ones(n), np.zeros(n)]), 
 				f=f,
-				pis=None,
+				propensities=None,
 				max_nvals=2*n,
-			)
+			)['estimates']
 			# Real estimator
 			ests[r] = db.generic.plug_in_no_covariates(
-				y=y, W=W, f=f, pis=pis, max_nvals=n
-			)
+				outcome=y, treatment=W, f=f, propensities=pis, max_nvals=n
+			)['estimates']
 
 		# Take averages
 		naive_mu = naive.mean(axis=0)

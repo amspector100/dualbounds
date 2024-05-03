@@ -7,7 +7,7 @@ import numpy as np
 import scipy as sp
 from . import utilities
 
-def adaptive_interpolate(x, y, newx):
+def adaptive_interpolate(x: np.array, y: np.array, newx: np.array):
 	"""
 	Adaptively chooses between linear and nearest-neighbor
 	interpolation.
@@ -33,7 +33,7 @@ def adaptive_interpolate(x, y, newx):
 		return linear_interpolate(x, y, newx)
 
 
-def nn_interpolate(x, y, newx):
+def nn_interpolate(x: np.array, y: np.array, newx: np.array):
 	"""
 	Nearest-neighbor interpolation.
 
@@ -65,7 +65,7 @@ def nn_interpolate(x, y, newx):
 	return y[nbrs]
 
 
-def linear_interpolate(x, y, newx):
+def linear_interpolate(x: np.array, y: np.array, newx: np.array):
 	"""
 	Linear interpolation.
 

@@ -221,7 +221,7 @@ class TestDualLeeBounds(unittest.TestCase):
 		_, expected = lee.compute_analytical_lee_bound(**args, y0_dists=y0_dists)
 		# analytical bounds based on linear programming
 		ldb = lee.LeeDualBounds(
-			y=y, X=None, W=np.ones(n), S=np.random.binomial(1, 0.5, n),
+			outcome=y, treatment=np.ones(n), selections=np.random.binomial(1, 0.5, n),
 		)
 		ldb.compute_dual_variables(
 			**args, ymin=-10, ymax=10, nvals=nvals
@@ -285,7 +285,7 @@ class TestDualLeeBounds(unittest.TestCase):
 			expected = np.mean(abounds * s0_probs + s0_probs * y0_dists.mean(), axis=1)
 			# compute dual variables
 			ldb = lee.LeeDualBounds(
-				y=Y[0], S=S[0], W=W[0], X=None, pis=pis
+				outcome=Y[0], selections=S[0], treatment=W[0], X=None, propensities=pis
 			)
 			ldb.y0_dists = y0_dists
 			ldb.s0_probs = s0_probs
@@ -319,20 +319,20 @@ class TestDualLeeBounds(unittest.TestCase):
 
 		# Method 1
 		ldb1 = db.lee.LeeDualBounds(
-			X=pd.DataFrame(data['X']),
-			y=pd.Series(data['y']),
-			W=pd.Series(data['W']),
-			S=pd.Series(data['S']),
-			pis=pd.DataFrame(data['pis']),
+			covariates=pd.DataFrame(data['X']),
+			outcome=pd.Series(data['y']),
+			treatment=pd.Series(data['W']),
+			selections=pd.Series(data['S']),
+			propensities=pd.DataFrame(data['pis']),
 		)
 
 		# Method 2
 		ldb2 = db.lee.LeeDualBounds(
-			X=data['X'],
-			y=data['y'],
-			W=data['W'],
-			S=data['S'],
-			pis=data['pis'],
+			covariates=data['X'],
+			outcome=data['y'],
+			treatment=data['W'],
+			selections=data['S'],
+			propensities=data['pis'],
 		)
 
 		# Test equality
@@ -362,38 +362,38 @@ class TestDualLeeBounds(unittest.TestCase):
 			n=500, p=3, r2=0, dgp_seed=1, sample_seed=1,
 		)
 
-		for Y_model, S_model, W_model, pis in zip(
+		for outcome_model, selection_model, propensity_model, pis in zip(
 			['rf', 'ridge', 'knn', 'elastic'],
 			['monotone_logistic', 'knn', 'logistic', 'rf'],
 			[None, None, 'knn', 'logistic'],
 			[data['pis'], data['pis'], None, None]
 		):
 			ldb = lee.LeeDualBounds(
-				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=pis,
-				Y_model=Y_model, S_model=S_model, W_model=W_model,
+				outcome=data['y'], treatment=data['W'], selections=data['S'], covariates=data['X'], pis=pis,
+				outcome_model=outcome_model, selection_model=selection_model, propensity_model=propensity_model,
 			)
 			ldb.fit(nfolds=3).summary()
 			# Test y-model is correct
 			Ym = ldb.model_fits[0].model
-			Y_exp = db.dist_reg.parse_model_type(Y_model, discrete=False)
+			Y_exp = db.dist_reg.parse_model_type(outcome_model, discrete=False)
 			self.assertTrue(
 				isinstance(Ym, Y_exp),
-				f"fit model {Ym} with Y_model={Y_model} is not of type {Y_exp}"
+				f"fit model {Ym} with outcome_model={outcome_model} is not of type {Y_exp}"
 			)
 			# Test s-model is correct
-			Sm = ldb.S_model_fits[0].model
-			S_exp = db.dist_reg.parse_model_type(S_model, discrete=True)
+			Sm = ldb.selection_model_fits[0].model
+			S_exp = db.dist_reg.parse_model_type(selection_model, discrete=True)
 			self.assertTrue(
 				isinstance(Sm, S_exp),
-				f"fit model {Sm} with S_model={S_model} is not of type {S_exp}"
+				f"fit model {Sm} with selection_model={selection_model} is not of type {S_exp}"
 			)
 			# Test pi model is correct if fit
 			if pis is None:
-				Wm = ldb.W_model_fits[0]
-				W_exp = db.dist_reg.parse_model_type(W_model, discrete=True)
+				Wm = ldb.propensity_model_fits[0]
+				W_exp = db.dist_reg.parse_model_type(propensity_model, discrete=True)
 				self.assertTrue(
 					isinstance(Wm, W_exp),
-					f"fit model {Wm} with S_model={W_model} is not of type {W_exp}"
+					f"fit model {Wm} with selection_model={propensity_model} is not of type {W_exp}"
 				)
 
 
@@ -418,12 +418,12 @@ class TestDualLeeBounds(unittest.TestCase):
 			expected, _ = lee.compute_analytical_lee_bound(**oracle_args)
 			## Oracle test
 			ldb_oracle = lee.LeeDualBounds(
-				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+				outcome=data['y'], treatment=data['W'], selections=data['S'], covariates=data['X'], propensities=data['pis'],
 			)
 			est_oracle = ldb_oracle.fit(**oracle_args, suppress_warning=True).estimates
 			## Actual dual bounds
 			ldb = lee.LeeDualBounds(
-				y=data['y'], W=data['W'], S=data['S'], X=data['X'], pis=data['pis'],
+				outcome=data['y'], treatment=data['W'], selections=data['S'], covariates=data['X'], propensities=data['pis'],
 			)
 			est_actual = ldb.fit(nfolds=3).estimates
 			for est, name in zip([est_oracle, est_actual], ['Oracle', 'Dual']):

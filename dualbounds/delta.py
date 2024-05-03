@@ -8,52 +8,63 @@ from .generic import DualBounds
 
 class DeltaDualBounds(DualBounds):
 	"""
-	Performs inference on h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])
-	where h is monotone increasing in its first argument.
-	This wraps ``dualbounds.generic.DualBounds`` and applies
-	the bootstrap or delta method. 
+	Computes generalized dual bounds via the delta method.
 
+	The estimand is
+
+	:math:`h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])`
+
+	where h must be monotone increasing in its first argument. 
+	
 	Parameters
 	----------
 	h : function
 		real-valued function of fval, z0, z1, e.g.,
 		``h = lambda fval, z0, z1 : fval / z0 + z1``.
 	z0 : function
-		potentially vector-valued function of y0, x.
+		vector-valued function of y0, x.
 	z1 : function
-		potentially vector-valued function of y1, x.
+		vector-valued function of y1, x.
 	f : function
 		Function which defines the partially identified estimand.
 		Must be a function of three arguments: y0, y1, x 
 		(in that order). E.g.,
 		``f = lambda y0, y1, x : y0 <= y1``
-	X : np.array
-		(n, p)-shaped array of covariates.
-	W : np.array
-		n-length array of binary treatment indicators.
-	Y : np.array
-		n-length array of outcome measurements.
-	pis : np.array
-		n-length array of propensity scores P(W=1 | X). 
+	outcome : np.array | pd.Series
+		n-length array of outcome measurements (Y).
+	treatment : np.array | pd.Series
+		n-length array of binary treatment (W).
+	covariates : np.array | pd.Series
+		(n, p)-shaped array of covariates (X).
+	propensities : np.array | pd.Series
+		n-length array of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
-	Y_model : str or dist_reg.DistReg
-		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
-		Alternatively, a distributional regression class inheriting 
-		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
-	W_model : str or sklearn classifier
-		Specifies how to estimate the propensity scores if ``pis`` is
-		not known.  Either a str identifier as above or an sklearn
-		classifier---see the tutorial for examples.
+	outcome_model : str | dist_reg.DistReg
+		The model for estimating the law of :math:`Y \mid X, W`.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An object inheriting from ``dist_reg.DistReg``. 
+
+		E.g., when ``outcome`` is continuous, the default is
+		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
+	propensity_model : str | sklearn classifier
+		How to estimate the propensity scores if they are not provided.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
 	discrete : bool
-		If True, treats y as a discrete variable. 
+		If True, treats the outcome as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
 	support : np.array
-		Optinal support of y, if known.
+		Optional support of the outcome, if known and discrete.
 		Defaults to ``None`` (inferred from the data).
-	**model_kwargs : dict
-		Additional kwargs for the ``DistReg`` outcome model,
-		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
+	model_kwargs : dict
+		Additional kwargs for the ``outcome_model``, e.g.,
+		``feature_transform``. See 
+		:class:`dualbounds.dist_reg.CtsDistReg` or 
+		:class:`dualbounds.dist_reg.BinaryDistReg` for more kwargs.
 	"""
 	def __init__(
 		self, 
@@ -69,7 +80,7 @@ class DeltaDualBounds(DualBounds):
 		#self.h_grad = h_grad
 		super().__init__(*args, **kwargs)
 
-	def compute_final_bounds(
+	def _compute_final_bounds(
 		self, 
 		aipw: bool=True,
 		alpha: float=0.05,

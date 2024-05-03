@@ -119,16 +119,17 @@ def apply_pool_factorial(
 	kwargs : dict
 		Each key should correspond to an argument to func and should
 		map to a list of different arguments.
+
 	Returns
 	-------
 	outputs : list
 		List of outputs for each input, in the order of the inputs.
+	
 	Examples
 	--------
 	If we are varying inputs 'a' and 'b', we might have
-	``apply_pool(
-		func=my_func, a=[1,2], b=[5]
-	)``
+		>> apply_pool_factorial(func=my_func, a=[1,2], b=[5])
+
 	which would return ``[my_func(a=1, b=5), my_func(a=2,b=5)]``.
 	"""
 	# Construct input sequence 
@@ -170,10 +171,9 @@ def apply_pool(func, constant_inputs={}, num_processes=1, **kwargs):
 	Examples
 	--------
 	If we are varying inputs 'a' and 'b', we might have
-	``apply_pool(
-		func=my_func, a=[1,3,5], b=[2,4,6]
-	)``
-	which would return ``[my_func(a=1, b=2), my_func(a=3,b=4), my_func(a=5,b=6)]``.
+		>> apply_pool(func=my_func, a=[1,3,5], b=[2,4,6])
+
+	which returns ``[my_func(a=1, b=2), my_func(a=3,b=4), my_func(a=5,b=6)]``.
 	"""
 
 	# Construct input sequence
@@ -258,16 +258,22 @@ class ConstantDist:
 		return self.loc + self.scale * np.ones(size)
 
 class BatchedCategorical:
-	
+	"""
+	Batched discrete (categorical) distribution.
+
+	This class supports the small set of operations
+	needed by the ``DualBounds`` class.
+
+	Parameters
+	----------
+	vals : np.array
+		(n, nvals)-shaped array of supports.
+	probs : np.array
+		(n, nvals)-shaped array of probabilities.
+	"""
 	def __init__(
 		self, vals, probs
 	):
-		"""
-		Parameters
-		----------
-		vals : (n, nvals)-shaped array
-		probs : (n, nvals)-shaped array. probs.sum(axis=1) == 1.
-		"""
 		# sort
 		self.n, self.nvals = vals.shape
 		self.vals, self.probs = _sort_disc_dist(vals=vals, probs=probs)
@@ -279,11 +285,25 @@ class BatchedCategorical:
 			raise ValueError("probs.sum(axis=1) must equal 1")
 	
 	def mean(self):
+		"""
+		Returns
+		-------
+		mu : np.array
+			n-length mean of discrete distributions.
+		"""
 		return np.sum(self.vals * self.probs, axis=1)
 	
 	def ppf(self, q):
 		"""
-		q : (m,n)-shaped array.
+		Parameters
+		----------
+		q : np.array
+			(m,n)-shaped array of desired quantiles, between 0 and 1.
+
+		Returns
+		-------
+		quantile_values : np.array
+			The desired quantile values of the categorical distributions.
 		"""
 		m = q.shape[0]
 		if len(q.shape) == 1:
@@ -305,7 +325,6 @@ class BatchedCategorical:
 		u = np.random.uniform(size=(self.n, 1))
 		inds = (u < self.cumprobs).argmax(axis=1)
 		return self.vals[(np.arange(self.n), inds)]
-
 
 
 def _convert_to_cat(bern_dist, n):
@@ -379,20 +398,27 @@ def adjust_support_size(
 	vals, probs, new_nvals, ymin, ymax
 ):
 	"""
-	Adjust categorical distribution to have a support of size new_nvals.
+	Adjust categorical distribution to have support of size ``new_nvals``.
 	
 	Parameters
 	----------
 	vals : np.array
 		(n, nvals)-length array of support. vals[i] must be sorted for each i.
 	probs : np.array
-		(n, nvals)-length array of probabilities
+		(n, nvals)-length array of probabilities of original distributions.
 	new_nvals : int
 		Desired size of support.
 	ymin : float
-		Minimum value for support
+		Minimum value for support.
 	ymax : float
-		Maximum value for support
+		Maximum value for support.
+
+	Returns
+	-------
+	new_vals : np.array
+		(n, new_nvals)-array of supports.
+	new_probs : np.array
+		(n, new_nvals)-array of probabilities.
 	"""
 	n, nvals = vals.shape
 	new_vals = np.zeros((n, new_nvals))
@@ -403,7 +429,7 @@ def adjust_support_size(
 		)
 	return new_vals, new_probs
 
-def weighted_quantile(values, weights, quantiles, old_style=True):
+def weighted_quantile(values, weights, quantiles, _old_style=True):
 	"""
 	Very close to numpy.percentile, but supports weights.
 
@@ -414,7 +440,12 @@ def weighted_quantile(values, weights, quantiles, old_style=True):
 	weights : np.array
 		n-length array of sample weights
 	quantiles : array-like
-		desired quantiles
+		d-length array of desired quantiles
+
+	Returns
+	-------
+	results : np.array
+		d-length array of weighted quantiles.
 	"""
 	if np.any(quantiles < 0) or np.any(quantiles > 1):
 		raise ValueError("Quantiles must be in [0,1]")
@@ -425,7 +456,7 @@ def weighted_quantile(values, weights, quantiles, old_style=True):
 	weights = weights[sorter]
 	# Compute quantiles
 	cdf = np.cumsum(weights) - 0.5 * weights
-	if old_style:
+	if _old_style:
 		cdf -= cdf[0]
 		cdf /= cdf[-1]
 	else:

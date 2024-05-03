@@ -30,7 +30,6 @@ Lee bounds
    :template:
    ~dualbounds.lee.lee_bound_no_covariates
    ~dualbounds.lee.compute_analytical_lee_bound
-   ~dualbounds.lee.compute_cvar
 
 Variance bounds
 ===============

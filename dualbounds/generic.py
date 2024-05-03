@@ -23,17 +23,17 @@ this warning, set ``supress_warning=True``.
 ==================================================
 """
 
-def get_default_model(discrete, support, Y_model=None, **model_kwargs):
-	if isinstance(Y_model, dist_reg.DistReg):
-		return Y_model
-	Y_model = 'ridge' if Y_model is None else Y_model
+def get_default_model(discrete, support, outcome_model=None, **model_kwargs):
+	if isinstance(outcome_model, dist_reg.DistReg):
+		return outcome_model
+	outcome_model = 'ridge' if outcome_model is None else outcome_model
 	if not discrete:
 		return dist_reg.CtsDistReg(
-			model_type=Y_model, **model_kwargs
+			model_type=outcome_model, **model_kwargs
 		)
 	elif discrete and set(support) == set([0, 1]):
 		return dist_reg.BinaryDistReg(
-			model_type=Y_model, **model_kwargs
+			model_type=outcome_model, **model_kwargs
 		)
 	else:
 		raise NotImplementedError("Currently no default for non-binary discrete data")
@@ -81,7 +81,10 @@ def _default_ylims(
 
 class DualBounds:
 	"""
-	Computes dual bounds on E[f(Y(0),Y(1), X)].
+	Computes dual bounds on :math:`E[f(Y(0),Y(1), X)].`
+
+	Here, :math:`X` are covariates and :math:`Y(0), Y(1)` are 
+	potential outcomes.
 
 	Parameters
 	----------
@@ -90,33 +93,41 @@ class DualBounds:
 		Must be a function of three arguments: y0, y1, x 
 		(in that order). E.g.,
 		``f = lambda y0, y1, x : y0 <= y1``
-	y : np.array
-		n-length array/Series of outcome measurements.
-	W : np.array
-		n-length array/Series of binary treatment indicators.
-	X : np.array
-		(n, p)-shaped array/DataFrame of covariates.
-	pis : np.array
-		n-length array/Series of propensity scores P(W=1 | X). 
+	outcome : np.array | pd.Series
+		n-length array of outcome measurements (Y).
+	treatment : np.array | pd.Series
+		n-length array of binary treatment (W).
+	covariates : np.array | pd.Series
+		(n, p)-shaped array of covariates (X).
+	propensities : np.array | pd.Series
+		n-length array of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
-	Y_model : str or dist_reg.DistReg
-		One of ['ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'].
-		Alternatively, a distributional regression class inheriting 
-		from ``dist_reg.DistReg``. E.g., when ``y`` is continuous,
-		defaults to ``Y_model=dist_reg.CtsDistReg(model_type='ridge')``.
-	W_model : str or sklearn classifier
-		Specifies how to estimate the propensity scores if ``pis`` is
-		not known.  Either a str identifier as above or an sklearn
-		classifier---see the tutorial for examples.
+	outcome_model : str | dist_reg.DistReg
+		The model for estimating the law of :math:`Y \mid X, W`.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An object inheriting from ``dist_reg.DistReg``. 
+
+		E.g., when ``outcome`` is continuous, the default is
+		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
+	propensity_model : str | sklearn classifier
+		How to estimate the propensity scores if they are not provided.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
 	discrete : bool
-		If True, treats y as a discrete variable. 
+		If True, treats the outcome as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
 	support : np.array
-		Optinal support of y, if known.
+		Optional support of the outcome, if known and discrete.
 		Defaults to ``None`` (inferred from the data).
 	model_kwargs : dict
-		Additional kwargs for the ``DistReg`` outcome model,
-		e.g., ``eps_dist`` (for cts. y) or ``feature_transform``.
+		Additional kwargs for the ``outcome_model``, e.g.,
+		``feature_transform``. See 
+		:class:`dualbounds.dist_reg.CtsDistReg` or 
+		:class:`dualbounds.dist_reg.BinaryDistReg` for more kwargs.
 
 	Notes
 	-----
@@ -126,7 +137,7 @@ class DualBounds:
 
 	Examples
 	--------
-	Here we fit DualBounds on P(Y(0) < Y(1)) based on
+	Here we fit DualBounds on :math:`P(Y(0) < Y(1))` based on
 	synthetic regression data: ::
 		import dualbounds as db
 
@@ -136,11 +147,11 @@ class DualBounds:
 		# Initialize dual bounds object
 		dbnd = db.generic.DualBounds(
 			f=lambda y0, y1, x: y0 < y1,
-			X=data['X'], # n x p covariate matrix
-			W=data['W'], # n-length treatment vector
-			y=data['y'], # n-length outcome vector
-			pis=data['pis'], # n-length propensity scores (optional)
-			Y_model='ridge', # model for Y | X, W
+			covariates=data['X'],
+			treatment=data['W'],
+			outcome=data['y'],
+			propensities=data['pis'],
+			outcome_model='ridge',
 		)
 
 		# Compute dual bounds and observe output
@@ -149,12 +160,12 @@ class DualBounds:
 	def __init__(
 		self, 
 		f: callable,
-		y: Union[np.array, pd.Series],
-		W: Union[np.array, pd.Series],
-		X: Optional[Union[np.array, pd.DataFrame]]=None,
-		pis: Optional[Union[np.array, pd.Series]]=None,
-		Y_model: Union[str, dist_reg.DistReg]='ridge',
-		W_model: Union[str, sklearn.base.BaseEstimator]='ridge',
+		outcome: Union[np.array, pd.Series],
+		treatment: Union[np.array, pd.Series],
+		covariates: Optional[Union[np.array, pd.DataFrame]]=None,
+		propensities: Optional[Union[np.array, pd.Series]]=None,
+		outcome_model: Union[str, dist_reg.DistReg]='ridge',
+		propensity_model: Union[str, sklearn.base.BaseEstimator]='ridge',
 		discrete: Optional[np.array]=None,
 		support: Optional[np.array]=None,
 		**model_kwargs,
@@ -163,26 +174,25 @@ class DualBounds:
 		self.f = f
 
 		### Process outcome
-		self.y = y
+		self.y = outcome
 		if isinstance(self.y, pd.Series) or isinstance(self.y, pd.DataFrame):
 			self.y = self.y.values
 		if np.any(np.isnan(self.y)):
-			raise ValueError("outcome (y) contains nans")
+			raise ValueError("outcome contains nans")
 		if len(self.y.shape) > 1:
 			if len(self.y.shape) == 2 and self.y.shape[1] == 1:
 				self.y = self.y.flatten()
 			else:
-				raise ValueError("outcome (y) should be a flat array not a matrix")
+				raise ValueError("outcome should be a flat array not a matrix")
 		self.n = len(self.y)
 
 		### Treatment
-		if isinstance(W, pd.Series) or isinstance(W, pd.DataFrame):
-			W = W.values.reshape(self.n)
-		print("HERE", W)
-		self.W = utilities._binarize_variable(W, var_name='treatment (W)')
+		if isinstance(treatment, pd.Series) or isinstance(treatment, pd.DataFrame):
+			treatment = treatment.values.reshape(self.n)
+		self.W = utilities._binarize_variable(treatment, var_name='treatment')
 
 		### Process covariates
-		self.X = X
+		self.X = covariates
 		if self.X is None:
 			self.X = np.zeros((self.n, 1))
 		# limited preprocessing of covariates
@@ -201,21 +211,21 @@ class DualBounds:
 			self.X[naninds] = np.take(np.nanmean(self.X, axis=0), naninds[1])
 
 		### process propensities
-		self.pis = pis
+		self.pis = propensities
 		if isinstance(self.pis, pd.Series) or isinstance(self.pis, pd.DataFrame):
 			self.pis = self.pis.values.reshape(self.n)
 		if self.pis is not None:
 			if np.any(np.isnan(self.pis)):
 				raise ValueError(f"propensities (pis) are provided but contains missing values")
-			if np.any(pis < 0) or np.any(pis > 1):
+			if np.any(self.pis < 0) or np.any(self.pis > 1):
 				raise ValueError(f"propensities (pis) do not lie within [0,1]")
 
 		### Check if discrete
 		self.discrete, self.support = infer_discrete(
 			discrete=discrete, support=support, y=self.y,
 		)
-		self.Y_model = Y_model
-		self.W_model = W_model
+		self.outcome_model = outcome_model
+		self.propensity_model = propensity_model
 		self.model_kwargs = model_kwargs
 
 		## Initialize core objects
@@ -500,32 +510,42 @@ class DualBounds:
 		**kwargs,
 	):
 		"""
-		Estimates optimal dual variables based on the outcome model.
+		Estimates dual variables using the outcome model.
+
+		We generally recommend that the user call .fit() instead of 
+		calling this function directly.
 
 		Parameters
 		----------
 		y0_dists : list
-			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(0) | Xi
-			OR 
-			list of scipy dists whose shapes add up to n.
+			The ith distribution of y0_dists represents the conditional
+			law of :math:`Y_i(0) | X_i`. There are two input formats:
+
+			- batched scipy distribution of shape (n,)
+			- list of scipy dists whose shapes add up to n.
+
 		y0_vals : list
-			(n, nvals0)-length array of values y0 can take.
+			Alternatively, specify a (n, nvals0)-length array
+			where ``y0_vals[i]`` is the support of :math:`Y_i(0)`.
+			Ignored if ``y0_dists`` is provided.
 		y0_probs : np.array
-			(n, nvals0)-length array where
-			y0_probs[i, j] = P(Y(0) = yvals0[j] | Xi)
-		y1_dists : np.array
-			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Yi(1) | Xi
-			OR 
-			list of scipy dists whose shapes add up to n.
+			A (n, nvals0)-length array where ``y0_probs[i, j]``
+			is the estimated probability that :math:`Y_i(0)`
+			equals ``y0_vals[i, j].``
+		y1_dists : list
+			The ith distribution of y1_dists represents the conditional
+			law of :math:`Y_i(1) | X_i`. There are two input formats:
+
+			- batched scipy distribution of shape (n,)
+			- list of scipy dists whose shapes add up to n.
+
 		y1_vals : np.array
-			(n, nvals1)-length array of values y1 can take.
-			Ignored if ``y1_dists`` is provided.
+			(n, nvals1)-length array where ``y1_vals[i]`` is the support 
+			of :math:`Y_i(1)`.	Ignored if ``y1_dists`` is provided.
 		y1_probs : np.array
-			(n, nvals1)-length array where
-			y0_probs[i, j] = P(Y(1) = yvals1[j] | Xi).
-			Ignored if ``y1_dists`` is provided.
+			(n, nvals1)-length array where ``y1_probs[i, j]``
+			is the estimated probability that :math:`Y_i(1)`
+			equals ``y1_vals[i, j].``
 		nvals0 : int
 			How many values to use to discretize Y(0). 
 			Defaults to 100. Ignored for discrete Y.
@@ -534,22 +554,26 @@ class DualBounds:
 			Defaults to 100. Ignored for discrete Y.
 		interp_fn : function 
 			An interpolation function with the same input/output
-			signature as ``interpolation.linear_interpolate``,
+			signature as ``interpolation.adaptive_interpolate``,
 			which is the default. Ignored for discrete Y.
 		y0_min : float
 			Minimum support for Y(0).
-			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())
+			Defaults to ``self.y.min() - 0.5 * (self.y.max() - self.y.min())``
 		y1_min : float
 			Minimum support for Y(1). 
-			Defaults to self.y.min() - 0.5 * (self.y.max() - self.y.min())
+			Defaults to ``self.y.min() - 0.5 * (self.y.max() - self.y.min())``
 		y0_max : float
 			Maximum support for Y(0). 
-			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())
+			Defaults to ``self.y.max() + 0.5 * (self.y.max() - self.y.min())``
 		y1_max : float
 			Maximum support for Y(1). 
-			Defaults to self.y.max() + 0.5 * (self.y.max() - self.y.min())
+			Defaults to ``self.y.max() + 0.5 * (self.y.max() - self.y.min())``
 		kwargs : dict
 			kwargs for ``_ensure_feasibility`` method, e.g., ``grid_size``.
+
+		Returns
+		-------
+		None
 		"""
 		### Key quantities for optimizer
 		# to ensure numerical stability, we add extra quantiles
@@ -724,7 +748,7 @@ class DualBounds:
 			aipw0 = (self.hatnu0s[1-lower] - self.c0s[1-lower]) / (1-self.pis) + mus
 			self.aipw_summands[1-lower] = aipw1 * self.W + (1 - self.W) * aipw0
 
-	def compute_final_bounds(self, aipw=True, alpha=0.05):
+	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
 		Computes final results from the estimated dual variables.
 		"""
@@ -770,23 +794,36 @@ class DualBounds:
 		self, nfolds: int, clip: float=1e-2, verbose: bool=True,
 	):
 		"""
-		Performs cross-fitting to fit the propensity scores.
+		Cross-fits the propensity scores.
+
+		Parameters
+		----------
+		nfolds : int
+			Number of folds.
+		clip : float
+			Clip propensity scores to be in [clip, 1-clip].
+		verbose : bool
+			If True, prints progress reports.
+
+		Returns
+		-------
+		None
 		"""
 		# Parse model
-		if self.W_model is None:
-			self.W_model = 'ridge'
-		if isinstance(self.W_model, str):
+		if self.propensity_model is None:
+			self.propensity_model = 'ridge'
+		if isinstance(self.propensity_model, str):
 			model_cls = dist_reg.parse_model_type(
-				self.W_model, discrete=True
+				self.propensity_model, discrete=True
 			)
-			self.W_model = model_cls()
+			self.propensity_model = model_cls()
 		
 		# Loop through
 		if verbose:
 			print("Fitting propensity scores.")
 		starts, ends = dist_reg.create_folds(n=self.n, nfolds=nfolds)
 		# loop through and fit
-		self.W_model_fits = []
+		self.propensity_model_fits = []
 		self.pis = np.zeros(self.n)
 		for ii in utilities.vrange(len(starts), verbose=verbose):
 			start, end = starts[ii], ends[ii]
@@ -795,11 +832,11 @@ class DualBounds:
 				i for i in np.arange(self.n) if i < start or i >= end
 			]
 			# Fit 
-			model_fit = copy.deepcopy(self.W_model)
+			model_fit = copy.deepcopy(self.propensity_model)
 			model_fit.fit(
 				X=self.X[not_in_fold], y=self.W[not_in_fold]
 			)
-			self.W_model_fits.append(model_fit)
+			self.propensity_model_fits.append(model_fit)
 			# Predict out of sample
 			self.pis[start:end] = model_fit.predict_proba(
 				self.X[start:end]
@@ -815,19 +852,27 @@ class DualBounds:
 		verbose: bool=True,
 	):
 		"""
-		Performs cross-fitting to fit the outcome model.
+		Cross-fits the outcome model.
 
+		Parameters
+		----------
+		nfolds : int
+			Number of folds to use in cross-fitting.
+		suppress_warning : bool
+			If True, suppresses a potential warning about cross-fitting.
+		verbose : bool
+			If True, prints progress reports.
 
 		Returns
 		-------
 		y0_dists : list
 			list of batched scipy distributions whose shapes sum to n.
 			the ith distribution is the out-of-sample estimate of
-			the conditional law of Yi(0) | X[i]
+			the conditional law of :math:`Y_i(0) | X[i]`
 		y1_dists : list
 			list of batched scipy distributions whose shapes sum to n.
 			the ith distribution is the out-of-sample estimate of
-			the conditional law of Yi(1) | X[i]
+			the conditional law of :math:`Y_i(1) | X[i]`
 		"""
 
 		# if pis not supplied: will use cross-fitting
@@ -838,10 +883,10 @@ class DualBounds:
 		if self.y0_dists is None or self.y1_dists is None:
 			# Note: this returns the existing model
 			# if an existing model is provided
-			self.Y_model = get_default_model(
+			self.outcome_model = get_default_model(
 				discrete=self.discrete, 
 				support=self.support,
-				Y_model=self.Y_model,
+				outcome_model=self.outcome_model,
 				**self.model_kwargs
 			)
 			if verbose:
@@ -849,7 +894,7 @@ class DualBounds:
 			y_out = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.y, 
 				nfolds=nfolds, 
-				model=self.Y_model,
+				model=self.outcome_model,
 				verbose=verbose,
 			)
 			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = y_out
@@ -877,7 +922,7 @@ class DualBounds:
 		verbose: bool = True,
 		suppress_warning: bool = False,
 		**solve_kwargs,
-	) -> dict:
+	):
 		"""
 		Main function which (1) performs cross-fitting, (2) computes 
 		optimal dual variables, and (3) computes final dual bounds.
@@ -891,18 +936,25 @@ class DualBounds:
 		aipw : bool
 			If true, returns AIPW estimator.
 		y0_dists : list
-			list of batched scipy distributions whose shapes sum to n.
-			the ith distribution is an out-of-sample estimate of
-			the law of Yi(0) | X[i]. This is an optional input;
-			if provided, ``Y_model`` will be ignored.
+			The ith distribution of y0_dists represents the conditional
+			law of :math:`Y_i(0) | X_i`. There are two input formats:
+
+			- batched scipy distribution of shape (n,)
+			- list of scipy dists whose shapes add up to n.
+
+			This is an optional input; if provided, ``outcome_model``
+			will be ignored.
 		y1_dists : list
-			list of batched scipy distributions whose shapes sum to n.
-			the ith distribution is an out-of-sample estimate of
-			the law of Yi(1) | X[i]. This is an optional input;
-			if provided, ``Y_model`` will be ignored.
+			The ith distribution of y1_dists represents the conditional
+			law of :math:`Y_i(1) | X_i`. There are two input formats:
+
+			- batched scipy distribution of shape (n,)
+			- list of scipy dists whose shapes add up to n.
+
+			This is an optional input; if provided, ``outcome_model``
+			will be ignored.
 		verbose : bool
 			If True, gives occasional progress reports.
-			Defaults to True.
 		suppress_warning : bool
 			If True, suppresses a warning about cross-fitting.
 		solve_kwargs : dict
@@ -911,7 +963,7 @@ class DualBounds:
 
 		Returns
 		-------
-		self : object
+		self
 		"""
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
@@ -928,7 +980,7 @@ class DualBounds:
 		)
 		# compute dual bounds
 		self.alpha = alpha
-		self.compute_final_bounds(aipw=aipw, alpha=alpha)
+		self._compute_final_bounds(aipw=aipw, alpha=alpha)
 		return self
 
 	# def _plug_in_results(self):
@@ -947,7 +999,7 @@ class DualBounds:
 
 	def results(self, minval: float=-np.inf, maxval: float=np.inf):
 		"""
-		Produces a dataframe of key inferential results.
+		Returns a dataframe of key inferential results.
 
 		Parameters
 		----------
@@ -957,6 +1009,11 @@ class DualBounds:
 		maxval : float
 			Analytical upper bound on estimand used to clip results.
 			Defaults to np.inf.
+
+		Returns
+		-------
+		results : pd.DataFrame
+			DataFrame of key inferential results.
 		"""
 		self.results_ = pd.DataFrame(
 			np.stack(
@@ -984,6 +1041,15 @@ class DualBounds:
 		maxval : float
 			Analytical upper bound on estimand used to clip results.
 			Defaults to np.inf.
+
+		Returns
+		-------
+		None
+
+		Notes
+		-----
+		To access the inferential results as a pd.DataFrame, call
+		``DualBounds.results()``.
 		"""
 		print("___________________Inference_____________________")
 		print(self.results(minval=minval, maxval=maxval))
@@ -1007,29 +1073,29 @@ class DualBounds:
 
 
 def plug_in_no_covariates(
-	y: np.array, 
-	W: np.array, 
-	f: np.array, 
-	pis: Optional[np.array]=None,
+	outcome: np.array, 
+	treatment: np.array, 
+	f: callable, 
+	propensities: Optional[np.array]=None,
 	B: int=0,
 	verbose: bool=True,
 	alpha: float=0.05,
 	max_nvals: int=1000,
-):
+) -> dict:
 	"""
-	Computes plug-in bounds on E[f(Y(0),Y(1))] without using covariates.
+	Computes plug-in bounds on :math:`E[f(Y(0),Y(1))]` without using covariates.
 
 	Parameters
 	----------
-	y : np.array
-		n-length array of outcomes
-	W : np.array
-		n-length array of treatments.
+	outcome : np.array
+		n-length array of outcomes (y)
+	treatment : np.array
+		n-length array of treatments (W).
 	f : function
 		f(y0, y1, x) defines the objective.
-	pis : np.array
-		n-length array of propensity scores.
-		Default: all equal to 1/2.
+	propensities : np.array
+		n-length array of propensity scores (pis).
+		Default: all equal to treatment.mean().
 	B : int
 		Number of bootstrap replications to compute standard errors.
 		Defaults to 0 (no standard errors).
@@ -1038,11 +1104,26 @@ def plug_in_no_covariates(
 	alpha : float
 		nominal Type I error level.
 	max_nvals : int
-		Maximum dimension of OT problem.
+		Maximum dimension of optimal transport problem.
+
+	Returns
+	-------
+	results : dict
+		Dictionary containing up to three keys:
+
+		- estimates: 2-length array of lower/upper estimates.
+		- ses: 2-length array of lower/upper standard errors.
+		- cis: 2-length array of lower/upper confidence intervals.
 	"""
+	# rename for simplicity
+	y = outcome
+	W = treatment
+	pis = propensities
+
+	# Perform analysis
 	n = len(y)
 	if pis is None:
-		pis = np.ones(n) / 2
+		pis = np.ones(n) * treatment.mean()
 	if B == 0:
 		# Dists
 		y0_vals = y[W == 0]
@@ -1071,16 +1152,16 @@ def plug_in_no_covariates(
 			b=y1_probs,
 			M=-fvals,
 		)
-		return np.array([lower, upper])
+		return dict(estimates=np.array([lower, upper]))
 	else:
 		# Estimates
-		ests = plug_in_no_covariates(y=y, W=W, f=f, B=0)
+		ests = plug_in_no_covariates(outcome=y, treatment=W, f=f, B=0)
 		# Bootstrap
 		bs_ests = np.zeros((B, 2))
 		for b in utilities.vrange(B, verbose=verbose):
 			inds = np.random.choice(np.arange(n), size=n, replace=True)
 			bs_ests[b] = plug_in_no_covariates(
-				y=y[inds], W=W[inds], f=f, B=0
+				outcome=y[inds], treatment=W[inds], f=f, B=0
 			)
 		# Bias
 		bias = bs_ests.mean(axis=0) - ests

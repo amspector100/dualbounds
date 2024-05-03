@@ -13,24 +13,28 @@ def multiplier_bootstrap(
 	verbose: int=False,
 ):
 	"""
-	Computes a lower confidence bound on the max(mu),
-	where mu is the vector of means of ``samples``.
+	Computes multiplier bootstrap lower confidence bounds. 
+
+	Precisely, computes a lower confidence bound on
+	:math:`\max(\mu_1, \dots, \mu_d)`,
+	where :math:`\mu_i` is the mean of ``samples[i]``.
 
 	Parameters
 	----------
 	samples : np.array
 		(n,d)-shaped array where samples[i]
-		is i.i.d. with mean mui.
+		is i.i.d. with mean :math:`\mu_i`.
 	alpha : float
 		Nominal error control level.
 	B : int
 		Number of bootstrap replications
 	maxarrsize : float
-		Maximum size of an array; used to
-		save memory.
+		Maximum size of an array; used to save memory.
 	param : str
-		If param='max', computes a lower CB on max(mu).
-		Else, computes an upper CB on min(mu).
+		
+		- If param='max', computes a lower confidence bound on :math:`\max(\mu_1, \dots, \mu_d)`.
+		- Else, computes an upper confidence bound on :math:`\min(\mu_1, \dots, \mu_d)`,
+
 	verbose : bool
 		If True, shows a progress bar. Only useful
 		if ``samples`` is a very large matrix.
@@ -38,9 +42,9 @@ def multiplier_bootstrap(
 	Returns
 	-------
 	estimate : float
-		Estimate of max(mu1, ..., mud).
+		Estimate of :math:`\max(\mu_1, \dots, \mu_d)`.
 	ci : float
-		Lower confidence bound on max(mu1, ..., mud).
+		Lower confidence bound on :math:`\max(\mu_1, \dots, \mu_d)`.
 	"""
 	if param != 'max':
 		estimate, ci = multiplier_bootstrap(
@@ -117,14 +121,8 @@ def dualbound_multiplier_bootstrap(
 		kwargs for dualbounds.bootstrap.multiplier_bootstrap.
 	Returns
 	-------
-	Returns a dictionary with the following attributes:
-
-	estimates : np.array
-		array of lower and upper estimates. These in 
-		general may be biased.
-	cis : np.array
-		1 - alpha confidence lower/upper bounds on 
-		the partial identification bounds.
+	result : pd.DataFrame
+		dataframe of results.
 	"""
 	# Fetch summands
 	if aipw:

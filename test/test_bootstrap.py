@@ -67,8 +67,11 @@ class TestMultiplierBootstrap(unittest.TestCase):
 		db_objects = []
 		for Y_model in ['ridge', 'knn']:
 			gdb = db.generic.DualBounds(
-				y=data['y'], X=data['X'], W=data['W'], pis=data['pis'],
-				Y_model=Y_model,
+				outcome=data['y'], 
+				covariates=data['X'], 
+				treatment=data['W'], 
+				propensities=data['pis'],
+				outcome_model=Y_model,
 				f=lambda y0, y1, x: (y1 < y0).astype(float) 
 			)
 			gdb.fit(nfolds=2)

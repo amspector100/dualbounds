@@ -29,18 +29,18 @@ class TestDeltaDualBounds(unittest.TestCase):
 			z1=lambda y1, x: y1,
 			z0=lambda y0, x: y0,
 			f=lambda y0, y1, x: (y0-y1)**2,
-			X=data['X'],
-			y=data['y'],
-			W=data['W'],
-			pis=data['pis'],
+			covariates=data['X'],
+			outcome=data['y'],
+			treatment=data['W'],
+			propensities=data['pis'],
 		)
 		deltadb.fit().summary()
 		# Analytical variant
 		vdb = db.varite.VarITEDualBounds(
-			X=data['X'],
-			y=data['y'],
-			W=data['W'],
-			pis=data['pis'],
+			covariates=data['X'],
+			outcome=data['y'],
+			treatment=data['W'],
+			propensities=data['pis'],
 		)
 		vdb.fit(
 			y0_dists=deltadb.y0_dists,
@@ -75,18 +75,18 @@ class TestDeltaDualBounds(unittest.TestCase):
 		)
 		ddb1 = db.delta.DeltaDualBounds(
 			**fn_args,
-			X=pd.DataFrame(data['X']),
-			y=pd.DataFrame(data['y']),
-			W=pd.DataFrame(data['W']),
-			pis=pd.DataFrame(data['pis']),
+			covariates=pd.DataFrame(data['X']),
+			outcome=pd.DataFrame(data['y']),
+			treatment=pd.DataFrame(data['W']),
+			propensities=pd.DataFrame(data['pis']),
 		)
 		# Method 2
 		ddb2 = db.delta.DeltaDualBounds(
 			**fn_args,
-			X=data['X'],
-			y=data['y'],
-			W=data['W'],
-			pis=data['pis'],
+			covariates=data['X'],
+			outcome=data['y'],
+			treatment=data['W'],
+			propensities=data['pis'],
 		)
 
 		# Test equality
