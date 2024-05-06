@@ -63,7 +63,7 @@ Interpolation
    ~dualbounds.interpolation.nn_interpolate
    ~dualbounds.interpolation.linear_interpolate
 
-Miscallaneous
+Miscellaneous
 -------------
 .. autosummary::
    :toctree: generated/misc/

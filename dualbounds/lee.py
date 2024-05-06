@@ -178,12 +178,12 @@ def lee_bound_no_covariates(
 	"""
 	# Rename for simplicity
 	y = outcome
+	n = len(y)
 	W = treatment
 	S = selections
 	pis = propensities
 	if pis is None:
 		pis = np.ones(n) * treatment.mean()
-	n = len(W)
 
 	# compute P(S | W)
 	s0_prob = np.array([np.mean(S[W == 0])])
@@ -220,7 +220,11 @@ def lee_bound_no_covariates(
 		for b in range(B):
 			inds = np.random.choice(n, n, replace=True)
 			bs_ests[b] = lee_bound_no_covariates(
-				treatment=W[inds], selections=S[inds], outcome=y[inds], B=0
+				treatment=W[inds], 
+				selections=S[inds],
+				outcome=y[inds],
+				propensities=pis[inds],
+				B=0,
 			)['estimates']
 		bias = bs_ests.mean(axis=0) - ests
 		ses = bs_ests.std(axis=0)
