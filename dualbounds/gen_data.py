@@ -226,3 +226,78 @@ def gen_lee_bound_data(
 	):
 		output[key] = val
 	return output
+
+def gen_iv_data(
+	n: int,
+	p: int,
+	betaZ_norm: float=0,
+	betaW_norm: float=0.5,
+	r2: float=0.95,
+	eps_dist: str='gaussian',
+	lmda_dist: str='constant',
+	tau: float=3,
+	tauv: float=1,
+	heterosked: str='constant',
+):
+	"""
+	
+	Parameters
+	----------
+	n : int
+		Number of observations.
+	p : int
+		Number of covariates
+	lmda_dist : str
+		str specifying the distribution of lmdai, 
+		where Xi = lmdai * N(0, Sigma), so the 
+		covariates are elliptically distributed. 
+	eps_dist : str
+		str specifying the distribution of the 
+		residuals. See ``utilities.parse_dist``
+		for the list of options.
+	heterosked : str
+		str specifying the type of heteroskedasticity.
+		Defaults to ``constant``.
+	tau : float
+		Average treatment effect.
+	tauv : float
+		Ratio of Var(Y(1) | X) / Var(Y(0) | X)
+	r2 : float
+		Population r^2 of 1 - E[Var(Y | X)] / Var(Y).
+	interactions : bool
+		If True, there are interactions in the regression
+		of Y on X.
+	betaZ_norm: float
+		Norm of beta in logistic regression of Z on X.
+	betaW_norm : float
+		Norm of beta in logistic regression of W on X, Z.
+	tauZ : float
+		Coefficient of Z in logistic regression of W on X, Z.
+	dgp_seed : int
+		Random seed for the data-generating parameters.
+	sample_seed : int
+		Random seed for the randomness from sampling.
+	"""
+	# create parameters
+	np.random.seed(dgp_seed)
+	# Create beta
+	beta_norm = r2 / (1 - r2) if r2 > 0 else 0
+	# No interactions with treatment
+	if not interactions:
+		beta = _sample_norm_vector(p, beta_norm)
+		beta_int = np.zeros(p)
+	# interactions with treatment
+	else:
+		beta = _sample_norm_vector(2*p, beta_norm)
+		beta_int = beta[p:].copy()
+		beta = beta[0:p].copy()
+
+	# Create beta_W (for W | X)
+	betaW = _sample_norm_vector(p, betaW_norm)
+
+	# sample X
+	np.random.seed(sample_seed)
+	X = np.random.randn(n, p)
+	lmdas = parse_dist(lmda_dist).rvs(size=n)
+	lmdas /= np.sqrt(np.power(lmdas, 2).mean())
+	X = X * lmdas.reshape(-1, 1)

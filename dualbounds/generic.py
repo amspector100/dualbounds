@@ -670,6 +670,10 @@ class DualBounds:
 		This is used in two places:
 		1. _compute_realized_dual_variables
 		2. Main loop of compute_dual_variables
+
+		We use this in the main loop of compute_dual_variables
+		instead of just calling _compute_realized_dual_variables
+		so that the progress report is accurate.
 		"""
 		nu0x = self.nu0s[1-lower, i]
 		nu1x = self.nu1s[1-lower, i]
@@ -702,6 +706,7 @@ class DualBounds:
 		Helper function which applies interpolation 
 		(for continuous Y) to compute realized dual variables.
 		It also ensures feasibility through a 2D gridsearch.
+		This is used primarily in unit tests.
 		"""
 		y = self.y if y is None else y
 

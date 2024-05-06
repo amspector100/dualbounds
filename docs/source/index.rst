@@ -58,9 +58,13 @@ Bibtex entry::
    
    https://arxiv.org/abs/2310.08115
 
-
 Index
 =====
 
 * :ref:`genindex`
 * :ref:`modindex`
+
+Thanks
+======
+
+Thanks to Kevin Guo, whose comments substantially improved the API structure.
