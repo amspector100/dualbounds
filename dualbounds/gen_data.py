@@ -309,7 +309,7 @@ def gen_iv_data(
 	X = X * lmdas.reshape(-1, 1)
 
 	### Sample Z | X
-	muZ = X @ betaW
+	muZ = X @ betaZ
 	pis = np.exp(muZ)
 	pis = pis / (1 + pis)
 	# clip in truth
@@ -317,7 +317,7 @@ def gen_iv_data(
 	Z = np.random.binomial(1, pis).astype(int)
 
 	### Sample W | Z, X. Here U are meant to be unmeasured.
-	wprobs = np.stack([X @ betaZ, X @ betaZ + tauZ], axis=1)
+	wprobs = np.stack([X @ betaW, X @ betaW + tauZ], axis=1)
 	wprobs = np.exp(wprobs) / (1 + np.exp(wprobs))
 	U = np.random.uniform(size=n)
 	W01 = (U.reshape(n, 1) <= wprobs).astype(int)
@@ -352,9 +352,6 @@ def gen_iv_data(
 		for z in [0,1]:
 			for w, muY, sigmaY in zip([0,1], [mu0, mu1], [sigmas0, sigmas1]):
 				ydists[z].append(parse_dist(eps_dist, mu=muY, sd=sigmaY))
-				if eps_dist == 'bernoulli':
-					ydists[z][w] = _convert_to_cat(ydists[z][w], n=n)
-
 
 	return dict(
 		y=Y,

@@ -21,7 +21,8 @@ Also, do we need to define a ConcatScipyDist wrapper...?
 class DualIVBounds(generic.DualBounds):
 	"""
 	This docstring needs to be constructed. Notes:
-	(1) many parameter descriptions need to be changed etc,
+	(1) many parameter descriptions need to be changed,
+	including f and support_restriction
 	(2) instrument = Z, exposure = W. So propensities are Z | X.
 
 	Other notes:
@@ -91,43 +92,57 @@ class DualIVBounds(generic.DualBounds):
 		probs1 = np.concatenate([probs[1, 0], probs[1, 1]])
 		vals1 = np.concatenate([yvals[1, 0], yvals[1, 1]], axis=0)
 
-		# Compute dual variables
+		# Evaluate f(w0, w1, y0, y1, x).
+		# This is not the final constraint matrix
+		# and needs to be adjusted later, depending on the value of lower.
 		nvals = yvals.shape[-1]
+		fvals_raw = np.zeros((2*nvals, 2*nvals))
+		not_in_support = np.zeros((2*nvals, 2*nvals)).astype(bool)
+		for w0 in [0,1]:
+			w0_vals = np.arange(nvals) + w0 * nvals
+			for w1 in [0,1]:
+				w1_vals = np.arange(nvals) + w1 * nvals
+				block_inds = np.ix_(w0_vals, w1_vals)
+				block_args=dict(
+					w0=w0,
+					w1=w1,
+					y0=yvals[0, w0],
+					y1=yvals[1, w1],
+					x=x,
+				)
+				fvals_raw[block_inds] = self._apply_ot_fn(fn=self.f, **block_args)
+				if self.support_restriction is not None:
+					not_in_support[block_inds] = ~self._apply_ot_fn(
+						fn=self.support_restriction, **block_args
+					).astype(bool)
+
+		# Compute dual variables
 		objvals = np.zeros(2)
 		nu0s = np.zeros((2, 2, nvals))
 		nu1s = np.zeros((2, 2, nvals))
 		c0s = np.zeros(2)
 		c1s = np.zeros(2)
-		for lower in [True, False]:
-			# Evaluate f(w0, w1, y0, y1, x). 
-			# This is not a generic OT constraint matrix
-			# and needs to be adjusted depending on the value of lower.
-			fvals = np.zeros((2*nvals, 2*nvals))
-			for w0 in [0,1]:
-				w0_vals = np.arange(nvals) + w0 * nvals
-				for w1 in [0,1]:
-					w1_vals = np.arange(nvals) + w1 * nvals
-					fblock = self.f(
-						w0=w0,
-						w1=w1,
-						y0=yvals[0, w0].reshape(-1, 1),
-						y1=yvals[1, w1].reshape(1, -1),
-						x=x,
-					)
-					# when w0 == w1, this is a linear non-OT constraint.
-					# we use a hack to encode this within the ot 
-					# framework so that we can use the efficient ot functions
-					if w0 == w1:
-						almost_inf = (1 + np.abs(fblock)).max() * 1e5
-						if lower:
-							fblock = fblock.min(axis=1-w0)
-						else:
-							fblock = fblock.max(axis=1-w0)
-							almost_inf *= -1
-						# A hack to make the non-diagonal constraints unimportant
-						fblock = np.ones((nvals, nvals)) * almost_inf + np.diag(fblock - almost_inf)
-
-					fvals[np.ix_(w0_vals, w1_vals)] = fblock
+		for lower in [1, 0]:
+			# Get rid of constraints which conflict with a-priori
+			# support restrictions
+			fvals = fvals_raw.copy()
+			almost_inf = (2*lower - 1) * (np.abs(fvals).max() + 1) * 1e5
+			fvals[not_in_support] = almost_inf
+			# Adjust constraint matrix since when w0==w1,
+			# we have a linear non-OT constraint. 
+			# We use a hack to encode this within the OT framework
+			# so that we can use the efficient OT functions.
+			for w in [0,1]:
+				winds = np.arange(nvals) + w * nvals
+				block_inds = np.ix_(winds, winds)
+				fblock = fvals[block_inds]
+				if lower:
+					fblock = fblock.min(axis=1-w)
+				else:
+					fblock = fblock.max(axis=1-w)
+				# A hack to make the non-diagonal constraints unimportant
+				fblock = np.ones((nvals, nvals)) * almost_inf + np.diag(fblock - almost_inf)
+				fvals[block_inds] = fblock
 
 			# Solve
 			if lower:
@@ -226,20 +241,30 @@ class DualIVBounds(generic.DualBounds):
 						[self._yvals[i, z, w], extra_yvals], axis=0
 					))))
 			# New fvals
-			raise NotImplementedError("FVALS ARE WRONG NEED TO CHANGE THIS")
 			new_fvals = [[], []]
 			for w0 in [0,1]:
 				for w1 in [0,1]:
-					# fvals
-					new_fvals[w0].append(
-						self.f(
-							w0=w0,
-							w1=w1,
-							y0=new_yvals[0][w0].reshape(-1, 1),
-							y1=new_yvals[1][w1].reshape(1, -1),
-							x=self.X[i],
-						)
+					block_args = dict(
+						w0=w0,
+						w1=w1,
+						y0=new_yvals[0][w0],
+						y1=new_yvals[1][w1],
+						x=self.X[i],
 					)
+					# fvals
+					new_fvals[w0].append(self._apply_ot_fn(fn=self.f, **block_args))
+					# Account for support restrictions
+					if self.support_restriction is not None:
+						not_in_support = ~(self._apply_ot_fn(
+							fn=self.support_restriction, **block_args
+						).astype(bool))
+					else:
+						not_in_support = np.zeros(new_fvals[w0][-1].shape).astype(bool)
+					if lower:
+						new_fvals[w0][-1][not_in_support] = np.inf
+					else:
+						new_fvals[w0][-1][not_in_support] = -np.inf
+
 			# Interpolate nus
 			new_nus = [[], []]
 			for z in [0,1]:
@@ -247,29 +272,47 @@ class DualIVBounds(generic.DualBounds):
 					new_nus[z].append(self.interp_fn(
 						x=self._yvals[i, z, w], y=orig_nus[z, w], newx=new_yvals[z][w]
 					))
-			# Check feasibility for each w0, w1
-			for w0 in [0,1]:
-				for w1 in [0,1]:
-					deltas = new_nus[0][w0].reshape(-1, 1) + new_nus[1][w1].reshape(1, -1)
-					deltas = deltas - new_fvals[w0][w1]
-					# Figure out which axis to adjust
-					if lower:
-						deltas0 = deltas.max(axis=1)
-						dx0 = np.mean(np.maximum(deltas0, 0))
-						deltas1 = deltas.max(axis=0)
-						dx1 = np.mean(np.maximum(deltas1, 0))
-						adj_axis = 1 if dx1 <= dx0 else 0
-					else:
-						deltas0 = deltas.min(axis=1)
-						dx0 = np.mean(np.minimum(deltas0, 0))
-						deltas1 = deltas.min(axis=0)
-						dx1 = np.mean(np.minimum(deltas1, 0))
-						adj_axis = 1 if dx1 >= dx0 else 0
-					# Adjust
-					if adj_axis == 0:
-						new_nus[0][w0] -= deltas0
-					else:
-						new_nus[1][w1] -= deltas1
+			### Check feasibility. Two cases.
+			### Case 1: w0 == w1. Here we have vanilla linear (non-OT) constraints
+			for w in [0,1]:
+				if lower:
+					new_fvals_block = new_fvals[w][w].min(axis=1-w)
+				else:
+					new_fvals_block = new_fvals[w][w].max(axis=1-w)
+				deltas = new_nus[0][w] + new_nus[1][w] - new_fvals_block
+				if lower:
+					deltas = np.maximum(deltas, 0)
+					new_nus[0][w] -= deltas / 2
+					new_nus[1][w] -= deltas / 2
+				else:
+					deltas = np.minimum(deltas, 0)
+					new_nus[0][w] -= deltas / 2
+					new_nus[1][w] -= deltas / 2
+
+			### Case 2: w0 != w1. Here we have full OT constraints.
+			for w0, w1 in zip([0,1], [1,0]):
+				deltas = new_nus[0][w0].reshape(-1, 1) + new_nus[1][w1].reshape(1, -1)
+				deltas = deltas - new_fvals[w0][w1]
+				# Figure out which axis to adjust
+				if lower:
+					deltas = np.maximum(deltas, 0)
+					deltas0 = deltas.max(axis=1)
+					dx0 = np.mean(np.maximum(deltas0, 0))
+					deltas1 = deltas.max(axis=0)
+					dx1 = np.mean(np.maximum(deltas1, 0))
+					adj_axis = 1 if dx1 <= dx0 else 0
+				else:
+					deltas = np.minimum(deltas, 0)
+					deltas0 = deltas.min(axis=1)
+					dx0 = np.mean(np.minimum(deltas0, 0))
+					deltas1 = deltas.min(axis=0)
+					dx1 = np.mean(np.minimum(deltas1, 0))
+					adj_axis = 1 if dx1 >= dx0 else 0
+				# Adjust
+				if adj_axis == 0:
+					new_nus[0][w0] -= deltas0
+				else:
+					new_nus[1][w1] -= deltas1
 			
 			# Compute difference in objective values by remapping to original shape
 			adj_nus = np.zeros(orig_nus.shape)
@@ -313,7 +356,7 @@ class DualIVBounds(generic.DualBounds):
 			# interpolate to find realized values 
 			self.hatnus[1-lower, i] = self.interp_fn(
 				x=new_yvals[zi][wi], y=new_nus[zi][wi], newx=yi,
-			)
+			).item()
 		else:
 			j = np.where(self._yvals[i, zi, wi] == yi)[0][0]
 			self.hatnus[1-lower, i] = nusx[zi, wi, j]
@@ -359,7 +402,7 @@ class DualIVBounds(generic.DualBounds):
 			self.nvals = nvals
 			# if self.nvals <= generic.MIN_NVALS
 
-		####TODO: need to infer the ymin/ymaxes but that's okay for now
+		# Infer ymin/ymax
 		if ymin is None:
 			ymin = self.y.min() - (self.y.max() - self.y.min()) / 2
 		if ymax is None:
@@ -435,6 +478,7 @@ class DualIVBounds(generic.DualBounds):
 					ymin=ymin,
 					ymax=ymax,
 					i=i,
+					**kwargs,
 				)
 
 	def _compute_realized_dual_variables(self, y=None, Z=None, W=None, **kwargs):
@@ -459,7 +503,7 @@ class DualIVBounds(generic.DualBounds):
 					i=i,
 					yi=y[i],
 					zi=Z[i],
-					wi=Z[i],
+					wi=W[i],
 					lower=lower, 
 					ymin=ymin,
 					ymax=ymax,
@@ -478,7 +522,7 @@ class DualIVBounds(generic.DualBounds):
 		# Compute IPW summands and AIPW summands
 		Z = self.Z.reshape(1, self.n)
 		pis = self.pis.reshape(1, self.n)
-		ipw_denom = Z / (pis) + (1 - Z) / (1 - pis) 
+		ipw_denom = Z * (pis) + (1 - Z) * (1 - pis) 
 		self.ipw_summands = self.hatnus / ipw_denom
 		# Compute AIPW summands
 		mus = self.cs.sum(axis=2).T # (2, n)-shaped array

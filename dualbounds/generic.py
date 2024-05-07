@@ -123,6 +123,11 @@ class DualBounds:
 	support : np.array
 		Optional support of the outcome, if known and discrete.
 		Defaults to ``None`` (inferred from the data).
+	support_restriction : function
+		Boolean-valued function of y0, y1, x where 
+		``support_restriction(y0, y1, x) = False`` asserts that 
+		y0, y1, x is not in the support of :math:`Y(0), Y(1), X`.
+		Defaults to ``None`` (no a-priori support restrictions).
 	model_kwargs : dict
 		Additional kwargs for the ``outcome_model``, e.g.,
 		``feature_transform``. See 
@@ -168,6 +173,7 @@ class DualBounds:
 		propensity_model: Union[str, sklearn.base.BaseEstimator]='ridge',
 		discrete: Optional[np.array]=None,
 		support: Optional[np.array]=None,
+		support_restriction: Optional[callable]=None,
 		**model_kwargs,
 	) -> None:
 		# Estimand
@@ -228,11 +234,52 @@ class DualBounds:
 		self.propensity_model = propensity_model
 		self.model_kwargs = model_kwargs
 
+		## Support restrictions
+		self.support_restriction = support_restriction
+
 		## Initialize core objects
 		self.y0_dists = None
 		self.y1_dists = None
 		self.oos_dist_preds = None
 
+	def _apply_ot_fn(
+		self, fn: callable, y0: Union[float, np.array], y1: Union[float, np.array], **kwargs
+	):
+		"""
+		Applies fn and infers appropriate broadcasting for the OT setting.
+
+		Parameters
+		----------
+		y0 : float | np.array
+		y1 : float | np.array
+		kwargs : dict
+			Other parameters, e.g., x, or w0 and w1 in the IV setting
+			(since DualIVBounds inherits this function).
+
+		Returns
+		-------
+		fn_val : float | np.array
+			Array of shape (len(y0) x len(y1)).
+
+		Notes
+		-----
+		Internally, this is used to apply self.f and self.support_restriction.
+		"""
+		y0_haslength = utilities.haslength(y0)
+		y1_haslength = utilities.haslength(y1)
+		# Handle the scalar case
+		if not y0_haslength and not y1_haslength:
+			return fn(y0=y0, y1=y1, **kwargs)
+		# Otherwise vectorize appropriately 
+		if not y0_haslength:
+			y0 = np.array([y0])
+		if not y1_haslength:
+			y1 = np.array([y1])
+
+		# Adding extra zeros ensures correct broadcasting
+		orig = fn(y0=y0.reshape(-1, 1), y1=y1.reshape(1, -1), **kwargs)
+		return orig + np.zeros((len(y0), len(y1)))
+		
 	def _discretize(
 		self, 
 		ydists,
@@ -413,10 +460,26 @@ class DualBounds:
 				x=self.y1_vals[i], y=nu1, newx=new_y1_vals,
 			)
 			# compute required bounds
-			fx = lambda y0, y1: self.f(y0, y1, self.X[i])
-			fvals = fx(
-				new_y0_vals.reshape(-1, 1), new_y1_vals.reshape(1, -1)
+			fvals = self.f(
+				y0=new_y0_vals.reshape(-1, 1),
+				y1=new_y1_vals.reshape(1, -1),
+				x=self.X[i],
 			)
+			# support restrictions relax constraints
+			if self.support_restriction is not None:
+				not_in_support = ~self.support_restriction(
+					y0=new_y0_vals.reshape(-1, 1),
+					y1=new_y1_vals.reshape(1, -1),
+					x=self.X[i],
+				)
+				# Relax constraints
+				#almost_inf = 1e5 * (np.abs(fvals) + 1).max()
+				if lower:
+					fvals[not_in_support] = np.inf
+				else:
+					fvals[not_in_support] = - np.inf
+
+
 			## Adjust elementwise (as opposed to a constant subtraction)
 			# Calculate how far we are from feasibility
 			deltas = new_nu0.reshape(-1, 1) + new_nu1.reshape(1, -1)
