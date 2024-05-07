@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 import time
@@ -469,15 +470,23 @@ def parse_dist(
 ):
 	## variant 1 based on mu/sd
 	dist = dist.lower()
-	if mu is not None and sd is not None:
-		if dist == 'bernoulli':
-			raise ValueError("Cannot enforce mean/sd for Bernoulli dist.")
+	if mu is not None and sd is not None and dist != 'bernoulli':
+
 		# get SD correct
 		temp = parse_dist(dist, loc=0, scale=sd, **kwargs)
 		scale = sd / temp.std()
 		temp = parse_dist(dist, loc=0, scale=sd*scale, **kwargs)
 		shift = mu - temp.mean()
 		return parse_dist(dist, loc=shift, scale=sd*scale, **kwargs)
+	elif mu is not None and sd is not None and dist == 'bernoulli':
+		# Note: Cannot enforce mean/sd for Bernoulli dist.
+		# So we just use loc/scale.
+		loc = copy.copy(mu)
+		scale = copy.copy(sd)
+		mu = None
+		sd = None
+	elif mu is not None or sd is not None:
+		raise ValueError("Must provide both of mu and sd, not just one.")
 
 	## variant 2 based on location/scale
 	# sometimes return a regular dist object

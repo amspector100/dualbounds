@@ -235,9 +235,14 @@ def gen_iv_data(
 	r2: float=0.95,
 	eps_dist: str='gaussian',
 	lmda_dist: str='constant',
+	interactions: bool=True,
 	tau: float=3,
 	tauv: float=1,
+	tauZ: float=1,
+	tau_conf: float=0,
 	heterosked: str='constant',
+	dgp_seed: int=1,
+	sample_seed: Optional[int]=None,
 ):
 	"""
 	
@@ -294,6 +299,7 @@ def gen_iv_data(
 
 	# Create beta_W (for W | X)
 	betaW = _sample_norm_vector(p, betaW_norm)
+	betaZ = _sample_norm_vector(p, betaZ_norm)
 
 	# sample X
 	np.random.seed(sample_seed)
@@ -301,3 +307,135 @@ def gen_iv_data(
 	lmdas = parse_dist(lmda_dist).rvs(size=n)
 	lmdas /= np.sqrt(np.power(lmdas, 2).mean())
 	X = X * lmdas.reshape(-1, 1)
+
+	### Sample Z | X
+	muZ = X @ betaW
+	pis = np.exp(muZ)
+	pis = pis / (1 + pis)
+	# clip in truth
+	pis = np.maximum(np.minimum(pis, 1-1e-3), 1e-3)
+	Z = np.random.binomial(1, pis).astype(int)
+
+	### Sample W | Z, X. Here U are meant to be unmeasured.
+	wprobs = np.stack([X @ betaZ, X @ betaZ + tauZ], axis=1)
+	wprobs = np.exp(wprobs) / (1 + np.exp(wprobs))
+	U = np.random.uniform(size=n)
+	W01 = (U.reshape(n, 1) <= wprobs).astype(int)
+	W = W01[(np.arange(n), Z)]
+
+	### Sample Y | Z, W, X
+	## (a) conditional variance of Y
+	sigmas = heteroskedastic_scale(X, heterosked=heterosked)
+	# allow for sigmas to depend on W
+	sigmas0 = sigmas.copy()
+	sigmas1 = tauv * sigmas.copy()
+	denom = np.sqrt((np.mean(sigmas0**2) + np.mean(sigmas1**2)) / 2)
+	sigmas0 /= denom; sigmas1 /= denom
+	## (b) conditional mean of Y | X, W U
+	mu0 = X @ beta + tau_conf * np.sign(U - 1/2)
+	_y0_dists = parse_dist(
+		eps_dist, mu=mu0, sd=sigmas0
+	)
+	cates = X @ beta_int + tau
+	mu1 = mu0 + cates
+	_y1_dists = parse_dist(
+		eps_dist, mu=mu1, sd=sigmas1
+	)
+	Y0 = _y0_dists.rvs(); Y1 = _y1_dists.rvs()
+	Y = Y0.copy(); Y[W == 1] = Y1[W == 1]
+	## (c) ydists for external use. 
+	# ydists[z][w] are the laws of Y(w) | W(z) = w
+	ydists = [[], []]
+	if tau_conf != 0:
+		warnings.warn("Oracle ydists not available when tau_conf != 0; need to implement ScipyMixture.")
+	else:
+		for z in [0,1]:
+			for w, muY, sigmaY in zip([0,1], [mu0, mu1], [sigmas0, sigmas1]):
+				ydists[z].append(parse_dist(eps_dist, mu=muY, sd=sigmaY))
+				if eps_dist == 'bernoulli':
+					ydists[z][w] = _convert_to_cat(ydists[z][w], n=n)
+
+
+	return dict(
+		y=Y,
+		W=W,
+		Z=Z,
+		X=X,
+		pis=pis,
+		cates=_y1_dists.mean() - _y0_dists.mean(),
+		# betas
+		beta=beta,
+		beta_int=beta_int,
+		betaZ=betaZ,
+		betaW=betaW,
+		# distributions
+		wprobs=wprobs,
+		ydists=ydists,
+
+	)
+
+
+# class ScipyMixture:
+# 	"""
+# 	A finite mixture of scipy distributions.
+
+	
+# 	Parameters
+# 	---------
+# 	distributions : rv_generic
+# 		A list of scipy distributions of shape (n,).
+# 	proportions : np.array
+# 		The mixture proportions. Must sum to 1.
+
+# 	Notes
+# 	-----
+# 	This is only used within the ``gen_iv_data``
+# 	function to calculate the law of Y(w) | W(z) = w
+# 	when tau_conf != 0.
+# 	"""
+# 	def __init__(
+# 		self, distributions, proportions
+# 	):
+# 		self.dists = distributions
+# 		self.props = proportions
+# 		if not np.allclose(np.sum(self.props), 1):
+# 			raise ValueError("proportions must sum to 1")
+
+# 	def mean(self):
+# 		"""
+# 		Returns
+# 		-------
+# 		mu : np.array
+# 			n-shaped array of means of mixture distribution.
+# 		"""
+# 		mus = np.stack([d.mean() * p for d, p in zip(self.dists, self.props)], axis=0)
+# 		return np.sum(mus, axis=0)
+
+# 	def cdf(self, x):
+# 		"""
+# 		Parameters
+# 		----------
+# 		x : np.array
+# 			Inputs to CDF.
+
+# 		Returns
+# 		-------
+# 		cdf : np.array
+# 			CDF realized values.
+# 		"""
+# 		cdfs = np.stack([d.cdf() * p for d, p in zip(self.dists, self.props)], axis=0)
+# 		return np.sum(cdfs, axis=0)
+
+# 	def ppf(self, qs):
+# 		"""
+# 		Parameters
+# 		----------
+# 		qs : np.array
+# 			Inputs to quantile function.
+
+# 		Returns
+# 		-------
+# 		vals : np.array
+# 			Quantile function evaluated at qs.
+# 		"""
+# 		pass

@@ -14,6 +14,8 @@ from typing import Optional, Union
 """
 Note to self: do we need to define an IVDistReg wrapper? And use
 multipler inheritance? IDK
+
+Also, do we need to define a ConcatScipyDist wrapper...?
 """
 
 class DualIVBounds(generic.DualBounds):
@@ -88,35 +90,63 @@ class DualIVBounds(generic.DualBounds):
 		vals0 = np.concatenate([yvals[0, 0], yvals[0, 1]], axis=0)
 		probs1 = np.concatenate([probs[1, 0], probs[1, 1]])
 		vals1 = np.concatenate([yvals[1, 0], yvals[1, 1]], axis=0)
-		print(f"probs0 sums to {probs0.sum()}, probs1 sums to {probs1.sum()}")
-		# Evaluate f(w0, w1, y0, y1, x)
-		nvals = yvals.shape[-1]
-		fvals = np.zeros((2*nvals, 2*nvals))
-		for w0 in [0,1]:
-			w0_vals = np.arange(nvals) + w0 * nvals
-			for w1 in [0,1]:
-				w1_vals = np.arange(nvals) + w1 * nvals
-				fvals[np.ix_(w0_vals, w1_vals)] = self.f(
-					w0=w0,
-					w1=w1,
-					y0=yvals[0, w0].reshape(-1, 1),
-					y1=yvals[1, w1].reshape(1, -1),
-					x=x,
-				)
+
 		# Compute dual variables
+		nvals = yvals.shape[-1]
 		objvals = np.zeros(2)
 		nu0s = np.zeros((2, 2, nvals))
 		nu1s = np.zeros((2, 2, nvals))
 		c0s = np.zeros(2)
 		c1s = np.zeros(2)
 		for lower in [True, False]:
+			# Evaluate f(w0, w1, y0, y1, x). 
+			# This is not a generic OT constraint matrix
+			# and needs to be adjusted depending on the value of lower.
+			fvals = np.zeros((2*nvals, 2*nvals))
+			for w0 in [0,1]:
+				w0_vals = np.arange(nvals) + w0 * nvals
+				for w1 in [0,1]:
+					w1_vals = np.arange(nvals) + w1 * nvals
+					fblock = self.f(
+						w0=w0,
+						w1=w1,
+						y0=yvals[0, w0].reshape(-1, 1),
+						y1=yvals[1, w1].reshape(1, -1),
+						x=x,
+					)
+					# when w0 == w1, this is a linear non-OT constraint.
+					# we use a hack to encode this within the ot 
+					# framework so that we can use the efficient ot functions
+					if w0 == w1:
+						almost_inf = (1 + np.abs(fblock)).max() * 1e5
+						if lower:
+							fblock = fblock.min(axis=1-w0)
+						else:
+							fblock = fblock.max(axis=1-w0)
+							almost_inf *= -1
+						# A hack to make the non-diagonal constraints unimportant
+						fblock = np.ones((nvals, nvals)) * almost_inf + np.diag(fblock - almost_inf)
+
+					fvals[np.ix_(w0_vals, w1_vals)] = fblock
+
 			# Solve
-			objval, log = ot.lp.emd2(
-				a=probs0,
-				b=probs1,
-				M=fvals,
-				log=True,
-			)
+			if lower:
+				objval, log = ot.lp.emd2(
+					a=probs0,
+					b=probs1,
+					M=fvals,
+					log=True,
+				)
+			else:
+				objval, log = ot.lp.emd2(
+					a=probs0,
+					b=probs1,
+					M=-1*fvals,
+					log=True,
+				)
+				objval *= -1
+				log['u'] *= -1
+				log['v'] *= -1
 			# Extract objective value
 			objvals[int(1-lower)] = objval
 			# Extract dual variables
@@ -196,6 +226,7 @@ class DualIVBounds(generic.DualBounds):
 						[self._yvals[i, z, w], extra_yvals], axis=0
 					))))
 			# New fvals
+			raise NotImplementedError("FVALS ARE WRONG NEED TO CHANGE THIS")
 			new_fvals = [[], []]
 			for w0 in [0,1]:
 				for w1 in [0,1]:
@@ -450,8 +481,8 @@ class DualIVBounds(generic.DualBounds):
 		ipw_denom = Z / (pis) + (1 - Z) / (1 - pis) 
 		self.ipw_summands = self.hatnus / ipw_denom
 		# Compute AIPW summands
-		mus = self.cs.sum(axis=1).T # (2, n)-shaped array
-		deltas = self.cs[:, 1].T * Z + self.cs[:, 0].T * (1 - Z) # (2, n)-shaped array
+		mus = self.cs.sum(axis=2).T # (2, n)-shaped array
+		deltas = self.cs[:, :, 1].T * Z + self.cs[:, :, 0].T * (1 - Z) # (2, n)-shaped array
 		self.aipw_summands = (self.hatnus - deltas) / ipw_denom + mus
 
 	def _compute_cond_means(self):
