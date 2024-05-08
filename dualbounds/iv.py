@@ -12,10 +12,7 @@ import sklearn.base
 from typing import Optional, Union
 
 """
-Note to self: do we need to define an IVDistReg wrapper? And use
-multipler inheritance? IDK
-
-Also, do we need to define a ConcatScipyDist wrapper...?
+Note to self: do we need to define a ConcatScipyDist wrapper...?
 """
 
 class DualIVBounds(generic.DualBounds):
@@ -38,6 +35,7 @@ class DualIVBounds(generic.DualBounds):
 		self,
 		exposure: Union[np.array, pd.Series],
 		instrument: Union[np.array, pd.Series],
+		exposure_model: Union[str, dist_reg.DistReg]='ridge',
 		*args, 
 		**kwargs,
 	):
@@ -51,6 +49,7 @@ class DualIVBounds(generic.DualBounds):
 		if isinstance(instrument, pd.Series) or isinstance(instrument, pd.DataFrame):
 			instrument = instrument.values.reshape(self.n)
 		self.Z = utilities._binarize_variable(instrument, var_name='instrument')
+		self.exposure_model = exposure_model
 
 	def _solve_single_instance(
 		self,
@@ -530,13 +529,161 @@ class DualIVBounds(generic.DualBounds):
 		self.aipw_summands = (self.hatnus - deltas) / ipw_denom + mus
 
 	def _compute_cond_means(self):
-		raise NotImplementedError()
+		"""
+		Computes self.mu0 = E[Y(W(0)) | Z=0]
+		and self.mu1 = E[Y(W(1)) | Z = 1].
+		"""
+		ydist_means = np.zeros((2, 2, self.n))
+		for z in [0,1]:
+			for w in [0,1]:
+				ydist_means[z, w] = np.concatenate([x.mean() for x in self.ydists[z][w]])
+
+		self.mu0 = self.wprobs[:, 0] * ydist_means[0, 1]
+		self.mu0 += (1 - self.wprobs[:, 0]) * ydist_means[0][0]
+		self.mu1 = self.wprobs[:, 1] * ydist_means[1][1]
+		self.mu1 += (1 - self.wprobs[:, 1]) * ydist_means[1][0]
 
 	def _compute_oos_resids(self):
-		raise NotImplementedError()
+		"""
+		Computes out-of-sample predictions of Y | Z and residuals.
+		"""
+		self._compute_cond_means()
+		self.oos_preds = self.mu0.copy()
+		self.oos_preds[self.Z == 1] = self.mu1[self.Z == 1]
+		# residuals and return
+		self.oos_resids = self.y - self.oos_preds
+		return self.oos_resids
 
-	def fit(self):
-		raise NotImplementedError()
+	def cross_fit(
+		self,
+		nfolds: int=5,
+		suppress_warning: bool=False,
+		verbose: bool=True,
+	):
+		"""
+		Cross-fits the outcome model.
 
-	def summary(self):
-		raise NotImplementedError()
+		Parameters
+		----------
+		nfolds : int
+			Number of folds to use in cross-fitting.
+		suppress_warning : bool
+			If True, suppresses a potential warning about cross-fitting.
+		verbose : bool
+			If True, prints progress reports.
+
+		Returns
+		-------
+		ydists : list
+			for z, w in [0,1], ydists[z][w] is a list of batched scipy
+			distributions whose shapes sum to n. the ith distribution 
+			is the out-of-sample estimate of the conditional law
+			of :math:`Y_i(w) | W(z) = w, X_i`.
+		"""
+		# if pis not supplied: will use cross-fitting
+		if self.pis is None:
+			self.fit_propensity_scores(nfolds=nfolds, verbose=verbose)
+
+		# Fit exposure model
+		if self.wprobs is None:
+			self.exposure_model = generic.get_default_model(
+				outcome_model=self.exposure_model, 
+				# the following args are ignored if exposure_model
+				# inherits from dist_reg.DistReg class
+				support=set([0,1]), 
+				discrete=True,
+				monotonicity=True, 
+				how_transform='intercept',
+			)
+			if verbose:
+				print("Cross-fitting the exposure model.")
+			wout = dist_reg.cross_fit_predictions(
+				W=self.Z, X=self.X, y=self.W, 
+				nfolds=nfolds, 
+				model=self.exposure_model,
+				verbose=verbose,
+				probs_only=True,
+			)
+			wprobs, self.exposure_model_fits, _ = wout
+			self.wprobs = np.stack(wprobs, axis=1)
+		elif not suppress_warning:
+			warnings.warn(CROSSFIT_WARNING.replace("y0_dists/y1_dists", "wprobs"))
+
+		# Fit outcome model
+		if self.ydists is None:
+			# Note: this returns the existing model
+			# if an existing model is provided
+			self.outcome_model = generic.get_default_model(
+				discrete=self.discrete, 
+				support=self.support,
+				outcome_model=self.outcome_model,
+				**self.model_kwargs
+			)
+			if verbose:
+				print("Cross-fitting the outcome model.")
+			y_out = dist_reg.cross_fit_predictions(
+				W=self.W, X=self.X, y=self.y, Z=self.Z, 
+				nfolds=nfolds, 
+				model=self.outcome_model,
+				verbose=verbose,
+			)
+			self.ydists, self.model_fits, self.oos_dist_preds = y_out
+		elif not suppress_warning:
+			warnings.warn(CROSSFIT_WARNING)
+
+		return self.ydists
+
+
+	def fit(
+		self,
+		nfolds: int = 5,
+		aipw: bool = True,
+		alpha: float = 0.05,
+		wprobs: Optional[list]=None,
+		ydists: Optional[list]=None,
+		verbose: bool = True,
+		suppress_warning: bool = False,
+		**solve_kwargs,
+	):
+		# Fit model of W | X and Y | X if not provided
+		self.ydists, self.wprobs = ydists, wprobs
+		self.cross_fit(
+			nfolds=nfolds, suppress_warning=suppress_warning, verbose=verbose,
+		)
+
+		# compute dual variables
+		self.compute_dual_variables(
+			ydists=self.ydists,
+			wprobs=self.wprobs,
+			verbose=verbose,
+			**solve_kwargs,
+		)
+		# compute dual bounds
+		self.alpha = alpha
+		self._compute_final_bounds(aipw=aipw, alpha=alpha)
+		return self
+
+	def summary(self, minval=-np.inf, maxval=np.inf):
+		print("___________________Inference_____________________")
+		print(self.results(minval=minval, maxval=maxval))
+		print()
+		print("_________________Outcome model___________________")
+		self._compute_oos_resids()
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.y, haty=self.oos_preds
+		)
+		print(sumstats)
+		print()
+		print("_________________Exposure model__________________")
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.W, 
+			haty=self.wprobs[(np.arange(self.n), self.Z.astype(int))]
+		)
+		print(sumstats)
+		print()
+		print("_________________Treatment model_________________")
+		sumstats = dist_reg._evaluate_model_predictions(
+			y=self.Z, haty=self.pis
+		)
+		print(sumstats)
+		print()

@@ -103,7 +103,7 @@ class DualBounds:
 		n-length array of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
 	outcome_model : str | dist_reg.DistReg
-		The model for estimating the law of :math:`Y \mid X, W`.
+		The model for estimating the law of :math:`Y | X, W`.
 		Two options:
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
@@ -965,7 +965,9 @@ class DualBounds:
 				model=self.outcome_model,
 				verbose=verbose,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = y_out
+			counterfactuals, self.model_fits, self.oos_dist_preds = y_out
+			self.y0_dists = counterfactuals[0]
+			self.y1_dists = counterfactuals[1]
 		elif not suppress_warning:
 			warnings.warn(CROSSFIT_WARNING)
 

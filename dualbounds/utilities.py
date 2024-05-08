@@ -284,6 +284,24 @@ class BatchedCategorical:
 			raise ValueError("probs must be nonnegative")
 		if np.any(np.abs(self.probs.sum(axis=1)-1) > 1e-5):
 			raise ValueError("probs.sum(axis=1) must equal 1")
+
+	@classmethod
+	def from_binary_probs(
+		cls, probs
+	):
+		"""
+		Instantiates distribution for a binary-valued variable.
+
+		Parameters
+		----------
+		probs : np.array
+			n-length array of P(Yi = 1)
+		"""
+		n = len(probs)
+		probs_stacked = np.stack([1-probs, probs], axis=1)
+		vals = np.zeros((n, 2))
+		vals[:, 1] += 1
+		return cls(vals=vals, probs=probs_stacked)
 	
 	def mean(self):
 		"""

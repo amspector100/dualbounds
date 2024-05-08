@@ -79,7 +79,7 @@ class TestDistReg(unittest.TestCase):
 		# cross-fitting approach one
 		model_kwargs = dict(model_type='ridge', cv=cv, how_transform='identity', eps_dist='gaussian')
 		rdr = dist_reg.CtsDistReg(**model_kwargs)
-		preds0, preds1, _, _ = dist_reg.cross_fit_predictions(
+		(preds0, preds1), _, _ = dist_reg.cross_fit_predictions(
 			W=W, y=Y, X=X, nfolds=nfolds, model=rdr,
 		)
 		mu0s, sigma0s = convert_norm_dists_to_array(preds0)
@@ -92,7 +92,8 @@ class TestDistReg(unittest.TestCase):
 			not_in_fold = [i for i in range(n) if i < start or i >= end]
 			model = dist_reg.CtsDistReg(**model_kwargs)
 			model.fit(W=W[not_in_fold], X=X[not_in_fold], y=Y[not_in_fold])
-			pr0s, pr1s = model.predict(X=X[start:end])
+			pr0s = model.predict(X=X[start:end], W=np.zeros(end-start))
+			pr1s = model.predict(X=X[start:end], W=np.ones(end-start))
 			p0s.append(pr0s); p1s.append(pr1s)
 		mu0s_exp, sigma0s_exp = convert_norm_dists_to_array(p0s)
 		mu1s_exp, sigma1s_exp = convert_norm_dists_to_array(p1s)

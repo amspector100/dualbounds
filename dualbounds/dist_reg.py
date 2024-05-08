@@ -58,6 +58,66 @@ def create_folds(n, nfolds):
 	ends = splits[1:]
 	return starts, ends
 
+def _enforce_monotonicity(
+	y0_dists: Union[BatchedCategorical, np.array], 
+	y1_dists: Union[BatchedCategorical, np.array],
+	margin=0.005,
+):
+	"""
+	For a binary variable, enforces the monotonicity constraint
+	that P(Y_i(0) = 1) <= P(Y_i(1) = 1).
+
+	Parameters
+	----------
+	y0_dists : BatchedCategorical | np.array
+		Either an array whose ith element is P(Y_i(0) = 1)
+		or a BatchedCategorical distribution.
+	y1_dists : BatchedCategorical | np.array
+		Either an array whose ith element is P(Y_i(1) = 1)
+		or a BatchedCategorical distribution.
+	margin : float
+		Minimum distance between P(Y_i(0) = 1) and P(Y_i(1) = 1).
+
+	Returns
+	-------
+	y0_dists : BatchedCategorical | np.array
+		Either an array whose ith element is P(Y_i(0) = 1)
+		or a BatchedCategorical distribution.
+	y1_dists : BatchedCategorical | np.array
+		Either an array whose ith element is P(Y_i(1) = 1)
+		or a BatchedCategorical distribution.
+
+	Notes
+	-----
+	The output format is the same as the input format.
+	"""
+	# Convert to np array
+	if isinstance(y0_dists, BatchedCategorical):
+		p0s = y0_dists.probs[:, 1].copy()
+	else:
+		p0s = y0_dists.copy()
+
+	if isinstance(y1_dists, BatchedCategorical):
+		p1s = y1_dists.probs[:, 1].copy()
+	else:
+		p1s = y1_dists.copy()
+
+	# Clip
+	p0s = np.minimum(1-TOL, np.maximum(TOL, p0s))
+	p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
+	# enforce monotonicity
+	flags = p0s > p1s - margin
+	avg = (p0s[flags] + p1s[flags]) / 2
+	p0s[flags] = np.maximum(TOL, avg-margin)
+	p1s[flags] = np.minimum(1-TOL, avg+margin)
+	# ensure correct format
+	if isinstance(y0_dists, BatchedCategorical):
+		p0s = BatchedCategorical.from_binary_probs(p0s)
+	if isinstance(y1_dists, BatchedCategorical):
+		p1s = BatchedCategorical.from_binary_probs(p1s)
+	# Return
+	return p0s, p1s
+
 def _evaluate_model_predictions(y, haty, tol=1e-9):
 	# Preliminaries
 	n = len(y)
@@ -141,6 +201,7 @@ def cross_fit_predictions(
 	W,
 	X,
 	y,
+	Z=None,
 	S=None,
 	nfolds=2,
 	train_on_selections=True,
@@ -165,7 +226,9 @@ def cross_fit_predictions(
 	model_kwargs : dict
 		kwargs to construct model; used only if model_cls is specified.
 		E.g., ``model_kwargs=dict(eps_dist=empirical)``.
-	S : array
+	Z : np.array
+		Optional n-length array of binary instruments.
+	S : np.array
 		Optional n-length array of selection indicators.
 	train_on_selections : bool
 		If True, trains model only on data where S[i] == 1.
@@ -196,8 +259,8 @@ def cross_fit_predictions(
 	# create folds
 	starts, ends = create_folds(n=n, nfolds=nfolds)
 	# loop through folds
-	pred0s = []; pred1s = [] # results for W = 0, W = 1
-	oos_preds = [] # results for true W
+	counterfactual_preds = []# results for different values of W/Z
+	oos_preds = [] # results for true W/Z
 	fit_models = []
 	for ii in vrange(len(starts), verbose=verbose):
 		start = starts[ii]; end = ends[ii]
@@ -217,27 +280,50 @@ def cross_fit_predictions(
 			reg_model = copy.deepcopy(model)
 		
 		reg_model.fit(
-			W=W[not_in_fold], X=X[not_in_fold], y=y[not_in_fold]
+			W=W[not_in_fold], X=X[not_in_fold], y=y[not_in_fold],
+			Z=None if Z is None else Z[not_in_fold],
 		)
 
 		# predict and append on this fold
 		subX = X[start:end].copy(); 
 		if S_flag:
 			subX[:, 0] = 1 # set selection = 1 for predictions
-		if not probs_only:
-			pred0, pred1 = reg_model.predict(subX)
-			oos_pred = reg_model.predict(subX, W[start:end])
-		else:
-			pred0, pred1 = reg_model.predict_proba(subX)
-			oos_pred = reg_model.predict_proba(subX, W[start:end])
-		pred0s.append(pred0); pred1s.append(pred1)
+
+		# Actual predictions
+		oos_pred = reg_model.predict(
+			subX, W[start:end], Z=None if Z is None else Z[start:end]
+		)
+		counterfactual_pred = reg_model.predict_counterfactuals(subX)
+
+		# Save predictions and model fits
+		counterfactual_preds.append(counterfactual_pred)
 		oos_preds.append(oos_pred)
 		fit_models.append(reg_model)
-	# concatenate if arrays; else return
-	if isinstance(pred0s[0], np.ndarray):
-		pred0s = np.concatenate(pred0s, axis=0)
-		pred1s = np.concatenate(pred1s, axis=0)
-	return pred0s, pred1s, fit_models, oos_preds
+
+	# Appropriately concatenate counterfactual predictions. 
+	# Requires different code for the IV/non-IV case.
+	if Z is not None:
+		cf_output = [[np.nan, np.nan], [np.nan, np.nan]]
+		for z in [0,1]:
+			for w in [0,1]:
+				cf_output[z][w] = [x[z][w] for x in counterfactual_preds]
+				# Concatenate probabilities if we're only interested in them
+				if probs_only:
+					cf_output[z][w] = np.concatenate(
+						[x.probs[:, 1] for x in cf_output[z][w]]
+					)
+
+	else:
+		cf_output = [[], []]
+		for z in [0,1]:
+			cf_output[z] = [x[z] for x in counterfactual_preds]
+			# Concatenate probabilities if we're only interested in probabilities
+			if probs_only:
+				cf_output[z] = np.concatenate([x.probs[:, 1] for x in cf_output[z]])
+
+
+
+	return cf_output, fit_models, oos_preds
 
 class DistReg:
 	"""
@@ -260,7 +346,13 @@ class DistReg:
 		self.how_transform = how_transform
 
 
-	def fit(self, W: np.array, X: np.array, y: np.array):
+	def fit(
+		self,
+		W: np.array,
+		X: np.array,
+		y: np.array,
+		Z: Optional[np.array]=None,
+	):
 		"""
 		Fits model on the data.
 
@@ -272,10 +364,13 @@ class DistReg:
 			(n, p)-shaped array of covariates.
 		y : np.array
 			n-length array of outcome measurements.
+		Z : np.array
+			Optional n-length array of instrument values
+			for the instrumental variables setting.
 		"""
 		raise NotImplementedError()
 
-	def feature_transform(self, W: np.array, X: np.array):
+	def feature_transform(self, W: np.array, X: np.array, Z: Optional[np.array]=None):
 		"""
 		Transforms the features before feeding them to the base model.
 
@@ -284,27 +379,42 @@ class DistReg:
 		X : np.array
 			(n, p)-shaped array of covariates.
 		W : np.array
-			n-length array of treatment indicators
+			n-length array of treatment/exposure indicators.
+		Z : np.array
+			Optional n-length array of binary instruments
+			for the instrumental variables setting.
 
 		Returns
 		-------
 		features : np.array
 			(n, d)-shaped array of features.
 		"""
+		# Transformations based on W
 		if self.how_transform in ['none', 'identity']:
-			return np.concatenate([W.reshape(-1, 1), X],axis=1)
+			features = np.concatenate([W.reshape(-1, 1), X],axis=1)
 		elif self.how_transform in ['intercept']:
-			return np.concatenate([W.reshape(-1, 1), np.ones((len(X), 1)), X],axis=1)
+			features = np.concatenate([W.reshape(-1, 1), np.ones((len(X), 1)), X],axis=1)
 		elif self.how_transform in [
 			'int', 'interaction', 'interactions'
 		]:
-			return np.concatenate([
+			features = np.concatenate([
 				W.reshape(-1, 1), W.reshape(-1, 1) * X, X], axis=1
 			)
 		else:
 			raise ValueError(f"Unrecognized transformation {self.how_transform}")
 
-	def predict(self, X: np.array, W: Optional[np.array]=None):
+		# Add Z. Note that we cannot add interactions with W
+		if Z is None:
+			return features
+
+		if self.how_transform in ['int', 'interaction', 'interactions']:
+
+	def predict(
+		self, 
+		X: np.array,
+		W: np.array,
+		Z: np.array,
+	):
 		"""
 		Parameters
 		----------
@@ -312,19 +422,56 @@ class DistReg:
 			(n, p)-shaped array of covariates.
 		W : np.array
 			Optional n-length array of binary treatment indicators.
+		Z : np.array
+			Optional n-length array of binary instruments
+			for the instrumental variables setting.
 
 		Returns
 		-------
 		y_dists : stats.rv_continuous / stats.rv_discrete
 			batched scipy distribution of shape (n,) where the ith
-			distribution is the conditional law of Y[i] | X[i], W[i].
-			Only returned if W is provided.
-		(y0_dists, y1_dists) : tuple 
-			If W is not provided, returns a tuple of batched scipy 
-			dists of shape (n,). The ith distribution in yk_dists is
-			the conditional law of Yi(k) | Xi, for k in {0,1}.
+			distribution is the conditional law of :math:`Y_i | X_i, W_i, Z_i`
+			(without conditioning on :math:`Z_i` if ``Z`` is not provided).
 		"""
 		raise NotImplementedError()
+
+	def predict_counterfactuals(self, X: np.array):
+		"""
+		Predicts counterfactual distributions of Y (outcome).
+
+		Parameters
+		----------
+		X : np.array
+			(n,p)-shaped design matrix.
+
+		Returns
+		-------
+		y0_dists : np.array
+			y0_dists[i] = the law of :math:`Y_i(0) | X_i`.
+			Only returned in a setting without instrumental variables.
+		y1_dists : np.array
+			y1_dists[i] = the law of :math:`Y_i(1) | X_i`.
+			Only returned in a setting without instrumental variables.
+		ydists : list
+			Only returned if trained using instrumental variables.
+			Then ydists[z][w] is a batched scipy distribution
+			array whose ith element represents the law of
+			:math:`Y_i(w) | X_i, W_i(z) = w)`.
+		"""
+		n = len(X)
+		# Case 1: instrument variables (4 counterfactuals)
+		if self._iv:
+			ydists = [[], []]
+			for z in [0,1]:
+				y0_dists = self.predict(X=X, W=np.zeros(n), Z=z*np.ones(n))
+				y1_dists = self.predict(X=X, W=np.ones(n), Z=z*np.ones(n))
+				ydists[z] = [y0_dists, y1_dists]
+			return ydists
+		# Case 2: intent to treat (2 counterfactuals)
+		else:
+			p0s = self.predict(X=X, W=np.zeros(n))
+			p1s = self.predict(X=X, W=np.ones(n))
+			return p0s, p1s
 
 class CtsDistReg(DistReg):
 	"""
@@ -391,11 +538,10 @@ class CtsDistReg(DistReg):
 		y = np.random.randn(n)
 		cdreg.fit(W=W, X=X, y=y)
 
-		# Predict on new X with or without W
+		# Predict on new X
 		m = 10
 		Xnew = np.random.randn(m, p)
-		y0_dists, y1_dists = cdreg.predict(X=Xnew)
-		y0_dists = cdreg.predict(X=Xnew, W=np.zeros(m))
+		y0_preds = cdreg.predict(X=Xnew, W=np.zeros(m))
 	"""
 	def __init__(
 		self,
@@ -434,10 +580,11 @@ class CtsDistReg(DistReg):
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 		
 
-	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
+	def fit(self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None) -> None:
+		self._iv = Z is not None
 		self.Wtrain = W
 		# fit model
-		features = self.feature_transform(W=W, X=X)
+		features = self.feature_transform(W=W, X=X, Z=Z)
 		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
 
@@ -483,45 +630,41 @@ class CtsDistReg(DistReg):
 				self.rvals1, self.rprobs1, **adj_kwargs
 			)
 
-	def predict(self, X: np.array, W: Optional[np.array]=None):
-		if W is not None:
-			features = self.feature_transform(W, X=X)
-			mu = self.model.predict(features)
-			# heteroskedasticity
-			if self.heterosked:
-				scale = np.sqrt(np.clip(
-					self.sigma2_model.predict(features),
-					0.01 * self.hatsigma**2,
-					np.inf,
-				))
-			else:
-				scale = self.hatsigma
-			# Option 1: nonparametric law of eps
-			if self.eps_dist == 'empirical':
-				# law of normalized residuals
-				# only use empirical residuals from the same treatment/control group
-				vals = np.stack(
-					[self.rvals0 if Wi == 0 else self.rvals1 for Wi in W],
-					axis=0
-				)
-				vals = vals * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
-				# Create probs and return
-				probs = np.stack(
-					[self.rprobs0 if Wi == 0 else self.rprobs1 for Wi in W], 
-					axis=0
-				)
-				return utilities.BatchedCategorical(
-					vals=vals, probs=probs
-				)
-			# Option 2: parametric law of eps, return scipy dists
-			else:
-				return parse_dist(
-					self.eps_dist, mu=mu, sd=scale, **self.eps_kwargs,
-				)
+	def predict(self, X: np.array, W: np.array, Z: Optional[np.array]=None):
+
+		features = self.feature_transform(W, X=X, Z=Z)
+		mu = self.model.predict(features)
+		# heteroskedasticity
+		if self.heterosked:
+			scale = np.sqrt(np.clip(
+				self.sigma2_model.predict(features),
+				0.01 * self.hatsigma**2,
+				np.inf,
+			))
 		else:
-			n = len(X)
-			W0 = np.zeros(n); W1 = np.ones(n)
-			return self.predict(X, W=W0), self.predict(X, W=W1)
+			scale = self.hatsigma
+		# Option 1: nonparametric law of eps
+		if self.eps_dist == 'empirical':
+			# law of normalized residuals
+			# only use empirical residuals from the same treatment/control group
+			vals = np.stack(
+				[self.rvals0 if Wi == 0 else self.rvals1 for Wi in W],
+				axis=0
+			)
+			vals = vals * np.array([scale]).reshape(-1, 1) + mu.reshape(-1, 1)
+			# Create probs and return
+			probs = np.stack(
+				[self.rprobs0 if Wi == 0 else self.rprobs1 for Wi in W], 
+				axis=0
+			)
+			return utilities.BatchedCategorical(
+				vals=vals, probs=probs
+			)
+		# Option 2: parametric law of eps, return scipy dists
+		else:
+			return parse_dist(
+				self.eps_dist, mu=mu, sd=scale, **self.eps_kwargs,
+			)
 
 class QuantileDistReg(DistReg):
 	"""
@@ -561,9 +704,10 @@ class QuantileDistReg(DistReg):
 		self.probs = self.quantiles[1:] - self.quantiles[0:-1]
 		self.alphas = alphas
 
-	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
+	def fit(self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None) -> None:
+		self._iv = Z is not None
 		# Pick regularization by using CV lasso reg. strength
-		features = self.feature_transform(W=W, X=X)
+		features = self.feature_transform(W=W, X=X, Z=Z)
 		if len(self.alphas) > 0:
 			from sklearn.metrics import d2_pinball_score, make_scorer
 			from sklearn.model_selection import cross_validate
@@ -601,34 +745,28 @@ class QuantileDistReg(DistReg):
 				self.model[quantile] = None
 				self.scores[quantile] = None
 			
-	def predict(self, X: np.array, W: Optional[np.array]=None):
-		"""
-		"""
-		if W is not None:
-			features = self.feature_transform(W, X=X)
-			all_preds = [] 
-			for quantile in self.quantiles:
-				if quantile == 0:
-					preds = np.zeros(len(features)) + self.ymin
-				elif quantile == 1:
-					preds = np.zeros(len(features)) + self.ymax
-				else:
-					preds = self.model[quantile].predict(features)
-				all_preds.append(preds)
+	def predict(self, X: np.array, W: np.array, Z: Optional[np.array]=None):
 
-			all_preds = np.stack(all_preds, axis=1) # n x self.nq
-			# sort to ensure coherence
-			all_preds = np.sort(all_preds, axis=1)
-			# take centers and return
-			yvals = (all_preds[:, 1:] + all_preds[:, 0:-1]) / 2
-			probs = np.stack([self.probs for _ in range(len(X))], axis=0)
-			return utilities.BatchedCategorical(
-				vals=yvals, probs=probs
-			)
-		else:
-			n = len(X)
-			W0 = np.zeros(n); W1 = np.ones(n)
-			return self.predict(X, W=W0), self.predict(X, W=W1)
+		features = self.feature_transform(W, X=X, Z=Z)
+		all_preds = [] 
+		for quantile in self.quantiles:
+			if quantile == 0:
+				preds = np.zeros(len(features)) + self.ymin
+			elif quantile == 1:
+				preds = np.zeros(len(features)) + self.ymax
+			else:
+				preds = self.model[quantile].predict(features)
+			all_preds.append(preds)
+
+		all_preds = np.stack(all_preds, axis=1) # n x self.nq
+		# sort to ensure coherence
+		all_preds = np.sort(all_preds, axis=1)
+		# take centers and return
+		yvals = (all_preds[:, 1:] + all_preds[:, 0:-1]) / 2
+		probs = np.stack([self.probs for _ in range(len(X))], axis=0)
+		return utilities.BatchedCategorical(
+			vals=yvals, probs=probs
+		)
 
 class BinaryDistReg(DistReg):
 	"""
@@ -649,10 +787,13 @@ class BinaryDistReg(DistReg):
 		- 'interactions' : interaction terms btwn. the treatment/covariates
 
 		The default is ``interactions``.
-	monotonicity : bool
-		If true, ensures that the coefficient corresponding to the treatment
-		is nonnegative. This is important when fitting Lee Bounds that assume
-		monotonicity. Defaults to False.
+	montonicity: bool
+		If True, ensures `P(Y_i(1) = 1 | X_i) - P(Y_i(0) = 1 | X_i)` >= 0.
+	monotonicity_margin : float
+		When ``self.monotonicity = True``, ensures that
+		:math:`P(Y_i(1) = 1 | X_i) - P(Y_i(0) = 1 | X_i)` >= margin. 
+		This is important for numerical stability but does not affect 
+		validity.
 	model_kwargs : dict
 		kwargs to sklearn model class.
 	"""
@@ -660,12 +801,14 @@ class BinaryDistReg(DistReg):
 		self, 
 		model_type: Union[str, sklearn.base.BaseEstimator] = 'logistic', 
 		monotonicity: bool = False,
+		monotonicity_margin: float=0.005,
 		how_transform: str = 'interactions',
 		**model_kwargs
 	) -> None:
 		self.mtype_raw = model_type
 		self.model_type = parse_model_type(model_type, discrete=True)
 		self.monotonicity = monotonicity
+		self.margin = monotonicity_margin
 		self.how_transform = str(how_transform).lower()
 		self.model_kwargs = model_kwargs
 
@@ -682,61 +825,64 @@ class BinaryDistReg(DistReg):
 			self.model_kwargs['l1_ratios'] = np.array([0, 0.5, 1])
 
 
-	def fit(self, W: np.array, X: np.array, y: np.array) -> None:
+	def fit(
+		self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None
+	) -> None:
+		self._iv = Z is not None
 		# check y is binary
 		if set(np.unique(y).tolist()) != set([0,1]):
 			raise ValueError(f"y must be binary; instead np.unique(y)={np.unique(y)}")
 		# fit 
-		features = self.feature_transform(W=W, X=X)
+		features = self.feature_transform(W=W, X=X, Z=Z)
 		self.model = self.model_type(**self.model_kwargs)
 		self.model.fit(features, y)
 
 	def predict_proba(
-		self, X: np.array, W: Optional[np.array]=None, margin=0.005,
+		self, X: np.array, W: np.array, Z: Optional[np.array]=None,
 	):
-		"""
-		If W is None, returns (P(Y = 1 | W = 0, X), P(Y = 1 | W = 1, X))
-		Else, returns P(Y = 1 | W , X) 
-		"""
-		if W is not None:
-			# return predict P(Y = 1 | X, W)
-			return self.model.predict_proba(
-				self.feature_transform(W, X)
-			)[:, 1]
-		else:
-			# make predictions for W = 0 and W = 1
-			n = len(X)
-			W0 = np.zeros(n); W1 = np.ones(n)
-			p0s, p1s = self.predict_proba(X, W=W0), self.predict_proba(X, W=W1)
-			p0s = np.minimum(1-TOL, np.maximum(TOL, p0s))
-			p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
-			# enforce monotonicity
-			if self.monotonicity:
-				flags = p0s > p1s - margin
-				avg = (p0s[flags] + p1s[flags]) / 2
-				p0s[flags] = np.maximum(TOL, avg-margin)
-				p1s[flags] = np.minimum(1-TOL, avg+margin)
-			return p0s, p1s
+		# return P(Y = 1 | X, W)
+		return self.model.predict_proba(
+			self.feature_transform(W, X, Z=Z)
+		)[:, 1]
+		# else:
+		# 	# make predictions for W = 0 and W = 1
+		# 	n = len(X)
+		# 	W0 = np.zeros(n); W1 = np.ones(n)
+		# 	p0s, p1s = self.predict_proba(X, W=W0), self.predict_proba(X, W=W1)
+		# 	p0s = np.minimum(1-TOL, np.maximum(TOL, p0s))
+		# 	p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
+		# 	# enforce monotonicity
+		# 	if self.monotonicity:
+		# 		flags = p0s > p1s - margin
+		# 		avg = (p0s[flags] + p1s[flags]) / 2
+		# 		p0s[flags] = np.maximum(TOL, avg-margin)
+		# 		p1s[flags] = np.minimum(1-TOL, avg+margin)
+		# 	return p0s, p1s
 
-	def predict(self, X: np.array, W: Optional[np.array]=None):
-		"""
-		If W is None, returns (y0_dists, y1_dists)
-		Else, returns (y_dists) 
-		"""
-		if W is not None:
-			# predict
-			features = self.feature_transform(W, X=X)
-			probs = self.model.predict_proba(features)
-			# return BatchedCategorical object
-			vals = np.zeros((len(X), 2))
-			vals[:, -1] += 1
-			return BatchedCategorical(
-				vals=vals, probs=probs
-			)
+	def predict(self, X: np.array, W: np.array, Z: Optional[np.array]=None):
+		return BatchedCategorical.from_binary_probs(
+			self.predict_proba(X=X, W=W, Z=Z)
+		)
+
+	def predict_counterfactuals(self, X: np.array):
+		n = len(X)
+		ydists = DistReg.predict_counterfactuals(self, X=X)
+		## enforce monotonicity
+		if not self.monotonicity:
+			return ydists
+
+		# Case 1: instrument variables (4 counterfactuals)
+		if self._iv:
+			for z in [0,1]:
+				ydists[z] = _enforce_monotonicity(
+					ydists[z][0], ydists[z][1], margin=self.margin
+				)
+			return ydists
+		# Case 2: intent to treat (2 counterfactuals)
 		else:
-			n = len(X)
-			W0 = np.zeros(n); W1 = np.ones(n)
-			return self.predict(X, W=W0), self.predict(X, W=W1)
+			return _enforce_monotonicity(ydists[0], ydists[1], margin=self.margin)
+
+
 
 class MonotoneLogisticReg:
 	"""

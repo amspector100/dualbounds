@@ -271,7 +271,7 @@ class LeeDualBounds(generic.DualBounds):
 	where :math:`Y(1), Y(0)` are potential outcomes and 
 	:math:`S(1), S(0)` are post-treatment selection events.
 	These bounds assume monotonicity, i.e., 
-	:math:`S(1) \ge S(0)` a.s. (see Lee 2009).
+	:math:`S(1) >= S(0)` a.s. (see Lee 2009).
 
 	Parameters
 	----------
@@ -287,7 +287,7 @@ class LeeDualBounds(generic.DualBounds):
 		n-length array-like of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
 	outcome_model : str | dist_reg.DistReg
-		The model for estimating the law of :math:`Y \mid X, W`.
+		The model for estimating the law of :math:`Y | X, W`.
 		Two options:
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
@@ -626,7 +626,8 @@ class LeeDualBounds(generic.DualBounds):
 				verbose=verbose,
 				probs_only=True,
 			)
-			self.s0_probs, self.s1_probs, self.selection_model_fits, self.S_oos_preds = sout
+			counterfactuals, self.selection_model_fits, self.S_oos_preds = sout
+			self.s0_probs, self.s1_probs = counterfactuals
 		elif not suppress_warning:
 			warnings.warn(
 				generic.CROSSFIT_WARNING.replace("y0_", "s0_").replace("y1_", "s1_")
@@ -645,7 +646,8 @@ class LeeDualBounds(generic.DualBounds):
 				model=self.outcome_model,
 				verbose=verbose,
 			)
-			self.y0_dists, self.y1_dists, self.model_fits, self.oos_dist_preds = yout
+			counterfactuals, self.model_fits, self.oos_dist_preds = yout
+			self.y0_dists, self.y1_dists = counterfactuals
 		elif not suppress_warning:
 			warnings.warn(generic.CROSSFIT_WARNING)
 
