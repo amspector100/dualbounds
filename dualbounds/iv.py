@@ -222,53 +222,66 @@ class DualIVBounds(generic.DualBounds):
 		check if there are ways to speed it up / dual formulations
 		(e.g. ensure dual boundedness instead of primal feasibility.)
 		"""
-		## Step 1: adjust to ensure a common support for Y(0) and Y(1)
-		# by concatenating to yvals and padding probs with zeros
-		yvals_new = [[np.nan, np.nan], [np.nan, np.nan]]
-		probs_new = [[np.nan, np.nan], [np.nan, np.nan]]
-		for w in [0,1]:
-			# Figure out what we need to concatenate
-			set0 = set(yvals[0, w].tolist())
-			set1 = set(yvals[1, w].tolist())
-			to_add0 = np.array(list(set1 - set0))
-			to_add1 = np.array(list(set0 - set1))
-			# TODO get rid this check later
-			if len(to_add0) != len(to_add1):
-				raise RunTimeError("to_add0 and to_add1 have different lengths...")
-			# Concatenate for each z
-			for z, to_add in zip([0, 1], [to_add0, to_add1]):
-				ynew = np.concatenate([yvals[z, w], to_add], axis=0)
-				pnew = np.concatenate([jointprobs[z, w], np.zeros(len(to_add))], axis=0)
-				# Always ensure yvals are sorted
-				inds = np.argsort(ynew)
-				yvals_new[z][w] = ynew[inds]
-				probs_new[z][w] = pnew[inds]
+		# ## Step 1: adjust to ensure a common support for Y(0) and Y(1)
+		# # by concatenating to yvals and padding probs with zeros
+		# yvals_new = [[np.nan, np.nan], [np.nan, np.nan]]
+		# probs_new = [[np.nan, np.nan], [np.nan, np.nan]]
+		# for w in [0,1]:
+		# 	# Figure out what we need to concatenate
+		# 	set0 = set(yvals[0, w].tolist())
+		# 	set1 = set(yvals[1, w].tolist())
+		# 	to_add0 = np.array(list(set1 - set0))
+		# 	to_add1 = np.array(list(set0 - set1))
+		# 	# TODO get rid this check later
+		# 	if len(to_add0) != len(to_add1):
+		# 		raise RunTimeError("to_add0 and to_add1 have different lengths...")
+		# 	# Concatenate for each z
+		# 	for z, to_add in zip([0, 1], [to_add0, to_add1]):
+		# 		ynew = np.concatenate([yvals[z, w], to_add], axis=0)
+		# 		pnew = np.concatenate([jointprobs[z, w], np.zeros(len(to_add))], axis=0)
+		# 		# Always ensure yvals are sorted
+		# 		inds = np.argsort(ynew)
+		# 		yvals_new[z][w] = ynew[inds]
+		# 		probs_new[z][w] = pnew[inds]
 
-		## TODO: remove this check later
+		# ## TODO: remove this check later
+		# for w in [0,1]:
+		# 	np.testing.assert_array_almost_equal(
+		# 		yvals_new[0][w], yvals_new[1][w],
+		# 		decimal=8,
+		# 		err_msg=f"yvals_new[0][{w}] and yvals_new[1][{w}] do not match"
+		# 	)
+		# nvals0 = len(yvals_new[0][0])
+		# nvals1 = len(yvals_new[1][1])
+
+		## Step 1: Test that Y(0) has a common support regardless of the value of Z
 		for w in [0,1]:
 			np.testing.assert_array_almost_equal(
-				yvals_new[0][w], yvals_new[1][w],
+				yvals[0][w], 
+				yvals[1][w],
 				decimal=8,
-				err_msg=f"yvals_new[0][{w}] and yvals_new[1][{w}] do not match"
+				err_msg=f"yvals[0][{w}] != yvals[1][{w}], making the primal infeasible and the dual unbounded."
 			)
-		nvals0 = len(yvals_new[0][0])
-		nvals1 = len(yvals_new[1][1])
+
+		# These should be the same by default but this allows custom user inputs.
+		nvals0 = len(yvals[0][0])
+		nvals1 = len(yvals[1][1])
 
 		## Step 2: set up the LP
 		## Step 2(a): define core variables
-		# w0y0_probs[w][i] is the P(W(0) = w, Y(0) = new_yvals[0/1][z][i])
-		w0y0_probs = cp.Variable((2, nvals0), pos=True)
-		# w1y1_probs[w][i] is the P(W(1) = w, Y(1) = new_yvals[0/1][z][i])
-		w1y1_probs = cp.Variable((2, nvals1), pos=True)
+		# w0yw0_probs[w][i] is the P(W(0) = w, Y(w) = yvals[0/1][w][i])
+		w0yw0_probs = [cp.Variable(nvals0, pos=True), cp.Variable(nvals1, pos=True)]
+		# w1yw1_probs[w][i] is the P(W(1) = w, Y(w) = yvals[0/1][w][i])
+		w1yw1_probs = [cp.Variable(nvals0, pos=True), cp.Variable(nvals1, pos=True)]
 		# jp_cp[w0][w1][i, j] is the joint PMF of W(0), W(1), Y(0) (value i), Y(1) (value j)
 		jp_cp = [[], []]
-		for z in [0,1]:
-			for w in [0,1]:
-				jp_cp[z].append(cp.Variable((nvals0, nvals1), pos=True))
-
+		for w0 in [0,1]:
+			for w1 in [0,1]:
+				jp_cp[w0].append(cp.Variable((nvals0, nvals1), pos=True))
+		# All distributions sum to 1
 		constraints = [
-			cp.sum(w0y0_probs) == 1,
-			cp.sum(w1y1_probs) == 1,
+			cp.sum(w0yw0_probs[0]) + cp.sum(w0yw0_probs[1]) == 1,
+			cp.sum(w1yw1_probs[0]) + cp.sum(w1yw1_probs[1]) == 1,
 			cp.sum(jp_cp[0][0] + jp_cp[0][0] + jp_cp[0][0] + jp_cp[1][1]) == 1,
 		]
 		## Step 2(b): support restrictions on the joint law
@@ -278,7 +291,7 @@ class DualIVBounds(generic.DualBounds):
 				for w1 in [0,1]:
 					inds1 = np.arange(nvals1) + w1 * nvals1
 					block_args = dict(
-						w0=w0, w1=w1, y0=new_yvals[0][w0], y1=new_yvals[1][w1], x=x,
+						w0=w0, w1=w1, y0=yvals[0][w0], y1=yvals[1][w1], x=x,
 					)
 					# Account for support restrictions
 					not_in_support[np.ix_(inds0, inds1)] = ~(self._apply_ot_fn(
@@ -287,40 +300,52 @@ class DualIVBounds(generic.DualBounds):
 			constraints.append(jp_cp[not_in_support] == 0)
 
 		### Step 2(c): marginal laws compatible with joint law
+		# Note: this is not a typical OT problem! The axis choice
+		# is subtle and important.
 		constraints.extend([
-			### 2(c)(i): the law of Y(0), W(0) matches
-			cp.sum(jp_cp[0][0] + jp_cp[0][1], axis=1) == w0y0_probs[0],
-			cp.sum(jp_cp[1][0] + jp_cp[1][1], axis=1) == w0y0_probs[1],
-			### 2(c)(ii): the law of Y(0), W(0) matches
-			cp.sum(jp_cp[0][0] + jp_cp[1][0], axis=0) == w1y1_probs[0],
-			cp.sum(jp_cp[0][1] + jp_cp[1][1], axis=0) == w1y1_probs[1],
+			### 2(c)(i): the law of Y(W(0)), W(0) matches
+			# W(0)=0 implies Y(W(0)) = Y(0), sum over W(1) and Y(1)
+			cp.sum(jp_cp[0][0] + jp_cp[0][1], axis=1) == w0yw0_probs[0],
+			# W(0) = 1 implies Y(W(0)) = Y(1), sum over W(1) and Y(0)
+			cp.sum(jp_cp[1][0] + jp_cp[1][1], axis=0) == w0yw0_probs[1],
+			### 2(c)(ii): the law of Y(W(1)), W(1) matches; repeat
+			cp.sum(jp_cp[0][0] + jp_cp[1][0], axis=1) == w1yw1_probs[0],
+			cp.sum(jp_cp[0][1] + jp_cp[1][1], axis=0) == w1yw1_probs[1],
 		])
 
 		### 3. Objective: 1-wasserstein distance over 
 		# conditional laws of Y(w) | W(z) = w
 		obj = 0
-		for z, mprobs in zip([0,1], [w0y0_probs, w1y1_probs]):
+		for z, mprobs in zip([0,1], [w0yw0_probs, w1yw1_probs]):
 			for w in [0,1]:
 				### 3(a). Ensure P(W(z)  = w | Z = z) is preserved
 				pw_given_z = jointprobs[z, w].sum()
 				constraints.append(cp.sum(mprobs[w]) == pw_given_z)
 				### 3(b). Compute Wasserstein distances
 				cprobs_cp = cp.cumsum(mprobs[w])[:-1]
-				cprobs_orig = np.cumsum(probs_new[z][w])[:-1]
-				yvals = yvals_new[z][w]
-				ydiffs = yvals[1:] - yvals[:-1]
+				cprobs_orig = np.cumsum(jointprobs[z][w])[:-1]
+				ydiffs = yvals[z][w][1:] - yvals[z][w][:-1]
 				obj += cp.sum(cp.multiply(ydiffs, cp.abs(cprobs_orig - cprobs_cp)))
 
 		### 4. Create problem and solve
 		problem = cp.Problem(cp.Minimize(obj), constraints=constraints)
 		problem.solve(solver=solver)
-		return dict(
-			problem=problem,
-			w0y0_probs=w0y0_probs,
-			w1y1_probs=w1y1_probs,
-			yvals_new=yvals_new,
-			probs_new=probs_new,
+
+		### 5. Concatenate
+		new_jointprobs = np.stack(
+			[
+				np.stack([w0yw0_probs[0].value, w0yw0_probs[1].value], axis=0),
+				np.stack([w1yw1_probs[0].value, w1yw1_probs[1].value], axis=0),
+			],
+			axis=0
 		)
+		return new_jointprobs
+		# return dict(
+		# 	problem=problem,
+		# 	w0yw0_probs=w0yw0_probs,
+		# 	w1yw1_probs=w1yw1_probs,
+		# 	jp_cp=jp_cp,
+		# )
 
 
 
@@ -515,6 +540,7 @@ class DualIVBounds(generic.DualBounds):
 		nvals: int=100,
 		ninterp: Optional[int]=None,
 		verbose: bool=True,
+		_ensure_primal_feas:bool=True,
 		**kwargs
 	):
 		"""
@@ -543,6 +569,7 @@ class DualIVBounds(generic.DualBounds):
 			self.nvals = len(self.support)
 		else:
 			self.nvals = nvals
+			##TODO?
 			# if self.nvals <= generic.MIN_NVALS
 
 		# Infer ymin/ymax
@@ -571,7 +598,28 @@ class DualIVBounds(generic.DualBounds):
 				self._yvals[z].append(yvals_zw)
 				self._yprobs[z].append(yprobs_zw)
 
-		##TODO: need to test that this concatenation is correct
+		# Ensure that the support of Y(w) | W(0) = w and Y(w) | W(1) = w 
+		# is the same. This is necessary to ensure primal feasibility.
+		concat_ys = False
+		for w in [0,1]:
+			if not np.all(self._yvals[0][w] == self._yvals[1][w]):
+				concat_ys = True
+		# Concatenate
+		if concat_ys:
+			for w in [0,1]:
+				# zero padding for probabilities
+				zero_pad = np.zeros((self.n, self.nvals))
+				# Create the union of the supports
+				yvals_w = np.concatenate([self._yvals[0][w], self._yvals[1][w]], axis=1)
+				self._yvals[0][w] = yvals_w
+				self._yvals[1][w] = yvals_w
+				# Pad probabilities
+				self._yprobs[0][w] = np.concatenate([self._yprobs[0][w], zero_pad], axis=1)
+				self._yprobs[1][w] = np.concatenate([zero_pad, self._yprobs[1][w]], axis=1)
+
+			# Adjust self.nvals
+			self.nvals *= 2
+
 		# Shape: (n, 2, 2, nvals) with the 2s corresponding to (z,w) in that order.
 		self._yvals = np.stack(
 			[np.stack(self._yvals[0], axis=1), np.stack(self._yvals[1], axis=1)],
@@ -581,10 +629,12 @@ class DualIVBounds(generic.DualBounds):
 			[np.stack(self._yprobs[0], axis=1), np.stack(self._yprobs[1], axis=1)],
 			axis=1
 		)
+
 		# joint law of (W, Y(W)) | Z
 		self._jointprobs = self._yprobs.copy()
 		self._jointprobs[:, :, 0] *= (1 - wprobs.reshape(self.n, 2, 1))
 		self._jointprobs[:, :, 1] *= wprobs.reshape(self.n, 2, 1)
+		self._adj_jointprobs = self._jointprobs.copy()
 
 		## Initialize results
 		# first dimension = [lower, upper]
@@ -600,10 +650,16 @@ class DualIVBounds(generic.DualBounds):
 		# second dimension = [z=0, z=1]
 		self.cs = np.zeros((self.n, 2, 2)) 
 		for i in utilities.vrange(self.n, verbose=verbose):
+			# Ensure primal feasibility
+			self._adj_jointprobs[i] = self._ensure_primal_feasibility(
+				yvals=self._yvals[i],
+				jointprobs=self._jointprobs[i],
+				x=self.X[i],
+			)
 			# Compute optimal dual variable functions
 			objvalsx, nusx, csx = self._solve_single_instance(
 				yvals=self._yvals[i],
-				probs=self._jointprobs[i],
+				probs=self._adj_jointprobs[i],
 				x=self.X[i],
 				ymin=ymin,
 				ymax=ymax,
