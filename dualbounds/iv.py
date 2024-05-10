@@ -2,6 +2,7 @@ import copy
 import warnings
 import numpy as np
 import ot
+import cvxpy as cp
 from scipy import stats
 from . import utilities, generic, dist_reg, interpolation
 from .utilities import BatchedCategorical
@@ -186,11 +187,12 @@ class DualIVBounds(generic.DualBounds):
 		yvals,
 		jointprobs,
 		x,
+		solver='ECOS',
 	):
 		"""
 		Parameters
 		----------
-		probs : np.array
+		jointprobs : np.array
 			(2, 2, nvals)-shaped array where probs[z, w, y] =
 			P(W(z) = w, Y(w) = yvals[z, w, y] | X = x).
 		yvals : np.array
@@ -236,9 +238,9 @@ class DualIVBounds(generic.DualBounds):
 			# Concatenate for each z
 			for z, to_add in zip([0, 1], [to_add0, to_add1]):
 				ynew = np.concatenate([yvals[z, w], to_add], axis=0)
-				pnew = np.concatenate([probs[z, w], np.zeros(len(to_add))], axis=0)
+				pnew = np.concatenate([jointprobs[z, w], np.zeros(len(to_add))], axis=0)
 				# Always ensure yvals are sorted
-				inds = np.argsort(ynew, axis=1)
+				inds = np.argsort(ynew)
 				yvals_new[z][w] = ynew[inds]
 				probs_new[z][w] = pnew[inds]
 
@@ -255,15 +257,19 @@ class DualIVBounds(generic.DualBounds):
 		## Step 2: set up the LP
 		## Step 2(a): define core variables
 		# w0y0_probs[w][i] is the P(W(0) = w, Y(0) = new_yvals[0/1][z][i])
-		w0y0_probs = [cp.Variable(nvals0, pos=True) for _ in range(2)]
+		w0y0_probs = cp.Variable((2, nvals0), pos=True)
 		# w1y1_probs[w][i] is the P(W(1) = w, Y(1) = new_yvals[0/1][z][i])
-		w1y1_probs = [cp.Variable(nvals1, pos=True) for _ in range(2)]
-		# jp[w][i]... huh
-		jp_cp = cp.Variable((nvals0, nvals1), pos=True)
+		w1y1_probs = cp.Variable((2, nvals1), pos=True)
+		# jp_cp[w0][w1][i, j] is the joint PMF of W(0), W(1), Y(0) (value i), Y(1) (value j)
+		jp_cp = [[], []]
+		for z in [0,1]:
+			for w in [0,1]:
+				jp_cp[z].append(cp.Variable((nvals0, nvals1), pos=True))
+
 		constraints = [
 			cp.sum(w0y0_probs) == 1,
 			cp.sum(w1y1_probs) == 1,
-			cp.sum(jp_cp) == 1,
+			cp.sum(jp_cp[0][0] + jp_cp[0][0] + jp_cp[0][0] + jp_cp[1][1]) == 1,
 		]
 		## Step 2(b): support restrictions on the joint law
 		if self.support_restriction is not None:
@@ -278,10 +284,43 @@ class DualIVBounds(generic.DualBounds):
 					not_in_support[np.ix_(inds0, inds1)] = ~(self._apply_ot_fn(
 						fn=self.support_restriction, **block_args
 					).astype(bool))
-		constraints.append(jp_cp[not_in_support] == 0)
-		## Step 2(c): marginal laws compatible with joint law
+			constraints.append(jp_cp[not_in_support] == 0)
 
+		### Step 2(c): marginal laws compatible with joint law
+		constraints.extend([
+			### 2(c)(i): the law of Y(0), W(0) matches
+			cp.sum(jp_cp[0][0] + jp_cp[0][1], axis=1) == w0y0_probs[0],
+			cp.sum(jp_cp[1][0] + jp_cp[1][1], axis=1) == w0y0_probs[1],
+			### 2(c)(ii): the law of Y(0), W(0) matches
+			cp.sum(jp_cp[0][0] + jp_cp[1][0], axis=0) == w1y1_probs[0],
+			cp.sum(jp_cp[0][1] + jp_cp[1][1], axis=0) == w1y1_probs[1],
+		])
 
+		### 3. Objective: 1-wasserstein distance over 
+		# conditional laws of Y(w) | W(z) = w
+		obj = 0
+		for z, mprobs in zip([0,1], [w0y0_probs, w1y1_probs]):
+			for w in [0,1]:
+				### 3(a). Ensure P(W(z)  = w | Z = z) is preserved
+				pw_given_z = jointprobs[z, w].sum()
+				constraints.append(cp.sum(mprobs[w]) == pw_given_z)
+				### 3(b). Compute Wasserstein distances
+				cprobs_cp = cp.cumsum(mprobs[w])[:-1]
+				cprobs_orig = np.cumsum(probs_new[z][w])[:-1]
+				yvals = yvals_new[z][w]
+				ydiffs = yvals[1:] - yvals[:-1]
+				obj += cp.sum(cp.multiply(ydiffs, cp.abs(cprobs_orig - cprobs_cp)))
+
+		### 4. Create problem and solve
+		problem = cp.Problem(cp.Minimize(obj), constraints=constraints)
+		problem.solve(solver=solver)
+		return dict(
+			problem=problem,
+			w0y0_probs=w0y0_probs,
+			w1y1_probs=w1y1_probs,
+			yvals_new=yvals_new,
+			probs_new=probs_new,
+		)
 
 
 

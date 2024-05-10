@@ -406,8 +406,12 @@ class DistReg:
 		# Add Z. Note that we cannot add interactions with W
 		if Z is None:
 			return features
-
-		if self.how_transform in ['int', 'interaction', 'interactions']:
+		else:
+			Z = Z.reshape(-1, 1)
+			if self.how_transform in ['int', 'interaction', 'interactions']:
+				return np.concatenate([features, Z, Z * X], axis=1)
+			else:
+				return np.concatenate([features, Z], axis=1)
 
 	def predict(
 		self, 
