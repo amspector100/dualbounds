@@ -181,6 +181,111 @@ class DualIVBounds(generic.DualBounds):
 
 		return objvals, nus, cs
 
+	def _ensure_primal_feasibility(
+		self,
+		yvals,
+		jointprobs,
+		x,
+	):
+		"""
+		Parameters
+		----------
+		probs : np.array
+			(2, 2, nvals)-shaped array where probs[z, w, y] =
+			P(W(z) = w, Y(w) = yvals[z, w, y] | X = x).
+		yvals : np.array
+			(2, 2, nvals)-shaped array where
+			yvals[z, w] is the support of Y(w) | W(z) = w
+		x : np.array
+			value of x
+
+		Returns
+		-------
+		probs_adj : np.array
+			(2, 2, nvals)-shaped array which is as close to
+			probs as possible such that primal feasibility 
+			is satisfied.
+
+		Notes
+		-----
+		In this context, "primal feasibility" means that 
+		there exists some law of W(0), W(1), Y(0), Y(1) | X
+		which induces the implied marginals of 
+		W(0), Y(W(0)) | X and W(1), Y(W(1)) | X as stored
+		by probs and yvals.
+
+		Todo
+		----
+		This will be a bottleneck, specifically the LP. We should
+		check if there are ways to speed it up / dual formulations
+		(e.g. ensure dual boundedness instead of primal feasibility.)
+		"""
+		## Step 1: adjust to ensure a common support for Y(0) and Y(1)
+		# by concatenating to yvals and padding probs with zeros
+		yvals_new = [[np.nan, np.nan], [np.nan, np.nan]]
+		probs_new = [[np.nan, np.nan], [np.nan, np.nan]]
+		for w in [0,1]:
+			# Figure out what we need to concatenate
+			set0 = set(yvals[0, w].tolist())
+			set1 = set(yvals[1, w].tolist())
+			to_add0 = np.array(list(set1 - set0))
+			to_add1 = np.array(list(set0 - set1))
+			# TODO get rid this check later
+			if len(to_add0) != len(to_add1):
+				raise RunTimeError("to_add0 and to_add1 have different lengths...")
+			# Concatenate for each z
+			for z, to_add in zip([0, 1], [to_add0, to_add1]):
+				ynew = np.concatenate([yvals[z, w], to_add], axis=0)
+				pnew = np.concatenate([probs[z, w], np.zeros(len(to_add))], axis=0)
+				# Always ensure yvals are sorted
+				inds = np.argsort(ynew, axis=1)
+				yvals_new[z][w] = ynew[inds]
+				probs_new[z][w] = pnew[inds]
+
+		## TODO: remove this check later
+		for w in [0,1]:
+			np.testing.assert_array_almost_equal(
+				yvals_new[0][w], yvals_new[1][w],
+				decimal=8,
+				err_msg=f"yvals_new[0][{w}] and yvals_new[1][{w}] do not match"
+			)
+		nvals0 = len(yvals_new[0][0])
+		nvals1 = len(yvals_new[1][1])
+
+		## Step 2: set up the LP
+		## Step 2(a): define core variables
+		# w0y0_probs[w][i] is the P(W(0) = w, Y(0) = new_yvals[0/1][z][i])
+		w0y0_probs = [cp.Variable(nvals0, pos=True) for _ in range(2)]
+		# w1y1_probs[w][i] is the P(W(1) = w, Y(1) = new_yvals[0/1][z][i])
+		w1y1_probs = [cp.Variable(nvals1, pos=True) for _ in range(2)]
+		# jp[w][i]... huh
+		jp_cp = cp.Variable((nvals0, nvals1), pos=True)
+		constraints = [
+			cp.sum(w0y0_probs) == 1,
+			cp.sum(w1y1_probs) == 1,
+			cp.sum(jp_cp) == 1,
+		]
+		## Step 2(b): support restrictions on the joint law
+		if self.support_restriction is not None:
+			for w0 in [0,1]:
+				inds0 = np.arange(nvals0) + w0 * nvals0
+				for w1 in [0,1]:
+					inds1 = np.arange(nvals1) + w1 * nvals1
+					block_args = dict(
+						w0=w0, w1=w1, y0=new_yvals[0][w0], y1=new_yvals[1][w1], x=x,
+					)
+					# Account for support restrictions
+					not_in_support[np.ix_(inds0, inds1)] = ~(self._apply_ot_fn(
+						fn=self.support_restriction, **block_args
+					).astype(bool))
+		constraints.append(jp_cp[not_in_support] == 0)
+		## Step 2(c): marginal laws compatible with joint law
+
+
+
+
+
+
 	def _ensure_feasibility(
 		self,
 		i,
