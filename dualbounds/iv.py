@@ -16,6 +16,12 @@ from typing import Optional, Union
 Note to self: do we need to define a ConcatScipyDist wrapper...?
 """
 
+def _clip_jointprobs(jointprobs):
+	jointprobs = np.clip(jointprobs, 0, 1)
+	for z in [0,1]:
+		jointprobs[z] /= jointprobs[z].sum()
+	return jointprobs
+
 class DualIVBounds(generic.DualBounds):
 	"""
 	This docstring needs to be constructed. Notes:
@@ -222,38 +228,7 @@ class DualIVBounds(generic.DualBounds):
 		check if there are ways to speed it up / dual formulations
 		(e.g. ensure dual boundedness instead of primal feasibility.)
 		"""
-		# ## Step 1: adjust to ensure a common support for Y(0) and Y(1)
-		# # by concatenating to yvals and padding probs with zeros
-		# yvals_new = [[np.nan, np.nan], [np.nan, np.nan]]
-		# probs_new = [[np.nan, np.nan], [np.nan, np.nan]]
-		# for w in [0,1]:
-		# 	# Figure out what we need to concatenate
-		# 	set0 = set(yvals[0, w].tolist())
-		# 	set1 = set(yvals[1, w].tolist())
-		# 	to_add0 = np.array(list(set1 - set0))
-		# 	to_add1 = np.array(list(set0 - set1))
-		# 	# TODO get rid this check later
-		# 	if len(to_add0) != len(to_add1):
-		# 		raise RunTimeError("to_add0 and to_add1 have different lengths...")
-		# 	# Concatenate for each z
-		# 	for z, to_add in zip([0, 1], [to_add0, to_add1]):
-		# 		ynew = np.concatenate([yvals[z, w], to_add], axis=0)
-		# 		pnew = np.concatenate([jointprobs[z, w], np.zeros(len(to_add))], axis=0)
-		# 		# Always ensure yvals are sorted
-		# 		inds = np.argsort(ynew)
-		# 		yvals_new[z][w] = ynew[inds]
-		# 		probs_new[z][w] = pnew[inds]
-
-		# ## TODO: remove this check later
-		# for w in [0,1]:
-		# 	np.testing.assert_array_almost_equal(
-		# 		yvals_new[0][w], yvals_new[1][w],
-		# 		decimal=8,
-		# 		err_msg=f"yvals_new[0][{w}] and yvals_new[1][{w}] do not match"
-		# 	)
-		# nvals0 = len(yvals_new[0][0])
-		# nvals1 = len(yvals_new[1][1])
-
+		jointprobs = _clip_jointprobs(jointprobs)
 		## Step 1: Test that Y(0) has a common support regardless of the value of Z
 		for w in [0,1]:
 			np.testing.assert_array_almost_equal(
@@ -287,17 +262,15 @@ class DualIVBounds(generic.DualBounds):
 		## Step 2(b): support restrictions on the joint law
 		if self.support_restriction is not None:
 			for w0 in [0,1]:
-				inds0 = np.arange(nvals0) + w0 * nvals0
 				for w1 in [0,1]:
-					inds1 = np.arange(nvals1) + w1 * nvals1
 					block_args = dict(
 						w0=w0, w1=w1, y0=yvals[0][w0], y1=yvals[1][w1], x=x,
 					)
 					# Account for support restrictions
-					not_in_support[np.ix_(inds0, inds1)] = ~(self._apply_ot_fn(
+					not_in_support = ~(self._apply_ot_fn(
 						fn=self.support_restriction, **block_args
 					).astype(bool))
-			constraints.append(jp_cp[not_in_support] == 0)
+					constraints.append(jp_cp[w0][w1][not_in_support] == 0)
 
 		### Step 2(c): marginal laws compatible with joint law
 		# Note: this is not a typical OT problem! The axis choice
@@ -320,7 +293,8 @@ class DualIVBounds(generic.DualBounds):
 			for w in [0,1]:
 				### 3(a). Ensure P(W(z)  = w | Z = z) is preserved
 				pw_given_z = jointprobs[z, w].sum()
-				constraints.append(cp.sum(mprobs[w]) == pw_given_z)
+				###TODO why is this infeasible?
+				#constraints.append(cp.sum(mprobs[w]) == pw_given_z)
 				### 3(b). Compute Wasserstein distances
 				cprobs_cp = cp.cumsum(mprobs[w])[:-1]
 				cprobs_orig = np.cumsum(jointprobs[z][w])[:-1]
@@ -339,16 +313,11 @@ class DualIVBounds(generic.DualBounds):
 			],
 			axis=0
 		)
+		### 6. Clip and ensure sums to one
+		new_jointprobs = np.clip(new_jointprobs, 0, 1)
+		for z in [0,1]:
+			new_jointprobs[z] /= new_jointprobs[z].sum()
 		return new_jointprobs
-		# return dict(
-		# 	problem=problem,
-		# 	w0yw0_probs=w0yw0_probs,
-		# 	w1yw1_probs=w1yw1_probs,
-		# 	jp_cp=jp_cp,
-		# )
-
-
-
 
 	def _ensure_feasibility(
 		self,
@@ -616,6 +585,11 @@ class DualIVBounds(generic.DualBounds):
 				# Pad probabilities
 				self._yprobs[0][w] = np.concatenate([self._yprobs[0][w], zero_pad], axis=1)
 				self._yprobs[1][w] = np.concatenate([zero_pad, self._yprobs[1][w]], axis=1)
+				# argsort
+				for z in [0,1]:
+					self._yvals[z][w], self._yprobs[z][w] = utilities._sort_disc_dist(
+						vals=_yvals[z][w], probs=self._yprobs[z][w]
+					)
 
 			# Adjust self.nvals
 			self.nvals *= 2
@@ -651,11 +625,12 @@ class DualIVBounds(generic.DualBounds):
 		self.cs = np.zeros((self.n, 2, 2)) 
 		for i in utilities.vrange(self.n, verbose=verbose):
 			# Ensure primal feasibility
-			self._adj_jointprobs[i] = self._ensure_primal_feasibility(
-				yvals=self._yvals[i],
-				jointprobs=self._jointprobs[i],
-				x=self.X[i],
-			)
+			if _ensure_primal_feas:
+				self._adj_jointprobs[i] = self._ensure_primal_feasibility(
+					yvals=self._yvals[i],
+					jointprobs=self._jointprobs[i],
+					x=self.X[i],
+				)
 			# Compute optimal dual variable functions
 			objvalsx, nusx, csx = self._solve_single_instance(
 				yvals=self._yvals[i],
