@@ -245,11 +245,6 @@ class DeltaDualBounds(DualBounds):
 			B=B,
 			alpha=self.alpha,
 		)
-		print(self.estimates.shape, self.ses.shape, self.cis.shape)
-		# self.estimates = bootstrap_out['estimates']
-		# self.ses = bootstrap_out['ses']
-		# self.cis = bootstrap_out['cis']
-		# self.bootstrap_ests = bootstrap_out['bootstrap_ests']
 		# Return
 		return dict(
 			estimates=self.estimates,
