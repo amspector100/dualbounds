@@ -917,7 +917,7 @@ class MonotoneLogisticReg:
 	def __init__(self, lmda: float=0.001):
 		self.lmda = lmda
 
-	def fit(self, X: np.array, y: np.array, solver='ECOS'):
+	def fit(self, X: np.array, y: np.array, solver='CLARABEL', **solver_kwargs):
 		"""
 		Fits the linear model using a cvxpy backend.
 
@@ -928,7 +928,9 @@ class MonotoneLogisticReg:
 		y : np.array
 			n-length vector of binary response.
 		solver : str
-			Solver for cvxpy to use. Default: ECOS.
+			Solver for cvxpy to use. Default: CLARABEL.
+		solver_kwargs : dict
+			Kwargs for the cvxpy solver.
 		"""
 		# Set up data and losses
 		n, p = X.shape
@@ -942,10 +944,8 @@ class MonotoneLogisticReg:
 		# Objective and problem
 		obj = cp.Maximize(cp.sum(term1 - term2) - term3)
 		problem = cp.Problem(objective=obj, constraints=[beta[0] >= 0])
-		try:
-			problem.solve(solver=solver, max_iters=100)
-		except cp.error.SolverError:
-			problem.solve(solver=solver, max_iters=500)
+		problem.solve(solver=solver, **solver_kwargs)
+		# Learn value
 		self.beta = beta.value
 
 	def predict_proba(self, X: np.array):

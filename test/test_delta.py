@@ -18,7 +18,7 @@ except ImportError:
 from dualbounds import varite, gen_data, delta
 
 
-class TestDeltaDualBounds(unittest.TestCase):
+class TestDeltaDualBounds(context.DBTest):
 
 	def test_deltadb_and_varite(self):
 		""" This tests that DeltaDualBounds and VarITEDualBounds give the same answer. """
@@ -106,6 +106,32 @@ class TestDeltaDualBounds(unittest.TestCase):
 				err_msg=f"DeltaDualBounds pandas init. changes {name} values."
 			)
 
+	def test_delta_clustered_ses(self):
+		data = db.gen_data.gen_regression_data(
+			n=200, p=1, r2=0.9, dgp_seed=1, sample_seed=1, eps_dist='gaussian',
+			interactions=True,
+		)
+		f = lambda y0, y1, x: y1 * (y0 > 0)
+		z0 = lambda y0, x: y0 > 0
+		z1 = lambda y1, x: 0
+		h = lambda fval, z0, z1: fval / z0
+		# Stack data
+		data = np.stack(
+			[data['y'], data['W'], data['pis'], data['X'][:, 0]],
+			axis=1
+		)
+		def ddb_se_function(data, clusters):
+			ddb = db.delta.DeltaDualBounds(
+				f=f, z0=z0, z1=z1, h=h,
+				outcome=data[:, 0],
+				treatment=data[:, 1],
+				propensities=data[:, 2],
+				covariates=data[:, 3].reshape(-1, 1),
+				clusters=clusters,
+			)
+			ddb.fit().summary()
+			return ddb.ses
+		self.check_clustered_ses(func=ddb_se_function, data=data, msg_context='DeltaDualBounds')
 
 
 

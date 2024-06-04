@@ -7,6 +7,7 @@ from . import utilities
 from . import dist_reg
 from .utilities import BatchedCategorical
 from . import interpolation, generic
+from .delta import _delta_bootstrap_ses
 from typing import Optional, Union
 
 
@@ -137,54 +138,12 @@ def compute_analytical_lee_bound(
 	agg_bounds = np.mean(cond_bounds * s0_probs, axis=1) / np.mean(s0_probs) # aggregated bounds
 	return agg_bounds, cond_bounds
 
-def lee_bound_no_covariates(
-	outcome: np.array, 
-	treatment: np.array, 
-	selections: np.array, 
-	propensities: Optional[np.array]=None,
-	B: int=200,
-	alpha: float=0.05,
+def _lee_bound_no_covariates(
+	y: np.array, W: np.array, S: np.array, pis: np.array
 ):
 	"""
-	Computes plug-in Lee bounds without using covariates.
-
-	Parameters
-	----------
-	outcome : np.array
-		n-length array of outcomes (y)
-	treatment : np.array
-		n-length array of treatments (W).
-	selections : np.array
-		n-length array of selection indicators (S).
-	propensities : np.array
-		n-length array of propensity scores (pis).
-		Default: all equal to treatment.mean().
-	B : int
-		Number of bootstrap replications to compute standard errors.
-		Defaults to 0 (no standard errors).
-	verbose : bool
-		Show progress bar while bootstrapping if verbose=True.
-	alpha : float
-		nominal Type I error level.
-
-	Returns
-	-------
-	results : dict
-		Dictionary containing up to three keys:
-
-		- estimates: 2-length array of lower/upper estimates.
-		- ses: 2-length array of lower/upper standard errors.
-		- cis: 2-length array of lower/upper confidence intervals.
+	Helper function which gets called by the public variant.
 	"""
-	# Rename for simplicity
-	y = outcome
-	n = len(y)
-	W = treatment
-	S = selections
-	pis = propensities
-	if pis is None:
-		pis = np.ones(n) * treatment.mean()
-
 	# compute P(S | W)
 	s0_prob = np.array([np.mean(S[W == 0])])
 	s1_prob = np.array([np.mean(S[W == 1])])
@@ -214,30 +173,89 @@ def lee_bound_no_covariates(
 		y1_vals=y1_vals.reshape(1, -1)
 	)
 	# compute lower, upper bounds
-	ests = compute_analytical_lee_bound(**args)[1][:, 0]
-	if B > 0:
-		bs_ests = np.zeros((B, 2))
-		for b in range(B):
-			inds = np.random.choice(n, n, replace=True)
-			bs_ests[b] = lee_bound_no_covariates(
-				treatment=W[inds], 
-				selections=S[inds],
-				outcome=y[inds],
-				propensities=pis[inds],
-				B=0,
-			)['estimates']
-		bias = bs_ests.mean(axis=0) - ests
-		ses = bs_ests.std(axis=0)
-		cis = ests - bias
-		cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
-		cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
-		return dict(
-			estimates=ests,
-			ses=ses,
-			cis=cis,
-		)
-	else:
-		return dict(estimates=ests)
+	return compute_analytical_lee_bound(**args)[1][:, 0]
+	
+
+def lee_bound_no_covariates(
+	outcome: np.array, 
+	treatment: np.array, 
+	selections: np.array, 
+	propensities: Optional[np.array]=None,
+	clusters: Optional[np.array]=None,
+	B: int=200,
+	alpha: float=0.05,
+	verbose=False,
+):
+	"""
+	Computes plug-in Lee bounds without using covariates.
+
+	Parameters
+	----------
+	outcome : np.array
+		n-length array of outcomes (y)
+	treatment : np.array
+		n-length array of treatments (W).
+	selections : np.array
+		n-length array of selection indicators (S).
+	propensities : np.array
+		n-length array of propensity scores (pis).
+		Default: all equal to treatment.mean().
+	clusters : np.array
+		Optional n-length array of clusters, so ``clusters[i] = j``
+		indicates that observation i is in cluster j.
+	B : int
+		Number of bootstrap replications to compute standard errors.
+		Defaults to 0 (no standard errors).
+	alpha : float
+		nominal Type I error level.
+	verbose : bool
+		Show progress bar while bootstrapping if verbose=True.
+
+	Returns
+	-------
+	results : dict
+		Dictionary containing up to three keys:
+
+		- estimates: 2-length array of lower/upper estimates.
+		- ses: 2-length array of lower/upper standard errors.
+		- cis: 2-length array of lower/upper confidence intervals.
+	"""
+	# Infer propensities
+	if propensities is None:
+		propensities = np.ones(len(treatment)) * treatment.mean()
+	# Create estimates
+	estimates = _lee_bound_no_covariates(
+		y=outcome,
+		W=treatment,
+		S=selections,
+		pis=propensities,
+	)
+	if B == 0:
+		return dict(estimates=estimates)
+
+	# Compute bootstrapped SEs
+	data = np.stack([outcome, treatment, propensities, selections], axis=1)
+	func = lambda data: _lee_bound_no_covariates(
+		y=data[:, 0],
+		W=data[:, 1],
+		pis=data[:, 2],
+		S=data[:, 3],
+	)
+	ses = utilities.cluster_bootstrap_se(
+		data=data,
+		clusters=clusters,
+		func=func,
+		B=B,
+		verbose=verbose,
+	)
+	cis = estimates
+	cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
+	cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
+	return dict(
+		estimates=estimates,
+		ses=ses,
+		cis=cis,
+	)
 
 def lee_delta_method_se(
 	sbetas, skappas, sgammas
@@ -746,6 +764,7 @@ class LeeDualBounds(generic.DualBounds):
 		"""
 		Computes final bounds based in (A)IPW summands,
 		using the delta method for E[Y(1) - Y(0) | S(1) = S(0) = 1].
+		Uses the bootstrap for clustered standard errors.
 		"""
 		self._compute_ipw_summands()
 		summands = self.aipw_summands if aipw else self.ipw_summands
@@ -766,27 +785,44 @@ class LeeDualBounds(generic.DualBounds):
 		sgammas = (1-self.W) * (self.S - self.s0_probs) / (1-self.pis)
 		sgammas += self.s0_probs
 		self.sgammas = sgammas
-		for lower in [1, 0]:
-			# beta = part. identifiable component E[Y(1) S(0)]
-			sbetas = summands[1-lower]
-			hattheta, se = lee_delta_method_se(
-				sbetas=sbetas, skappas=skappas, sgammas=sgammas,
-			)
-			ests.append(hattheta)
-			ses.append(se)
-			if lower:
-				bounds.append(hattheta - scale * se)
-			else:
-				bounds.append(hattheta + scale * se)
+		if self.clusters is None:
+			for lower in [1, 0]:
+				# beta = part. identifiable component E[Y(1) S(0)]
+				sbetas = summands[1-lower]
+				hattheta, se = lee_delta_method_se(
+					sbetas=sbetas, skappas=skappas, sgammas=sgammas,
+				)
+				ests.append(hattheta)
+				ses.append(se)
+				if lower:
+					bounds.append(hattheta - scale * se)
+				else:
+					bounds.append(hattheta + scale * se)
 
-		self.estimates = np.array(ests)
-		self.ses = np.array(ses)
-		self.cis = np.array(bounds)
-		return dict(
-			estimates=self.estimates,
-			ses=self.ses,
-			cis=self.cis
-		)
+			self.estimates = np.array(ests)
+			self.ses = np.array(ses)
+			self.cis = np.array(bounds)
+			return dict(
+				estimates=self.estimates,
+				ses=self.ses,
+				cis=self.cis
+			)
+		else:
+			self.estimates, self.ses, self.cis = _delta_bootstrap_ses(
+				h=lambda fval, z0, z1: (fval - z0[0]) / z0[1],
+				summands=summands,
+				z0summands=np.stack([skappas, sgammas], axis=1),
+				z1summands=np.zeros((self.n, 1)),
+				clusters=self.clusters,
+				alpha=alpha,
+			)
+			# Return
+			return dict(
+				estimates=self.estimates,
+				ses=self.ses,
+				cis=self.cis,
+			)
+
 
 	def summary(self, minval=-np.inf, maxval=np.inf):
 		"""

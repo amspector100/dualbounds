@@ -18,12 +18,15 @@ except ImportError:
 	from context import dualbounds as db
 
 from dualbounds import generic, utilities, gen_data
-from dualbounds.utilities import parse_dist, _convert_to_cat
+from dualbounds.utilities import parse_dist, BatchedCategorical
 
 
-class TestGenericDualBounds(unittest.TestCase):
+class TestGenericDualBounds(context.DBTest):
 
 	def test_var_ite_oracle(self):
+		"""
+		Tests that Var(ITE) objvals are accurate.
+		"""
 		# create dists
 		np.random.seed(123)
 		n = 1
@@ -39,8 +42,8 @@ class TestGenericDualBounds(unittest.TestCase):
 			y1_dists = parse_dist(
 				dist1, loc=np.random.randn(n), scale=np.random.uniform(0.1, 1, size=n)
 			)
-			y0_dists_input = _convert_to_cat(y0_dists, n=n) if discrete else y0_dists
-			y1_dists_input = _convert_to_cat(y1_dists, n=n) if discrete else y1_dists
+			y0_dists_input = BatchedCategorical.from_scipy(y0_dists) if discrete else y0_dists
+			y1_dists_input = BatchedCategorical.from_scipy(y1_dists) if discrete else y1_dists
 			# analytically compute lower/upper bounds on var(ITE)
 			reps = 100000
 			U = np.random.uniform(size=reps)
@@ -122,12 +125,85 @@ class TestGenericDualBounds(unittest.TestCase):
 				err_msg=f"For f={f}, objdiffs are too large."
 			)
 
+
+	def test_optimal_dualvars_consistency(self):
+		"""
+		Tests that if we evaluate the optimal dual variables
+		we get the same value as the objvals in the perfectly
+		well-specified case.
+		"""
+		np.random.seed(1)
+		n, nvals, reps = 11, 5, 2000
+		# propensity scores
+		pis = np.random.uniform(0.3, 0.7, size=n)
+		# Create distributions satisfying monotonicity
+		y0_vals = np.random.randn(n, nvals)
+		#y0_vals = np.stack([y0_vals for _ in range(n)], axis=0)
+		probs = np.random.uniform(size=(n, nvals))
+		probs /= probs.sum(axis=-1).reshape(n, 1)
+		y1_vals = y0_vals + 1
+		# create distributions
+		y0_dists = BatchedCategorical(vals=y0_vals, probs=probs)
+		y1_dists = BatchedCategorical(vals=y1_vals, probs=probs)
+		ydists_input = dict(
+			y0_dists=y0_dists, y1_dists=y1_dists, suppress_warning=True,
+		)
+		# Sample values of Y and W
+		W = np.random.binomial(1, pis, size=(reps, n)).astype(int)
+		Y = np.zeros((reps, n))
+		for r in range(reps):
+			y = y0_dists.rvs()
+			y[W[r] == 1] = y1_dists.rvs()[W[r] == 1]
+			Y[r] = y
+		# Define estimand
+		f = lambda y0, y1, x : y1 - y0 >= 0.5
+		# Loop through different support restrictions
+		for srname, support_restriction in zip(
+			['none', 'monotonicity'], 
+			[None, lambda y0, y1, x: y0 <= y1]
+		):
+			for dual_strategy in ['ot', 'lp', 'qp', 'se']:
+				# Fit original dual bounds object
+				gdb = db.generic.DualBounds(
+					f=f,
+					outcome=Y[0],
+					treatment=W[0],
+					propensities=pis,
+					discrete=True,
+					support_restriction=support_restriction,
+				)
+				gdb.fit(
+					dual_strategy=dual_strategy, **ydists_input
+				)#.summary()
+				# Now, evaluate many dual variables
+				aipw_estimates = np.zeros((reps, 2))
+				ipw_estimates = np.zeros((reps, 2))
+				for r in range(reps):
+					# Collect W and Y
+					# Compute new (A)IPW summands 
+					gdb.W = W[r]
+					gdb._compute_realized_dual_variables(y=Y[r])
+					gdb._compute_final_bounds(aipw=True)
+					aipw_estimates[r] = gdb.estimates
+					gdb._compute_final_bounds(aipw=False)
+					ipw_estimates[r] = gdb.estimates
+				# Test
+				for method, estimates in zip(
+					['aipw', 'ipw '], [aipw_estimates, ipw_estimates]
+				):
+					np.testing.assert_array_almost_equal(
+						estimates.mean(axis=0),
+						gdb.objvals.mean(axis=1),
+						decimal=2 if method == 'aipw' else 1,
+						err_msg=f"Oracle {method} estimates are not unbiased for objective value, dual_strategy={dual_strategy}"
+					)
+
 	def test_base_models_cts(self):
 		"""
 		Ensure the built-in model types work.
 		"""
 		# Generate data
-		data = gen_data.gen_regression_data(n=50, p=5)
+		data = gen_data.gen_regression_data(n=50, p=5, heterosked='exp_linear')
 		f = lambda y0, y1, x: y0 <= y1
 		## 1. Model types to test
 		## 1a. Stringkwargs
@@ -213,7 +289,7 @@ class TestGenericDualBounds(unittest.TestCase):
 				propensities=data['pis'], 
 				outcome_model=model_type,
 			)
-			gdb.fit(nfolds=3, alpha=0.05).summary()
+			gdb.fit(nfolds=2, alpha=0.05).summary()
 			# Check the correct model type
 			Ym = gdb.model_fits[0].model
 			self.assertTrue(
@@ -226,7 +302,7 @@ class TestGenericDualBounds(unittest.TestCase):
 		"""
 		Same as above but for propensity_model
 		"""
-		data = gen_data.gen_regression_data(n=300, p=3, eps_dist='gaussian', r2=0)
+		data = gen_data.gen_regression_data(n=300, p=3, eps_dist='gaussian', r2=0, heterosked='invnorm')
 		f = lambda y0, y1, x : y0 <= y1
 		propensity_models = ['ridge', 'lasso', 'knn', 'rf']
 		expecteds = [
@@ -251,9 +327,13 @@ class TestGenericDualBounds(unittest.TestCase):
 			)
 
 	def test_from_pd(self):
-		# Sample data
-		for eps_dist in ['gaussian', 'bernoulli']:
-			data = gen_data.gen_regression_data(n=50, p=5, eps_dist='bernoulli', r2=0)
+		# Sample data. The different heterosked kwargs are just to increase coverage
+		for eps_dist, heterosked in zip(
+			['gaussian', 'bernoulli'], ['linear', 'norm']
+		):
+			data = gen_data.gen_regression_data(
+				n=100, p=5, eps_dist=eps_dist, r2=0, interactions=False, heterosked=heterosked
+			)
 
 			# Method 1
 			f = lambda y0, y1, x: y1 - y0
@@ -291,11 +371,128 @@ class TestGenericDualBounds(unittest.TestCase):
 					err_msg=f"Using pandas initialization changes {name} values."
 				)
 
+		# Test handling of strings
+		W = pd.Series(
+			np.array(['c', 't'])[data['W'].astype(int)]
+		).astype(str)
+		# Create some nans to test nan handling
+		data['X'][:, 1:][data['X'][:, 1:] < -2] = np.nan
+		# Create some discrete features
+		X = pd.DataFrame(data['X'])
+		X[0] = X[0].apply(lambda x: 'a' if x > 0 else 'b')
+		gdb = db.generic.DualBounds(
+			f=f,
+			outcome=data['y'],
+			treatment=W,
+			covariates=X,
+			propensities=data['pis'],
+		).fit(nfolds=2).summary()
+
+	@pytest.mark.slow
+	def test_support_restriction_consistency(self):
+		tau = 1
+		n = 11
+		data = db.gen_data.gen_regression_data(
+			n=n, p=1, r2=0.5, dgp_seed=1, sample_seed=1, eps_dist='gaussian',
+			interactions=False, tau=tau,
+		)
+		# Train on augmented data to get consistent estimates
+		def gen_new_data(reps):		
+			W = np.random.binomial(1, data['pis'], size=(reps, n))
+			Y0 = data['y0_dists'].rvs(size=(reps, n))
+			Y1 = data['y1_dists'].rvs(size=(reps, n))
+			Y = Y0.copy(); Y[W==1] = Y1[W==1].copy()
+			return Y, W
+
+		# Fit ridge
+		t0 = time.time()
+		reps = 5000
+		Y, W = gen_new_data(reps=reps)
+		ridge = db.dist_reg.CtsDistReg(model_type='ridge', how_transform='identity')
+		ridge.fit(
+			y=np.concatenate([Y[r] for r in range(reps)], axis=0),
+			W=np.concatenate([W[r] for r in range(reps)], axis=0),
+			X=np.concatenate([data['X'] for r in range(reps)], axis=0),
+		)
+		hat_y0_dists, hat_y1_dists = ridge.predict_counterfactuals(data['X'])
+
+
+		# Fit oracle and empirical dual variables
+		gdb_args = dict(
+			f=lambda y0, y1, x: (y1-y0)**2,
+			outcome=data['y'],
+			treatment=data['W'],
+			propensities=data['pis'],
+			covariates=data['X'],
+			support_restriction=lambda y0, y1, x: y0 <= y1,
+		)
+		oracle_gdb = db.generic.DualBounds(**gdb_args)
+		oracle_gdb.fit(
+			y0_dists=data['y0_dists'], y1_dists=data['y1_dists'], suppress_warning=True,
+		).summary()
+		empirical_gdb = db.generic.DualBounds(**gdb_args)
+		empirical_gdb.fit(
+			y0_dists=hat_y0_dists, y1_dists=hat_y1_dists, suppress_warning=True,
+		).summary()
+
+		# Evaluate many times
+		reps = 500
+		Y, W = gen_new_data(reps=reps)
+		oracle_ests = np.zeros((reps, 2))
+		empirical_ests = np.zeros((reps, 2))
+		for r in range(reps):
+			for ests, gdb in zip([oracle_ests, empirical_ests], [oracle_gdb, empirical_gdb]):
+				gdb.W = W[r]
+				gdb._compute_realized_dual_variables(y=Y[r])
+				gdb._compute_final_bounds()
+				ests[r] = gdb.estimates
+		# Check validity
+		o_ests = oracle_ests.mean(axis=0)
+		e_ests = empirical_ests.mean(axis=0)
+		o_objs = oracle_gdb.objvals.mean(axis=1)
+		e_objs = empirical_gdb.objvals.mean(axis=1)
+		err_msg = f"DualBounds w/ monotonicity is not consistent: empirical objvals={e_objs}"
+		err_msg += f", oracle objvals={o_objs}, empirical est={e_ests}, oracle est={o_ests}"
+		for obj1, obj2 in zip(
+			[e_objs, e_ests, e_ests],
+			[o_objs, o_ests, o_objs],
+		):
+			np.testing.assert_allclose(
+				obj1, 
+				obj2,
+				rtol=1e-1,
+				err_msg=err_msg
+			)
+
+	def test_generic_dualbound_clustered_ses(self):
+		data = db.gen_data.gen_regression_data(
+			n=100, p=1, r2=0, dgp_seed=1, sample_seed=1, eps_dist='gaussian',
+		)
+		f = lambda y0, y1, x: np.abs(y1 - y0)
+		# Stack data
+		data = np.stack(
+			[data['y'], data['W'], data['pis'], data['X'][:, 0]],
+			axis=1
+		)
+		def gdb_se_function(data, clusters):
+			gdb = generic.DualBounds(
+				f=f,
+				outcome=data[:, 0],
+				treatment=data[:, 1],
+				propensities=data[:, 2],
+				covariates=data[:, 3].reshape(-1, 1),
+				clusters=clusters,
+			)
+			gdb.fit().summary()
+			return gdb.ses
+		self.check_clustered_ses(func=gdb_se_function, data=data, msg_context='DualBounds')
+
+class TestPluginBounds(unittest.TestCase):
 
 	def test_plug_in_no_covariates(self):
 		np.random.seed(123)
 		## DGP
-		n, reps = 300, 100
+		n, reps, max_nvals = 350, 100, 150
 		mu0 = np.zeros(n)
 		mu1 = np.random.randn(n)
 		y0_dists = stats.norm(loc=mu0)
@@ -316,7 +513,12 @@ class TestGenericDualBounds(unittest.TestCase):
 			y = y1.copy(); y[W == 0] = y0[W==0]
 			# Naive estimator
 			naive[r] = db.generic.plug_in_no_covariates(
-				outcome=y, treatment=W, f=f, propensities=None, max_nvals=n
+				outcome=y, 
+				treatment=W, 
+				f=f, 
+				propensities=None, 
+				max_nvals=max_nvals,
+				B=0
 			)['estimates']
 			# Oracle estimator
 			oracles[r] = db.generic.plug_in_no_covariates(
@@ -324,11 +526,17 @@ class TestGenericDualBounds(unittest.TestCase):
 				treatment=np.concatenate([np.ones(n), np.zeros(n)]), 
 				f=f,
 				propensities=None,
-				max_nvals=2*n,
+				max_nvals=2*max_nvals,
+				B=0,
 			)['estimates']
 			# Real estimator
 			ests[r] = db.generic.plug_in_no_covariates(
-				outcome=y, treatment=W, f=f, propensities=pis, max_nvals=n
+				outcome=y, 
+				treatment=W,
+				f=f,
+				propensities=pis,
+				max_nvals=max_nvals,
+				B=0
 			)['estimates']
 
 		# Take averages
@@ -352,12 +560,52 @@ class TestGenericDualBounds(unittest.TestCase):
 			err_msg="plug_in_no_covariates fails to adjust for prop scores"
 		)
 
+	def test_plug_in_ses(self):
+		np.random.seed(123)
+		f = lambda y0, y1, x: np.abs(y0 - y1)
+		sample_kwargs = dict(n=200, p=1, dgp_seed=123)
+		# Compute SEs on one run
+		data = gen_data.gen_regression_data(**sample_kwargs, sample_seed=1)
+		output = generic.plug_in_no_covariates(
+			f=f,
+			outcome=data['y'],
+			treatment=data['W'],
+			propensities=data['pis'],
+			clusters=None,
+			B=200,
+		)
+		# Compute oracle SE on many runs
+		reps = 200
+		ests = np.zeros((reps, 2))
+		for r in range(reps):
+			data = gen_data.gen_regression_data(**sample_kwargs, sample_seed=r+1)
+			ests[r] = generic.plug_in_no_covariates(
+				f=f,
+				outcome=data['y'],
+				treatment=data['W'],
+				propensities=data['pis'],
+				clusters=None,
+				B=0,
+			)['estimates']
+		# Compare
+		ses = ests.std(axis=0),
+		hatses = output['ses']
+		for obj1, obj2 in zip([ses, hatses], [hatses, ses]):
+			self.assertTrue(
+				np.all(obj1 / obj2 <= 1.2),
+				msg=f"plug_in_no_covariates estimated se={hatses}, truth={ses}; these are not the same"
+			)
+
+
+
+
+
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev
 	basename = os.path.basename(os.path.abspath(__file__))
 	if sys.argv[0] == f'test/{basename}':
 		time0 = time.time()
-		context.run_all_tests([TestGenericDualBounds()])
+		context.run_all_tests([TestPluginBounds(), TestGenericDualBounds()])
 		elapsed = np.around(time.time() - time0, 2)
 		print(f"Finished running all tests at time={elapsed}")
 

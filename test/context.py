@@ -1,6 +1,7 @@
 import os
 import sys
 import numpy as np
+import unittest 
 
 # Add path to allow import of code
 file_directory = os.path.dirname(os.path.abspath(__file__))
@@ -77,6 +78,49 @@ def _run_se_computation_test(
 		decimal=decimal,
 		err_msg=f"{testname} SE estimator is not consistent"
 	)
+
+class DBTest(unittest.TestCase):
+
+	def check_clustered_ses(
+		self,
+		func: callable,
+		data: np.array,
+		msg_context: str='',
+		rel_tol=0.2,
+	):
+		"""
+		Checks that SEs do not change much if we concatenate the
+		same dataset to itself 5 times and use clustered standard errors.
+
+		Parameters
+		----------
+		func : callable
+			function of two arguments: ``data`` and ``clusters``
+			which returns an array of standard errors.
+		data : np.array
+			(n,d)-shaped array of data.
+		msg_context : str
+			context to print upon an error
+		rel_tol : float
+			Ensures new_ses / ses <= 1 + rel_tol and ses / new_ses <= 1 + rel_tol
+		"""
+		ses = func(data, clusters=None)
+		k = 4
+		n = len(data)
+		# Create new dataset, where we just repeat observations
+		new_data = np.concatenate([data for _ in range(k)], axis=0)
+		clusters = np.concatenate([np.arange(n) for _ in range(k)], axis=0)
+		inds = np.argsort(clusters)
+		clusters = clusters[inds]
+		new_data = new_data[inds]
+		# Create new ses
+		new_ses = func(new_data, clusters=clusters)
+		for obj1, obj2 in zip([ses, new_ses], [new_ses, ses]):
+			self.assertTrue(
+				np.all(obj1 / obj2 <= 1 + rel_tol),
+				msg=f"For {msg_context}, ses={ses} change if have size-{k} clusters, yielding new_ses={new_ses}"
+			)
+
 
 def run_all_tests(test_classes):
 	"""

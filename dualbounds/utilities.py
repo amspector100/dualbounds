@@ -34,6 +34,12 @@ def floatable(x):
 	except:
 		return False
 
+def itemize(x):
+	try:
+		return x.item()
+	except AttributeError:
+		return x
+
 ### For processing data
 def _binarize_variable(x: np.array, var_name: str):
 	"""
@@ -41,8 +47,9 @@ def _binarize_variable(x: np.array, var_name: str):
 	if it contains more than 2 values.
 	"""
 	# Check if nans
-	if np.any(np.isnan(x)):
-		raise ValueError(f"{var_name} has missing values.")
+	if x.dtype in [int, np.int32, np.int64, np.float32, np.float64]:
+		if np.any(np.isnan(x)):
+			raise ValueError(f"{var_name} has missing values.")
 
 	# Check if binary
 	vals = set(list(np.unique(x)))
@@ -51,6 +58,7 @@ def _binarize_variable(x: np.array, var_name: str):
 	elif len(vals - set([0,1])) == 0:
 		return x.astype(int)
 	else:
+		vals = sorted(list(vals))
 		print(f"For {var_name}, replacing {vals[0]} with 0 and {vals[1]} with 1.")
 		return (x == list(vals)[1]).astype(int)
 
@@ -84,127 +92,6 @@ def process_covariates(data: pd.DataFrame):
 		drop_first=True,
 	).astype(float)
 
-### Multiprocessing helper
-def _one_arg_function(list_of_inputs, args, func, kwargs):
-	"""
-	Globally-defined helper function for pickling in multiprocessing.
-	:param list of inputs: List of inputs to a function
-	:param args: Names/args for those inputs
-	:param func: A function
-	:param kwargs: Other kwargs to pass to the function. 
-	"""
-	new_kwargs = {}
-	for i, inp in enumerate(list_of_inputs):
-		new_kwargs[args[i]] = inp
-	return func(**new_kwargs, **kwargs)
-
-def apply_pool_factorial(
-	func, 
-	constant_inputs={}, 
-	num_processes=1, 
-	**kwargs
-):
-	"""
-	Spawns num_processes processes to apply func to many different arguments.
-	This wraps the multiprocessing.pool object plus the functools partial function. 
-	
-	Parameters
-	----------
-	func : function
-		An arbitrary function
-	constant_inputs : dictionary
-		A dictionary of arguments to func which do not change in each
-		of the processes spawned, defaults to {}.
-	num_processes : int
-		The maximum number of processes spawned, defaults to 1.
-	kwargs : dict
-		Each key should correspond to an argument to func and should
-		map to a list of different arguments.
-
-	Returns
-	-------
-	outputs : list
-		List of outputs for each input, in the order of the inputs.
-	
-	Examples
-	--------
-	If we are varying inputs 'a' and 'b', we might have
-		>> apply_pool_factorial(func=my_func, a=[1,2], b=[5])
-
-	which would return ``[my_func(a=1, b=5), my_func(a=2,b=5)]``.
-	"""
-	# Construct input sequence 
-	args = sorted(kwargs.keys())
-	kwarg_prod = list(product(*[kwargs[x] for x in args]))
-	# Prepare to send this to apply pool
-	final_kwargs = {}
-	for i, arg in enumerate(args):
-		final_kwargs[arg] = [k[i] for k in kwarg_prod]
-	return apply_pool(
-		func=func, 
-		constant_inputs=constant_inputs,
-		num_processes=num_processes,
-		**final_kwargs
-	)
-
-
-def apply_pool(func, constant_inputs={}, num_processes=1, **kwargs):
-	"""
-	Spawns num_processes processes to apply func to many different arguments.
-	This wraps the multiprocessing.pool object plus the functools partial function. 
-	
-	Parameters
-	----------
-	func : function
-		An arbitrary function
-	constant_inputs : dictionary
-		A dictionary of arguments to func which do not change in each
-		of the processes spawned, defaults to {}.
-	num_processes : int
-		The maximum number of processes spawned, defaults to 1.
-	kwargs : dict
-		Each key should correspond to an argument to func and should
-		map to a list of different arguments.
-	Returns
-	-------
-	outputs : list
-		List of outputs for each input, in the order of the inputs.
-	Examples
-	--------
-	If we are varying inputs 'a' and 'b', we might have
-		>> apply_pool(func=my_func, a=[1,3,5], b=[2,4,6])
-
-	which returns ``[my_func(a=1, b=2), my_func(a=3,b=4), my_func(a=5,b=6)]``.
-	"""
-
-	# Construct input sequence
-	args = sorted(kwargs.keys())
-	num_inputs = len(kwargs[args[0]])
-	for arg in args:
-		if len(kwargs[arg]) != num_inputs:
-			raise ValueError(f"Number of inputs differs for {args[0]} and {arg}")
-	inputs = [[] for _ in range(num_inputs)]
-	for arg in args:
-		for j in range(num_inputs):
-			inputs[j].append(kwargs[arg][j])
-
-	# Construct partial function
-	partial_func = partial(
-		_one_arg_function, args=args, func=func, kwargs=constant_inputs,
-	)
-
-	# Don't use the pool object if num_processes=1
-	num_processes = min(num_processes, len(inputs))
-	if num_processes == 1:
-		all_outputs = []
-		for inp in inputs:
-			all_outputs.append(partial_func(inp))
-	else:
-		with Pool(num_processes) as thepool:
-			all_outputs = thepool.map(partial_func, inputs)
-
-	return all_outputs
-
 def preprocess_clusters(clusters):
 	"""
 	Parameters
@@ -222,6 +109,65 @@ def preprocess_clusters(clusters):
 	for i, x in enumerate(np.sort(np.unique(clusters))):
 		new_clusters[clusters == x] = i
 	return new_clusters.astype(int)
+
+def cluster_bootstrap_se(
+	data: np.array,
+	clusters: Optional[callable]=None,
+	func: Optional[callable]=None,
+	B: int=1000,
+	verbose: bool=False,
+):
+	"""
+	Computes clustered bootstrap on func(data).
+
+	Parameters
+	----------
+	data : np.array
+		n-shaped or (n, d)-shaped array of data.
+	func : callable
+		A callable that maps an np.array to a scalar or array.
+		Defaults to ``func=lambda x: x.mean()``.
+	clusters : np.array
+		n-shaped array where clusters[i] = j means that observation
+		i is in the jth cluster.
+	B : int
+		Number of bootstrap draws to use. Ignored unless func or
+		clusters are provided.
+	verbose : bool
+		If True, provides a progress bar.
+
+	Returns
+	-------
+	se : float | np.array
+		standard error of the estimator.
+	"""
+	# parse function
+	n = len(data)
+	if func is None:
+		func = lambda x: x.mean()
+	# Non-clustered case
+	bs_ests = []
+	if clusters is None:
+		for b in vrange(B, verbose=verbose):
+			inds = np.random.choice(n, n, replace=True)
+			bs_ests.append(func(data[inds]))
+	# Clustered case
+	else:
+		# Preprocess clusters
+		clusters = preprocess_clusters(clusters).astype(int)
+		n_clusters = len(np.unique(clusters))
+		# data_clusters[j] = observations from cluster j
+		data_clusters = [
+			data[clusters==i] for i in range(n_clusters)
+		]
+		# Resample clusters uniformly at random
+		for b in vrange(B, verbose=verbose):
+			bs_clusters = np.random.choice(clusters, n_clusters, replace=True)
+			new_data = np.concatenate(
+				[data_clusters[i] for i in bs_clusters], axis=0
+			)
+			bs_ests.append(func(new_data))
+	return np.stack(bs_ests, axis=0).std(axis=0)
 
 def compute_est_bounds(
 	summands: np.array,
@@ -242,10 +188,10 @@ def compute_est_bounds(
 	Parameters
 	----------
 	summands : np.array
-		(2, n)-shaped array or (2, d, n)-shaped array
+		(2, n)-shaped array or (2, n, d)-shaped array
 	func : callable
 		A callable that maps a 1D np.array to a scalar.
-		Defaults to ``func=lambda x: x``.
+		Defaults to ``func=lambda x: x.mean()``.
 	clusters : np.array
 		n-shaped array where clusters[i] = j means that observation
 		i is in the jth cluster.
@@ -269,44 +215,26 @@ def compute_est_bounds(
 	This is meant primarily for internal use in the DualBounds class.
 	"""
 	scale = stats.norm.ppf(1-alpha/2)
-	n = summands.shape[-1]
+	n = summands.shape[1]
 	# In the simplest case, use analytical bounds
 	if func is None and clusters is None:
-		ests = summands.mean(axis=-1)
-		ses = summands.std(axis=-1) / np.sqrt(n)
+		ests = summands.mean(axis=1)
+		ses = summands.std(axis=1) / np.sqrt(n)
 	# else, use the bootstrap/delta method
 	else:
 		if func is None:
-			func = lambda x: x
+			func = lambda x: x.mean()
+		new_func = lambda data: itemize(func(data.mean(axis=0)))
 		# Estimators
-		ests = np.array([func(summands[k].mean(axis=-1)).item() for k in [0,1]])
-		bs_ests = np.zeros((2, B))
-		# Non-clustered case-regular nonparametric bootstrap
-		if clusters is None:
-			for b in range(B):
-				inds = np.random.choice(n, n, replace=True)
-				for k in [0,1]:
-					bs_ests[k, b] = func(summands[k][..., inds].mean(axis=-1)).item()
-		# Clustered case
-		else:
-			# Preprocess clusters
-			clusters = preprocess_clusters(clusters).astype(int)
-			n_clusters = len(np.unique(clusters))
-			# cluster_summands[j] = observations from cluster j
-			cluster_summands = [
-				summands[..., clusters==i] for i in range(n_clusters)
-			]
-			# Resample clusters uniformly at random
-			for b in range(B):
-				bs_clusters = np.random.choice(clusters, n_clusters, replace=True)
-				new_summands = np.concatenate(
-					[cluster_summands[i] for i in bs_clusters], axis=-1
-				)
-				for k in [0,1]:
-					bs_ests[k, b] = func(new_summands[k].mean(axis=-1)).item()
-
-		# Standard errors
-		ses = bs_ests.std(axis=1)
+		ests = np.array([new_func(summands[k]) for k in [0,1]])
+		ses = np.zeros(2)
+		for k in [0,1]:
+			ses[k] = itemize(cluster_bootstrap_se(
+				data=summands[k],
+				clusters=clusters,
+				func=new_func,
+				B=B,
+			))
 
 	return ests, ses, np.array([
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]
@@ -368,6 +296,29 @@ class BatchedCategorical:
 			raise ValueError("probs.sum(axis=1) must equal 1")
 
 	@classmethod
+	def from_scipy(
+		cls, scipy_bernoulli
+	):
+		"""
+		Instantiates distribution from a 1D scipy.stats.bernoulli 
+		object.
+
+		Parameters
+		----------
+		scipy_dist : scipy.stats.bernoulli
+		"""
+		# Probabilities
+		probs = scipy_bernoulli.mean()
+		# Values 
+		n = len(probs)
+		vals = np.zeros((n, 2)); vals[:, 1] += 1
+		# Return
+		return cls(
+			vals=vals, probs=np.stack([1-probs, probs], axis=1)
+		)
+
+
+	@classmethod
 	def from_binary_probs(
 		cls, probs
 	):
@@ -426,17 +377,6 @@ class BatchedCategorical:
 		u = np.random.uniform(size=(self.n, 1))
 		inds = (u < self.cumprobs).argmax(axis=1)
 		return self.vals[(np.arange(self.n), inds)]
-
-
-def _convert_to_cat(bern_dist, n):
-	"""
-	Convert bernoulli dist. object to BatchedCategorical
-	"""
-	vals = np.zeros((n, 2)); vals[:, 1] += 1
-	probs = bern_dist.mean()
-	return BatchedCategorical(
-		vals=vals, probs=np.stack([1-probs, probs], axis=1)
-	)
 
 def _adjust_support_size_unbatched(
 	vals, probs, new_nvals, ymin, ymax

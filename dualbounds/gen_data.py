@@ -5,7 +5,7 @@ Generate synthetic data for tests and illustrations.
 import numpy as np
 from scipy import stats
 from scipy.special import logsumexp
-from .utilities import parse_dist, _convert_to_cat
+from .utilities import parse_dist, BatchedCategorical
 from typing import Optional, Union
 
 def heteroskedastic_scale(X, heterosked='constant'):
@@ -151,6 +151,8 @@ def gen_regression_data(
 	sigmas1 = tauv * sigmas.copy()
 	denom = np.sqrt((np.mean(sigmas0**2) + np.mean(sigmas1**2)) / 2)
 	sigmas0 /= denom; sigmas1 /= denom
+	sigmas0 = np.maximum(1e-5, sigmas0)
+	sigmas1 = np.maximum(1e-5, sigmas1)
 	# Sample Y
 	y0_dists = parse_dist(
 		eps_dist, loc=mu, scale=sigmas0
@@ -175,17 +177,17 @@ def gen_regression_data(
 		cates=y1_dists.mean() - y0_dists.mean(),
 		betaW=betaW,
 	)
-	# for convenience
-	if eps_dist == 'bernoulli':
-		out.update(dict(
-			_y0_dists_4input=_convert_to_cat(y0_dists, n=n),
-			_y1_dists_4input=_convert_to_cat(y1_dists, n=n)
-		))
-	else:
-		out.update(dict(
-			_y0_dists_4input=y0_dists,
-			_y1_dists_4input=y1_dists,
-		))
+	# # for convenience
+	# if eps_dist == 'bernoulli':
+	# 	out.update(dict(
+	# 		_y0_dists_4input=BatchedCategorical.from_scipy(y0_dists),
+	# 		_y1_dists_4input=BatchedCategorical.from_scipy(y1_dists),
+	# 	))
+	# else:
+	# 	out.update(dict(
+	# 		_y0_dists_4input=y0_dists,
+	# 		_y1_dists_4input=y1_dists,
+	# 	))
 	return out
 
 def gen_lee_bound_data(

@@ -106,6 +106,9 @@ class DualBounds:
 	propensities : np.array | pd.Series
 		n-length array of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
+	clusters : np.array | pd.Series
+		Optional n-length array of clusters, so ``clusters[i] = j``
+		indicates that observation i is in cluster j.
 	outcome_model : str | dist_reg.DistReg
 		The model for estimating the law of :math:`Y | X, W`.
 		Two options:
@@ -174,6 +177,7 @@ class DualBounds:
 		treatment: Union[np.array, pd.Series],
 		covariates: Optional[Union[np.array, pd.DataFrame]]=None,
 		propensities: Optional[Union[np.array, pd.Series]]=None,
+		clusters: Optional[Union[np.array, pd.Series]]=None,
 		outcome_model: Union[str, dist_reg.DistReg]='ridge',
 		propensity_model: Union[str, sklearn.base.BaseEstimator]='ridge',
 		discrete: Optional[np.array]=None,
@@ -230,6 +234,12 @@ class DualBounds:
 				raise ValueError(f"propensities (pis) are provided but contains missing values")
 			if np.any(self.pis < 0) or np.any(self.pis > 1):
 				raise ValueError(f"propensities (pis) do not lie within [0,1]")
+
+		### Clusters
+		if clusters is not None:
+			if isinstance(clusters, pd.Series) or isinstance(clusters, pd.DataFrame):
+				clusters = clusters.values.reshape(self.n)
+		self.clusters = clusters
 
 		### Check if discrete
 		self.discrete, self.support = infer_discrete(
@@ -316,7 +326,10 @@ class DualBounds:
 			yprobs = []
 			for ydist in ydists:
 				if not isinstance(ydist, utilities.BatchedCategorical):
-					raise ValueError("self.discrete=True, but ydist is not a BatchedCategorical distribution.")
+					msg = "self.discrete=True, so the predicted ydists must be a BatchedCategorical"
+					msg += "distributions. To get discrete-like behavior using other distribution"
+					msg += "types, set discrete=False and grid_size=0."
+					raise ValueError(msg)
 				yvals.append(ydist.vals)
 				yprobs.append(ydist.probs)
 			return np.concatenate(yvals, axis=0), np.concatenate(yprobs, axis=0)
@@ -741,16 +754,12 @@ class DualBounds:
 				problem = cp.Problem(
 					cp.Maximize(linobj - quad_term), constraints=constraints
 				)
-				try:
-					problem.solve(solver=qp_solver)
-				except cp.SolverError:
-					problem.solve(solver=qp_solver)
-
+				problem.solve(solver=qp_solver)
 
 			# maximize mean - 2 standard errors
 			else:
 				if debug:
-					print(f"Solving quadratic problem with {se_solver} (not PyOT).")
+					print(f"Solving se-adjusted problem with {se_solver} (not PyOT).")
 				pcat = np.concatenate([probs0, probs1])
 				pi = self.pis[i]
 				Q = np.diag(np.concatenate([probs0 / (1-pi), probs1 / pi])) - np.outer(pcat, pcat)
@@ -904,12 +913,11 @@ class DualBounds:
 			print("Estimating optimal dual variables.")
 		if min([nvals0, nvals1]) <= MIN_NVALS:
 			raise ValueError(f"nvals0={nvals0}, nvals1={nvals1} must be larger than {MIN_NVALS}")
-		if self.discrete:
-			self.nvals0 = len(self.support)
-			self.nvals1 = len(self.support)
-		else:
-			self.nvals0 = nvals0
-			self.nvals1 = nvals1
+		
+		# If discrete=True and ydists are BatchedCategorical distributions,
+		# these values are ignored.
+		self.nvals0 = nvals0
+		self.nvals1 = nvals1
 		self.interp_fn = interp_fn
 
 		# max/min yvals
@@ -923,11 +931,15 @@ class DualBounds:
 				y0_dists, nvals=self.nvals0, min_quantile=min_quantile,
 				ymin=y0_min, ymax=y0_max, ninterp=ninterp,
 			)
+			if self.discrete:
+				self.nvals0 = y0_vals.shape[1]
 		if y1_vals is None or y1_probs is None:
 			y1_vals, y1_probs = self._discretize(
 				y1_dists, nvals=self.nvals1, min_quantile=min_quantile,
 				ymin=y1_min, ymax=y1_max, ninterp=ninterp,
 			)
+			if self.discrete:
+				self.nvals1 = y1_vals.shape[1]
 
 		# ensure y1_vals, y1_probs are sorted
 		self.y0_vals, self.y0_probs = utilities._sort_disc_dist(y0_vals, probs=y0_probs)
@@ -1031,8 +1043,8 @@ class DualBounds:
 				x=y1v, y=nu1adj, newx=yi,
 			)[0]
 		else:
-			j0 = np.where(self.y0_vals[i] == yi)[0][0]
-			j1 = np.where(self.y1_vals[i] == yi)[0][0]
+			j0 = np.argmin(np.abs(self.y0_vals[i] - yi))#.item()
+			j1 = np.argmin(np.abs(self.y1_vals[i] - yi))#.item()
 			self.hatnu0s[1 - lower, i] = nu0x[j0]
 			self.hatnu1s[1 - lower, i] = nu1x[j1]   
 
@@ -1061,10 +1073,6 @@ class DualBounds:
 					i=i,
 					yi=y[i],
 					lower=lower, 
-					y0_min=y0_min, 
-					y0_max=y0_max,
-					y1_min=y1_min,
-					y1_max=y1_max,
 					**kwargs
 				)
 
@@ -1097,7 +1105,8 @@ class DualBounds:
 		self._compute_ipw_summands()
 		self.estimates, self.ses, self.cis = utilities.compute_est_bounds(
 			summands=self.aipw_summands if aipw else self.ipw_summands,
-			alpha=alpha
+			alpha=alpha,
+			clusters=self.clusters,
 		)
 		return dict(
 			estimates=self.estimates,
@@ -1111,14 +1120,6 @@ class DualBounds:
 		self.mu1 = E[Y(1) | X]. Can only be run after the 
 		conditional distributions have been estimated.
 		"""
-		if self.y0_dists is None:
-			self.y0_dists = BatchedCategorical(
-				vals=self.y0_vals, probs=self.y0_probs
-			)
-		if self.y1_dists is None:
-			self.y1_dists = BatchedCategorical(
-				vals=self.y1_vals, probs=self.y1_probs
-			)
 		# make lists
 		if isinstance(self.y0_dists, list):
 			y0_dists = self.y0_dists
@@ -1442,15 +1443,49 @@ class DualBounds:
 		print()
 
 
+def _plug_in_no_covariates(
+	f: callable,
+	y: np.array,
+	W: np.array,
+	pis: Optional[np.array]=None,
+	max_nvals: int=1000,
+) -> float:
+	"""
+	Internal function which does the work for plug_in_no_covariates
+	and gets called in each bootstrap iteration.
+	"""
+	n = len(y)
+	# Create empirical distributions for treatment/control
+	y0_vals = y[W == 0]
+	y0_probs = 1 / (1-pis[W==0]); y0_probs /= y0_probs.sum()
+	y1_vals = y[W == 1]
+	y1_probs = 1 / (pis[W==1]); y1_probs /= y1_probs.sum()
+	# Reduce dimension to prevent memory errors for huge datasets
+	qs = np.linspace(1/(max_nvals+1), max_nvals/(max_nvals+1), max_nvals)
+	if len(y0_vals) > max_nvals:
+		y0_vals = utilities.weighted_quantile(y0_vals, y0_probs, quantiles=qs)
+		y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
+	if len(y1_vals) > max_nvals:
+		y1_vals = utilities.weighted_quantile(y1_vals, y1_probs, quantiles=qs)
+		y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+	# Fvals
+	fvals = f(y0_vals.reshape(-1, 1), y1_vals.reshape(1, -1), x=0)
+	# lower and upper
+	lower = ot.lp.emd2(a=y0_probs, b=y1_probs, M=fvals)
+	upper = -ot.lp.emd2(a=y0_probs, b=y1_probs, M=-fvals)
+	return np.array([lower, upper])
+
 def plug_in_no_covariates(
 	outcome: np.array, 
 	treatment: np.array, 
 	f: callable, 
 	propensities: Optional[np.array]=None,
+	clusters: Optional[np.array]=None,
 	B: int=0,
 	verbose: bool=True,
 	alpha: float=0.05,
 	max_nvals: int=1000,
+	_which_bound='both',
 ) -> dict:
 	"""
 	Computes plug-in bounds on :math:`E[f(Y(0),Y(1))]` without using covariates.
@@ -1466,6 +1501,9 @@ def plug_in_no_covariates(
 	propensities : np.array
 		n-length array of propensity scores (pis).
 		Default: all equal to treatment.mean().
+	clusters : np.array
+		Optional n-length array of clusters, so ``clusters[i] = j``
+		indicates that observation i is in cluster j.
 	B : int
 		Number of bootstrap replications to compute standard errors.
 		Defaults to 0 (no standard errors).
@@ -1475,6 +1513,8 @@ def plug_in_no_covariates(
 		nominal Type I error level.
 	max_nvals : int
 		Maximum dimension of optimal transport problem.
+	_which_bound : str
+		One of 'both', 'lower', 'upper'.
 
 	Returns
 	-------
@@ -1484,65 +1524,44 @@ def plug_in_no_covariates(
 		- estimates: 2-length array of lower/upper estimates.
 		- ses: 2-length array of lower/upper standard errors.
 		- cis: 2-length array of lower/upper confidence intervals.
+
+		These arrays will be length 1 (instead of 2) if which_bound != 'both'.
 	"""
-	# rename for simplicity
-	y = outcome
-	W = treatment
-	pis = propensities
-
-	# Perform analysis
-	n = len(y)
-	if pis is None:
-		pis = np.ones(n) * treatment.mean()
+	# Infer propensities
+	if propensities is None:
+		propensities = np.ones(len(treatment)) * treatment.mean()
+	# Create estimates
+	estimates = _plug_in_no_covariates(
+		f=f,
+		y=outcome,
+		W=treatment,
+		pis=propensities,
+		max_nvals=max_nvals
+	)	
 	if B == 0:
-		# Dists
-		y0_vals = y[W == 0]
-		y0_probs = 1 / (1-pis[W==0]); y0_probs /= y0_probs.sum()
-		y1_vals = y[W == 1]
-		y1_probs = 1 / (pis[W==1]); y1_probs /= y1_probs.sum()
-		# Reduce dimension to prevent memory errors for huge datasets
-		qs = np.linspace(1/(max_nvals+1), max_nvals/(max_nvals+1), max_nvals)
-		if len(y0_vals) > max_nvals:
-			y0_vals = utilities.weighted_quantile(y0_vals, y0_probs, quantiles=qs)
-			y0_probs = np.ones(len(y0_vals)) / len(y0_vals)
-		if len(y1_vals) > max_nvals:
-			y1_vals = utilities.weighted_quantile(y1_vals, y1_probs, quantiles=qs)
-			y1_probs = np.ones(len(y1_vals)) / len(y1_vals)
+		return dict(estimates=estimates)
 
-		# Fvals
-		fvals = f(y0_vals.reshape(-1, 1), y1_vals.reshape(1, -1), x=0)
-		# lower and upper
-		lower = ot.lp.emd2(
-			a=y0_probs,
-			b=y1_probs,
-			M=fvals,
-		)
-		upper = -ot.lp.emd2(
-			a=y0_probs,
-			b=y1_probs,
-			M=-fvals,
-		)
-		return dict(estimates=np.array([lower, upper]))
-	else:
-		# Estimates
-		ests = plug_in_no_covariates(
-			outcome=y, treatment=W, f=f, propensities=pis, B=0
-		)['estimates']
-		# Bootstrap
-		bs_ests = np.zeros((B, 2))
-		for b in utilities.vrange(B, verbose=verbose):
-			inds = np.random.choice(np.arange(n), size=n, replace=True)
-			bs_ests[b] = plug_in_no_covariates(
-				outcome=y[inds], treatment=W[inds], propensities=pis[inds], f=f, B=0
-			)['estimates']
-		# Bias
-		bias = bs_ests.mean(axis=0) - ests
-		ses = bs_ests.std(axis=0)
-		cis = ests - bias
-		cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
-		cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
-		return dict(
-			estimates=ests,
-			ses=ses,
-			cis=cis,
-		)
+	# Compute bootstrapped SEs
+	data = np.stack([outcome, treatment, propensities], axis=1)
+	func = lambda data: _plug_in_no_covariates(
+		f=f,
+		y=data[:, 0],
+		W=data[:, 1],
+		pis=data[:, 2],
+		max_nvals=max_nvals,
+	)
+	ses = utilities.cluster_bootstrap_se(
+		data=data,
+		clusters=clusters,
+		func=func,
+		B=B,
+		verbose=verbose,
+	)
+	cis = estimates
+	cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
+	cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
+	return dict(
+		estimates=estimates,
+		ses=ses,
+		cis=cis,
+	)

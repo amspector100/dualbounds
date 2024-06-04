@@ -19,7 +19,8 @@ except ImportError:
 	import context
 	from context import dualbounds as db
 
-from dualbounds import lee, utilities
+from dualbounds import lee, utilities, gen_data
+from dualbounds.utilities import BatchedCategorical
 
 def old_conditional_lee_bound(
 	ps0,
@@ -196,7 +197,43 @@ class TestLeeHelpers(unittest.TestCase):
 			param_shift=1,
 		)
 
-class TestDualLeeBounds(unittest.TestCase):
+	def test_lee_bound_no_covariates(self):
+		"""
+		Tests that lee_bound_no_covariates gives roughly correct SEs.
+		"""
+		n, n_clusters = 4000, 3000
+		clusters = np.random.choice(n_clusters, n, replace=True)
+		def lee_bound_output(sample_seed, B):
+			data = gen_data.gen_lee_bound_data(
+				n=n_clusters, p=1, lmda_dist='skewnorm', sample_seed=sample_seed, r2=0, stau=1.5, betaS_norm=0,
+			)
+			return lee.lee_bound_no_covariates(
+				outcome=data['y'][clusters], 
+				treatment=data['W'][clusters], 
+				propensities=data['pis'][clusters], 
+				selections=data['S'][clusters],
+				clusters=clusters,
+				B=B,
+				verbose=False,
+			)
+		# Estimate standard errors
+		hatses = lee_bound_output(sample_seed=1, B=100)['ses']
+		# Compute oracle standard erorrs
+		reps = 100
+		ests = np.zeros((reps, 2))
+		for r in range(reps):
+			ests[r] = lee_bound_output(sample_seed=r+1, B=0)['estimates']
+		ses = ests.std(axis=0)
+		# Check equality
+		for obj1, obj2 in zip(
+			[hatses, ses], [ses, hatses]
+		):
+			self.assertTrue(
+				np.all(obj1/obj2 <= 1.2),
+				msg=f"hatses={hatses}, ses={ses} are not the same for lee_bound_no_covariates with clusters"
+			)
+
+class TestDualLeeBounds(context.DBTest):
 
 	def test_dual_lee_lp_solver(self):
 		np.random.seed(1234)
@@ -260,7 +297,7 @@ class TestDualLeeBounds(unittest.TestCase):
 				scale=np.random.uniform(0.1, 1, size=n),
 			)
 			if eps_dist == 'bernoulli':
-				y1_dists_input = utilities._convert_to_cat(y1_dists, n=n)
+				y1_dists_input = BatchedCategorical.from_scipy(y1_dists)
 			else:
 				y1_dists_input = y1_dists
 
@@ -352,6 +389,29 @@ class TestDualLeeBounds(unittest.TestCase):
 				err_msg=f"LeeDualBounds init. from pandas changes {name} values."
 			)
 
+	def test_lee_bound_clustered_ses(self):
+		data = db.gen_data.gen_lee_bound_data(
+			n=300, p=1, r2=0, dgp_seed=1, sample_seed=1, lmda_dist='powerlaw',
+			stau=1, betaS_norm=0,
+		)
+		# Stack data
+		data = np.stack(
+			[data['y'], data['W'], data['S'], data['pis'], data['X'][:, 0]],
+			axis=1
+		)
+		def lee_se_function(data, clusters):
+			ldb = lee.LeeDualBounds(
+				outcome=data[:, 0],
+				treatment=data[:, 1],
+				selections=data[:, 2],
+				propensities=data[:, 3],
+				covariates=data[:, 4].reshape(-1, 1),
+				clusters=clusters,
+				selection_model='ridge',
+			)
+			ldb.fit().summary()
+			return ldb.ses
+		self.check_clustered_ses(func=lee_se_function, data=data, msg_context='Lee bounds')
 
 	def test_model_type_inputs(self):
 		"""
@@ -404,15 +464,18 @@ class TestDualLeeBounds(unittest.TestCase):
 		r2 = 0.0
 		tau = 2
 		for eps_dist in ['bernoulli', 'gaussian']:
+			discrete = eps_dist == 'bernoulli'
 			data = db.gen_data.gen_lee_bound_data(
 				n=n, p=p, r2=r2, tau=tau, dgp_seed=1, sample_seed=1,
 				eps_dist=eps_dist,
 			)
+			y0_dists = data['y0_dists']
+			y1_dists = data['y1_dists']
 			oracle_args = dict(
 				s0_probs=data['s0_probs'], 
 				s1_probs=data['s1_probs'],
-				y0_dists=data['_y0_dists_4input'], 
-				y1_dists=data['_y1_dists_4input'],
+				y0_dists=BatchedCategorical.from_scipy(y0_dists) if discrete else y0_dists, 
+				y1_dists=BatchedCategorical.from_scipy(y1_dists) if discrete else y1_dists,
 			)
 			## Ground truth
 			expected, _ = lee.compute_analytical_lee_bound(**oracle_args)
@@ -431,7 +494,7 @@ class TestDualLeeBounds(unittest.TestCase):
 					est,
 					expected,
 					decimal=1,
-					err_msg=f"{name} Lee bound is not consistent with n={n}"
+					err_msg=f"{name} Lee bound is not consistent with n={n}, eps_dist={eps_dist}"
 				)
 
 

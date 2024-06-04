@@ -99,11 +99,11 @@ class TestUtils(unittest.TestCase):
 
 	def test_se_computation(self):
 		np.random.seed(123)
-		reps = 200
+		reps = 100
 		n = 300
-		n_clusters = 80
+		n_clusters = 150
 		for d, func in zip(
-			[1, 1, 2], [lambda x: x[0], lambda x: x[0]**2, lambda x: x[0] * x[1]**2]
+			[1, 1, 1, 2], [None, lambda x: x[0], lambda x: x[0]**2, lambda x: x[0] * x[1]**2]
 		):
 
 			# True means, variances and parameters
@@ -116,9 +116,9 @@ class TestUtils(unittest.TestCase):
 			ses = np.zeros((reps, 2))
 			for r in range(reps):
 				# 100% within-cluster correlation
-				samples = np.random.randn(2, d, n_clusters) * sigmas.reshape(2, d, 1)
-				samples += mus.reshape(2, d, 1)
-				samples = samples[:, :, clusters]
+				samples = np.random.randn(2, n_clusters, d) * sigmas.reshape(2, 1, d)
+				samples += mus.reshape(2, 1, d)
+				samples = samples[:, clusters]
 				# bootstrap + ses
 				ests[r], ses[r], _ = utilities.compute_est_bounds(
 					summands=samples,

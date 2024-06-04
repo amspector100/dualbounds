@@ -18,7 +18,7 @@ except ImportError:
 	from context import dualbounds as db
 
 from dualbounds import generic, iv, utilities, gen_data
-from dualbounds.utilities import parse_dist, _convert_to_cat
+from dualbounds.utilities import parse_dist, BatchedCategorical
 
 
 def _balke_pearl_bounds(wprobs, ydists):
@@ -116,7 +116,7 @@ class TestDualIVBounds(unittest.TestCase):
 		ydists_cat = [[np.nan, np.nan], [np.nan, np.nan]]
 		for z in [0,1]:
 			for w in [0,1]:
-				ydists_cat[z][w] = _convert_to_cat(data['ydists'][z][w], n=n)
+				ydists_cat[z][w] = BatchedCategorical.from_scipy(data['ydists'][z][w])
 
 		dbiv.compute_dual_variables(
 			wprobs=data['wprobs'],

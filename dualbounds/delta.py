@@ -6,14 +6,16 @@ import ot
 from scipy import stats
 from . import utilities
 from .generic import DualBounds
+from typing import Optional
 
 def _delta_bootstrap_ses(
 	h: callable,
 	summands: np.array,
 	z1summands: np.array,
 	z0summands: np.array,
-	B: int,
 	alpha: float,
+	clusters: Optional[np.array]=None,
+	B: int=1000,
 ):
 	"""
 	Uses the bootstrap to compute SES and CIs for 
@@ -43,7 +45,7 @@ def _delta_bootstrap_ses(
 	d0 = z0summands.shape[1]
 	# Stack everything in the appropriate format
 	combined_summands = np.stack([
-		np.concatenate([summands[[k]], z0summands.T, z1summands.T], axis=0) 
+		np.concatenate([summands[[k]].T, z0summands, z1summands], axis=1) 
 		for k in [0,1]
 	], axis=0)
 	return utilities.compute_est_bounds(
@@ -52,42 +54,9 @@ def _delta_bootstrap_ses(
 			fval=x[0], z0=x[1:(1+d0)], z1=x[(1+d0):]
 		),
 		B=B,
-		#clusters=clusters,
+		clusters=clusters,
 		alpha=alpha,
 	)
-	# n = len(z1summands)
-	# estimates = np.zeros(2)
-	# bootstrap_ests = np.zeros((B, 2))
-	# for lower in [1, 0]:
-	# 	sbetas = summands[1-lower]
-	# 	est = h(
-	# 		sbetas.mean(), 
-	# 		z0=z0summands.mean(axis=0),
-	# 		z1=z1summands.mean(axis=0),
-	# 	).item()
-	# 	estimates[1-lower] = est
-	# 	for b in range(B):
-	# 		inds = np.random.choice(np.arange(n), size=n, replace=True)
-	# 		bootstrap_ests[b, 1-lower] = h(
-	# 			sbetas[inds].mean(),
-	# 			z0=z0summands[inds].mean(axis=0),
-	# 			z1=z1summands[inds].mean(axis=0),
-	# 		).item()
-
-	# # Standard errors 
-	# scale = stats.norm.ppf(1-alpha/2)
-	# ses = bootstrap_ests.std(axis=0)
-	# cis = np.array([
-	# 	estimates[0] - ses[0] * scale,
-	# 	estimates[1] + ses[1] * scale
-	# ])
-	# return dict(
-	# 	estimates=estimates,
-	# 	ses=ses,
-	# 	cis=cis,
-	# 	bootstrap_ests=bootstrap_ests,
-	# )
-
 
 class DeltaDualBounds(DualBounds):
 	"""
@@ -122,6 +91,9 @@ class DeltaDualBounds(DualBounds):
 	propensities : np.array | pd.Series
 		n-length array of propensity scores :math:`P(W=1 | X)`. 
 		If ``None``, will be estimated from the data.
+	clusters : np.array
+		Optional n-length array of clusters, so ``clusters[i] = j``
+		indicates that observation i is in cluster j.
 	outcome_model : str | dist_reg.DistReg
 		The model for estimating the law of :math:`Y \mid X, W`.
 		Two options:
@@ -171,6 +143,7 @@ class DeltaDualBounds(DualBounds):
 			z0summands=self.z0summands,
 			alpha=self.alpha,
 			B=B,
+			clusters=self.clusters,
 		)
 		return pd.DataFrame(
 			np.stack(
@@ -244,6 +217,7 @@ class DeltaDualBounds(DualBounds):
 			z0summands=self.z0summands,
 			B=B,
 			alpha=self.alpha,
+			clusters=self.clusters,
 		)
 		# Return
 		return dict(
