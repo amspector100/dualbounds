@@ -182,7 +182,7 @@ class TestGenericDualBounds(context.DBTest):
 					# Collect W and Y
 					# Compute new (A)IPW summands 
 					gdb.W = W[r]
-					gdb._compute_realized_dual_variables(y=Y[r])
+					gdb._compute_realized_dual_variables(y=Y[r], grid_size=0)
 					gdb._compute_final_bounds(aipw=True)
 					aipw_estimates[r] = gdb.estimates
 					gdb._compute_final_bounds(aipw=False)
@@ -443,7 +443,7 @@ class TestGenericDualBounds(context.DBTest):
 		for r in range(reps):
 			for ests, gdb in zip([oracle_ests, empirical_ests], [oracle_gdb, empirical_gdb]):
 				gdb.W = W[r]
-				gdb._compute_realized_dual_variables(y=Y[r])
+				gdb._compute_realized_dual_variables(y=Y[r], grid_size=0)
 				gdb._compute_final_bounds()
 				ests[r] = gdb.estimates
 		# Check validity
