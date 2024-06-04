@@ -22,6 +22,14 @@ def _clip_jointprobs(jointprobs):
 		jointprobs[z] /= jointprobs[z].sum()
 	return jointprobs
 
+def _compute_max_dualval(logs):
+	max_dualval = 0
+	for lower in [0,1]:
+		for key in ['u', 'v']:
+			max_dualval = max(np.abs(logs[lower][key]).max(), max_dualval)
+	return max_dualval
+
+
 class DualIVBounds(generic.DualBounds):
 	"""
 	This docstring needs to be constructed. Notes:
@@ -63,10 +71,10 @@ class DualIVBounds(generic.DualBounds):
 		probs0: np.array,
 		probs1: np.array,
 		fvals: np.array,
-		not_in_support: np.array,
+		not_binding: np.array,
 		lower: np.array,
 		objval_ot: float,
-		solver='ECOS',
+		solver='CLARABEL',
 	):
 		"""
 		Fallback solver using CP to minimize a norm-penalized variant.
@@ -84,9 +92,10 @@ class DualIVBounds(generic.DualBounds):
 			solves the problem for the upper CI.
 		tol : float
 			Ensure we are within tol of the objective.
-		not_in_support : array
+		not_binding : array
 			(nvals0, nvals1)-length boolean array. True indicates
-			that something is not in the support.
+			that something is not binding, typically because it 
+			violates an a-priori constraint or is a "padded" value.
 
 		Returns
 		-------
@@ -108,7 +117,7 @@ class DualIVBounds(generic.DualBounds):
 		objval_unreg.value = objval_ot
 		# Constraints
 		nusum = cp.reshape(nu0, (-1, 1)) + cp.reshape(nu1, (1, -1))
-		flags = (~not_in_support).astype(int)
+		flags = (~not_binding).astype(int)
 		if lower:
 			constraints = [
 				cp.multiply(nusum, flags) <= cp.multiply(fvals, flags)
@@ -117,8 +126,18 @@ class DualIVBounds(generic.DualBounds):
 			constraints = [
 				cp.multiply(nusum, flags) >= cp.multiply(fvals, flags)
 			]
-		# Objectives
+
+		# Stage 1: maximize linobj subject to constraints
 		linobj = nu0 @ probs0 + nu1 @ probs1
+		# if lower:
+		# 	lp = cp.Problem(cp.Maximize(linobj), constraints=constraints)
+		# else:
+		# 	lp = cp.Problem(cp.Minimize(linobj), constraints=constraints)
+		# lp.solve(solver=solver)
+		# print(lp.value, lp.status)
+		# objval_unreg.value = lp.value
+
+		# Stage 2: find min norm optimal solution
 		norm2 = cp.norm2(nu0) + cp.norm2(nu1)
 		# Constraints on true objective value
 		if lower:
@@ -128,12 +147,16 @@ class DualIVBounds(generic.DualBounds):
 		# Minimize norm subject to constraints
 		problem = cp.Problem(cp.Minimize(norm2), constraints=constraints)
 		# Back off until we find a feasible problem (this is for numerical stability)
-		for tol in [1e-5, 1e-4, 1e-3, 1e-1, 0, 1, 3]:
+		for tol in [0, 1e-7, 1e-5, 1e-4, 1e-3, 1e-1, 0, 1, 3]:
 			if lower:
 				objval_unreg.value -= tol
 			else:
 				objval_unreg.value += tol
-			problem.solve(solver=solver)
+			try:
+				problem.solve(solver=solver)
+			except cp.SolverError as e:
+				problem.solve(solver='ECOS')
+
 			if problem.status in ['optimal', 'optimal_inaccurate']:
 				break
 		# Return values
@@ -144,6 +167,7 @@ class DualIVBounds(generic.DualBounds):
 		yvals: np.array,
 		probs: np.array,
 		x: np.array,
+		i: Optional[int]=None,
 		**kwargs,
 	):
 		"""
@@ -159,6 +183,10 @@ class DualIVBounds(generic.DualBounds):
 			yvals[z, w] is the support of Y(w) | W(z) = w
 		x : np.array
 			p-length covariate.
+		i : int
+			Optional index specifying which observation this 
+			problem corresponds to. Used only to save the 
+			adjusted variant of probs if probs is primal infeasible.
 
 		Returns
 		-------
@@ -205,17 +233,27 @@ class DualIVBounds(generic.DualBounds):
 						fn=self.support_restriction, **block_args
 					).astype(bool)
 
+		# Signal that the off-diagonal entries of the
+		# diagonal block matrices are not binding 
+		# (these are essentially just padding)
+		not_binding = not_in_support.copy()
+		for w in [0,1]:
+			inds = np.arange(nvals) + w * nvals
+			block_inds = np.ix_(inds, inds)
+			not_binding[block_inds] = ((not_binding[block_inds]) | ~(np.eye(nvals).astype(int))) 
+
 		# Compute dual variables
-		objvals = np.zeros(2)
 		nu0s = np.zeros((2, 2, nvals))
 		nu1s = np.zeros((2, 2, nvals))
 		c0s = np.zeros(2)
 		c1s = np.zeros(2)
+		fvals_adj = dict()
+		objvals = dict()
 		for lower in [1, 0]:
 			# Get rid of constraints which conflict with a-priori
 			# support restrictions
 			fvals = fvals_raw.copy()
-			almost_inf = (2*lower - 1) * (np.abs(fvals).max() + 1) * 1e5
+			almost_inf = (2*lower - 1) * (np.abs(fvals).max() + 1) * 1e4
 			fvals[not_in_support] = almost_inf
 			# Adjust constraint matrix since when w0==w1,
 			# we have a linear non-OT constraint. 
@@ -236,56 +274,76 @@ class DualIVBounds(generic.DualBounds):
 			# Solve
 			if not lower:
 				fvals = -1 * fvals
-			objval, log = ot.lp.emd2(
+			fvals_adj[lower] = fvals
+
+		# First attempt. These dicts map lower --> output
+		objvals = dict()
+		logs = dict()
+		for lower in [1, 0]:
+			objvals[lower], logs[lower] = ot.lp.emd2(
 				a=probs0,
 				b=probs1,
-				M=fvals,
+				M=fvals_adj[lower],
 				log=True,
 			)
-			# Check if we the "almost_inf" constraints are binding.
-			# If so, the primal problem is likely infeasible and
-			# the dual problem is likely unbounded. Thus, 
-			uvT = log['u'].reshape(-1, 1) + log['v'].reshape(1, -1)
-			if np.any(np.abs(uvT) / np.abs(almost_inf) > 0.9):
-				probs = self._ensure_primal_feasibility(
-					jointprobs=probs, yvals=yvals, x=x,
-				)
-				probs0 = np.concatenate([probs[0, 0], probs[0, 1]], axis=0)
-				probs1 = np.concatenate([probs[1, 0], probs[1, 1]], axis=0)
-				objval, log = ot.lp.emd2(
+
+		# Check if we the "almost_inf" constraints are binding.
+		# If so, the primal problem is likely infeasible and
+		# the dual problem is likely unbounded. Then we resolve 
+		# both the lower and upper problem.
+		max_dualval = _compute_max_dualval(logs)
+		if max_dualval > 0.1 * np.abs(almost_inf):
+			# Ensure primal feasibility and save results
+			probs = self._ensure_primal_feasibility(
+				jointprobs=probs, yvals=yvals, x=x,
+			)
+			probs0 = np.concatenate([probs[0, 0], probs[0, 1]], axis=0)
+			probs1 = np.concatenate([probs[1, 0], probs[1, 1]], axis=0)
+			if i is not None:
+				self._adj_jointprobs[i] = probs
+
+			# Resolve
+			for lower in [1, 0]:
+				objvals[lower], logs[lower] = ot.lp.emd2(
 					a=probs0,
 					b=probs1,
-					M=fvals,
+					M=fvals_adj[lower],
 					log=True,
 				)
-			if not lower:
-				objval *= -1
-				log['u'] *= -1
-				log['v'] *= -1
-				# Reset fvals for later use
-				fvals *= -1
 
-			# If the dual variables are still too large, solve a norm penalized
-			# variant with cvxpy. This is quite slow but ideally will only
-			# need to be done for a observations.
-			max_dualval = max(np.abs(log['u']).max(), np.abs(log['v']).max())
-			if max_dualval > 0.1 * np.abs(almost_inf):
-				objval, nu0, nu1 = self._solve_single_instance_cp(
+		# Multiply dual vars and objective val by -1 for upper CI
+		objvals[False] *= -1
+		logs[False]['u'] *= -1
+		logs[False]['v'] *= -1
+		# Reset fvals for  cvxpy
+		fvals_adj[False] *= -1
+
+		# If the dual variables are still too large, solve a norm penalized
+		# variant with cvxpy. This is quite slow but ideally will only
+		# need to be done for a few observations.
+		max_dualval = _compute_max_dualval(logs)
+		if max_dualval > 0.1 * np.abs(almost_inf):
+			for lower in [1, 0]:
+				# Resolve with CP and l2 norm
+				objvals[lower], nu0, nu1 = self._solve_single_instance_cp(
 					probs0=probs0,
 					probs1=probs1,
-					fvals=fvals,
-					not_in_support=not_in_support,
-					objval_ot=objval,
+					fvals=fvals_adj[lower],
+					not_binding=not_binding,
+					objval_ot=objvals[lower],
 					lower=lower,
 				)
-				log['u'] = nu0
-				log['v'] = nu1
+				logs[lower]['u'] = nu0
+				logs[lower]['v'] = nu1
 
+		# Extract output
+		objvals_array = np.zeros(2)
+		for lower in [0,1]:
 			# Extract objective value
-			objvals[int(1-lower)] = objval
+			objvals_array[int(1-lower)] = objvals[lower]
 			# Extract dual variables
-			nu0s[int(1-lower)] = np.stack([log['u'][0:nvals], log['u'][nvals:]], axis=0)
-			nu1s[int(1-lower)] = np.stack([log['v'][0:nvals], log['v'][nvals:]], axis=0)
+			nu0s[int(1-lower)] = np.stack([logs[lower]['u'][0:nvals], logs[lower]['u'][nvals:]], axis=0)
+			nu1s[int(1-lower)] = np.stack([logs[lower]['v'][0:nvals], logs[lower]['v'][nvals:]], axis=0)
 			# Center
 			shift = nu0s[int(1-lower)].mean()
 			nu1s[int(1-lower)] += shift
@@ -293,20 +351,19 @@ class DualIVBounds(generic.DualBounds):
 			# Estimated conditional means
 			c0s[int(1-lower)] = np.sum(nu0s[int(1-lower)] * probs[0])
 			c1s[int(1-lower)] = np.sum(nu1s[int(1-lower)] * probs[1])
- 
 
 		# Concatenate and return
 		nus = np.stack([nu0s, nu1s], axis=1)
 		cs = np.stack([c0s, c1s], axis=1)
 
-		return objvals, nus, cs
+		return objvals_array, nus, cs
 
 	def _ensure_primal_feasibility(
 		self,
 		yvals,
 		jointprobs,
 		x,
-		solver='ECOS',
+		solver='CLARABEL',
 	):
 		"""
 		Parameters
@@ -418,20 +475,37 @@ class DualIVBounds(generic.DualBounds):
 
 		### 4. Create problem and solve
 		problem = cp.Problem(cp.Minimize(obj), constraints)
-		problem.solve(solver=solver)
+		try:
+			problem.solve(solver=solver)
+		except cp.SolverError as e:
+			problem.solve(solver='ECOS', verbose=True)
 
 		### 5. Concatenate
 		new_jointprobs = np.stack(
 			[
-				np.stack([w0yw0_probs[0].value, w0yw0_probs[1].value], axis=0),
-				np.stack([w1yw1_probs[0].value, w1yw1_probs[1].value], axis=0),
+				# np.stack([w0yw0_probs[0].value, w0yw0_probs[1].value], axis=0),
+				# np.stack([w1yw1_probs[0].value, w1yw1_probs[1].value], axis=0),
+				np.stack(
+					[
+						np.sum(jp_cp[0][0].value + jp_cp[0][1].value, axis=1),
+						np.sum(jp_cp[1][0].value + jp_cp[1][1].value, axis=0)
+					],
+					axis=0
+				),
+				np.stack(
+					[
+						np.sum(jp_cp[0][0].value + jp_cp[1][0].value, axis=1),
+						np.sum(jp_cp[0][1].value + jp_cp[1][1].value, axis=0)
+					],
+					axis=0
+				),
 			],
 			axis=0
 		)
 		### 6. Clip and ensure sums to one
-		new_jointprobs = np.clip(new_jointprobs, 0, 1)
-		for z in [0,1]:
-			new_jointprobs[z] /= new_jointprobs[z].sum()
+		# new_jointprobs = np.clip(new_jointprobs, 0, 1)
+		# for z in [0,1]:
+		# 	new_jointprobs[z] /= new_jointprobs[z].sum()
 		return new_jointprobs
 
 	def _ensure_feasibility(
@@ -619,12 +693,11 @@ class DualIVBounds(generic.DualBounds):
 		ydists: list,
 		ymin: Optional[float]=None,
 		ymax: Optional[float]=None,
-		min_quantile: float=1e-5,
+		min_quantile: Optional[float]=None,
 		interp_fn: callable=interpolation.adaptive_interpolate,
 		nvals: int=100,
 		ninterp: Optional[int]=None,
 		verbose: bool=True,
-		_ensure_primal_feas:bool=True,
 		**kwargs
 	):
 		"""
@@ -641,9 +714,8 @@ class DualIVBounds(generic.DualBounds):
 			of ydists[z][w] represents the law of 
 			:math:`Y_i(w) | W_i(z) = w, X_i`.
 		min_quantile : float
-			A tolerance used to ensure numerical stability in the dual solver. 
-			Essentially, in a discretization, considers quantiles as small as
-			tol from the estimated law of ydists.
+			Minimum quantile to consider when discretizing. 
+			Defaults to 1 / (2*nvals).
 		"""
 		# Setup
 		if verbose:
@@ -670,7 +742,7 @@ class DualIVBounds(generic.DualBounds):
 				yvals_zw, yprobs_zw = self._discretize(
 					ydists[z][w], 
 					nvals=self.nvals, 
-					alpha=min_quantile,
+					min_quantile=min_quantile,
 					ymin=ymin,
 					ymax=ymax,
 					ninterp=ninterp,
@@ -703,7 +775,7 @@ class DualIVBounds(generic.DualBounds):
 				# argsort
 				for z in [0,1]:
 					self._yvals[z][w], self._yprobs[z][w] = utilities._sort_disc_dist(
-						vals=_yvals[z][w], probs=self._yprobs[z][w]
+						vals=self._yvals[z][w], probs=self._yprobs[z][w]
 					)
 
 			# Adjust self.nvals
@@ -723,6 +795,7 @@ class DualIVBounds(generic.DualBounds):
 		self._jointprobs = self._yprobs.copy()
 		self._jointprobs[:, :, 0] *= (1 - wprobs.reshape(self.n, 2, 1))
 		self._jointprobs[:, :, 1] *= wprobs.reshape(self.n, 2, 1)
+		self._adj_jointprobs = self._jointprobs.copy()
 
 		## Initialize results
 		# first dimension = [lower, upper]
@@ -745,6 +818,7 @@ class DualIVBounds(generic.DualBounds):
 				x=self.X[i],
 				ymin=ymin,
 				ymax=ymax,
+				i=i,
 			)
 			self.objvals[:, i] = objvalsx
 			self.nus[i] = nusx

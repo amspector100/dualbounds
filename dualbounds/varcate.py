@@ -6,6 +6,7 @@ import numpy as np
 from scipy import stats
 from . import generic
 from .generic import infer_discrete, get_default_model
+import pandas as pd
 
 def _moments2varcate(
 	hxy1, hxy0, hx, y1, y0, shx2,
@@ -105,6 +106,23 @@ class VarCATEDualBounds(generic.DualBounds):
 
 	def _compute_ipw_summands(self):
 		pass
+
+	def _plug_in_results(self, B: int=1000):
+		# Estimates
+		pests = np.array([self.cates.std()**2, np.nan])
+		# SEs via bootstrap
+		inds = np.random.choice(self.n, size=(self.n, B), replace=True)
+		bootstrap_varcates = self.cates[inds].std(axis=0)**2
+		pses = np.array([bootstrap_varcates.std(), np.nan])
+		pcis = pests - pses * stats.norm.ppf(1-self.alpha) 
+		return pd.DataFrame(
+			np.stack(
+				[pests, pses, pcis], 
+				axis=0
+			),
+			index=['Estimate', 'SE', 'Conf. Int.'],
+			columns=['Lower', 'Upper']
+		)
 
 	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		self._compute_cond_means()

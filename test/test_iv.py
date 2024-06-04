@@ -118,28 +118,26 @@ class TestDualIVBounds(unittest.TestCase):
 			for w in [0,1]:
 				ydists_cat[z][w] = _convert_to_cat(data['ydists'][z][w], n=n)
 
-		for _ensure_primal_feas in [False, True]:
-			dbiv.compute_dual_variables(
-				wprobs=data['wprobs'],
-				ydists=ydists_cat,
-				verbose=True,
-				_ensure_primal_feas=True,
-			)
-			np.testing.assert_array_almost_equal(
-				dbiv.objvals,
-				bp_bounds,
-				decimal=5,
-				err_msg="For binary y, DualIVBounds objvals do not match Balke-Pearl bounds"
-			)
-			# Test relationship with CATE
-			self.assertTrue(
-				np.all(dbiv.objvals[0] <= data['cates']),
-				"lower objvals are sometimes larger than the CATE"
-			)
-			self.assertTrue(
-				np.all(dbiv.objvals[1] >= data['cates']),
-				"upper objvals are sometimes smaller than the CATE"
-			)
+		dbiv.compute_dual_variables(
+			wprobs=data['wprobs'],
+			ydists=ydists_cat,
+			verbose=True,
+		)
+		np.testing.assert_array_almost_equal(
+			dbiv.objvals,
+			bp_bounds,
+			decimal=5,
+			err_msg="For binary y, DualIVBounds objvals do not match Balke-Pearl bounds"
+		)
+		# Test relationship with CATE
+		self.assertTrue(
+			np.all(dbiv.objvals[0] <= data['cates']),
+			"lower objvals are sometimes larger than the CATE"
+		)
+		self.assertTrue(
+			np.all(dbiv.objvals[1] >= data['cates']),
+			"upper objvals are sometimes smaller than the CATE"
+		)
 
 		# Test that the AIPW process works. First, sample new data
 		reps = 2000
@@ -215,6 +213,13 @@ class TestDualIVBounds(unittest.TestCase):
 				decimal=5,
 				err_msg=f"{name} DualIV objective values do not match LATE numerator under monotonicity"
 			)
+
+	def test_consistency(self):
+		"""
+		Check that the final bounds are similar to the oracle bounds.
+		"""
+		pass
+
 
 
 if __name__ == "__main__":

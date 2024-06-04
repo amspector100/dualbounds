@@ -1,10 +1,93 @@
 import copy
 import warnings
 import numpy as np
+import pandas as pd
 import ot
 from scipy import stats
 from . import utilities
 from .generic import DualBounds
+
+def _delta_bootstrap_ses(
+	h: callable,
+	summands: np.array,
+	z1summands: np.array,
+	z0summands: np.array,
+	B: int,
+	alpha: float,
+):
+	"""
+	Uses the bootstrap to compute SES and CIs for 
+
+	:math:`h(E[f(Y(0), Y(1), X)], E[z_1(Y(1), X)], E[z_0(Y(0), X)])`.
+	
+	Parameters
+	----------
+	h : function
+		real-valued function of fval, z0, z1, e.g.,
+		``h = lambda fval, z0, z1 : fval / z0 + z1``.
+	summands : np.array
+		(2,n)-shaped array where summands[0].mean()
+		is a lower bound on E[f(Y(0), Y(1), X)] and
+		summands[1].mean() is an upper bound.
+	z1summands : np.array
+		(n,d)-length array where z1summands.mean(axis=0)
+		estimates E[z_1(Y(1), X)].
+	z0summands : np.array
+		(n,d)-length array where z0summands.mean(axis=0) 
+		estimates E[z_0(Y(0), X)].
+	B : int
+		Number of bootstrap replications.
+	alpha : float
+		Nominal level.
+	"""
+	d0 = z0summands.shape[1]
+	# Stack everything in the appropriate format
+	combined_summands = np.stack([
+		np.concatenate([summands[[k]], z0summands.T, z1summands.T], axis=0) 
+		for k in [0,1]
+	], axis=0)
+	return utilities.compute_est_bounds(
+		summands=combined_summands,
+		func=lambda x: h(
+			fval=x[0], z0=x[1:(1+d0)], z1=x[(1+d0):]
+		),
+		B=B,
+		#clusters=clusters,
+		alpha=alpha,
+	)
+	# n = len(z1summands)
+	# estimates = np.zeros(2)
+	# bootstrap_ests = np.zeros((B, 2))
+	# for lower in [1, 0]:
+	# 	sbetas = summands[1-lower]
+	# 	est = h(
+	# 		sbetas.mean(), 
+	# 		z0=z0summands.mean(axis=0),
+	# 		z1=z1summands.mean(axis=0),
+	# 	).item()
+	# 	estimates[1-lower] = est
+	# 	for b in range(B):
+	# 		inds = np.random.choice(np.arange(n), size=n, replace=True)
+	# 		bootstrap_ests[b, 1-lower] = h(
+	# 			sbetas[inds].mean(),
+	# 			z0=z0summands[inds].mean(axis=0),
+	# 			z1=z1summands[inds].mean(axis=0),
+	# 		).item()
+
+	# # Standard errors 
+	# scale = stats.norm.ppf(1-alpha/2)
+	# ses = bootstrap_ests.std(axis=0)
+	# cis = np.array([
+	# 	estimates[0] - ses[0] * scale,
+	# 	estimates[1] + ses[1] * scale
+	# ])
+	# return dict(
+	# 	estimates=estimates,
+	# 	ses=ses,
+	# 	cis=cis,
+	# 	bootstrap_ests=bootstrap_ests,
+	# )
+
 
 class DeltaDualBounds(DualBounds):
 	"""
@@ -80,11 +163,29 @@ class DeltaDualBounds(DualBounds):
 		#self.h_grad = h_grad
 		super().__init__(*args, **kwargs)
 
+	def _plug_in_results(self, B: int=1000):
+		ests, ses, cis = _delta_bootstrap_ses(
+			h=self.h,
+			summands=self.objvals,
+			z1summands=self.z1summands,
+			z0summands=self.z0summands,
+			alpha=self.alpha,
+			B=B,
+		)
+		return pd.DataFrame(
+			np.stack(
+				[ests, ses, cis], 
+				axis=0
+			),
+			index=['Estimate', 'SE', 'Conf. Int.'],
+			columns=['Lower', 'Upper']
+		)
+
 	def _compute_final_bounds(
 		self, 
 		aipw: bool=True,
 		alpha: float=0.05,
-		B: int=1000
+		B: int=1000,
 	):
 		"""
 		Computes final bounds based on (A)IPW summands,
@@ -135,31 +236,21 @@ class DeltaDualBounds(DualBounds):
 
 		## sample means and bootstrap
 		# Bootstrap is valid because the analytical delta method is valid
-		self.estimates = np.zeros(2)
-		self.bootstrap_ests = np.zeros((B, 2))
-		for lower in [1, 0]:	
-			sbetas = summands[1-lower]
-			est = self.h(
-				sbetas.mean(), 
-				z0=self.z0summands.mean(axis=0),
-				z1=self.z1summands.mean(axis=0),
-			).item()
-			self.estimates[1-lower] = est
-			for b in range(B):
-				inds = np.random.choice(np.arange(self.n), size=self.n, replace=True)
-				self.bootstrap_ests[b, 1-lower] = self.h(
-					sbetas[inds].mean(),
-					z0=self.z0summands[inds].mean(axis=0),
-					z1=self.z1summands[inds].mean(axis=0),
-				).item()
-
-		# Standard errors 
-		scale = stats.norm.ppf(1-alpha/2)
-		self.ses = self.bootstrap_ests.std(axis=0)
-		self.cis = np.array([
-			self.estimates[0] - self.ses[0] * scale,
-			self.estimates[1] + self.ses[1] * scale
-		])
+		self.alpha = alpha
+		self.estimates, self.ses, self.cis = _delta_bootstrap_ses(
+			h=self.h,
+			summands=summands,
+			z1summands=self.z1summands,
+			z0summands=self.z0summands,
+			B=B,
+			alpha=self.alpha,
+		)
+		print(self.estimates.shape, self.ses.shape, self.cis.shape)
+		# self.estimates = bootstrap_out['estimates']
+		# self.ses = bootstrap_out['ses']
+		# self.cis = bootstrap_out['cis']
+		# self.bootstrap_ests = bootstrap_out['bootstrap_ests']
+		# Return
 		return dict(
 			estimates=self.estimates,
 			ses=self.ses,

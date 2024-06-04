@@ -6,6 +6,7 @@ from scipy import stats
 from . import utilities, dist_reg, interpolation
 from .utilities import BatchedCategorical
 import pandas as pd
+import cvxpy as cp
 # typing
 from scipy.stats._distn_infrastructure import rv_generic
 import sklearn.base
@@ -19,7 +20,7 @@ Not fitting a model because y0_dists/y1_dists were
 directly provided. Please ensure cross-fitting is
 employed correctly, else inference will be invalid
 (see https://arxiv.org/abs/2310.08115). To suppress
-this warning, set ``supress_warning=True``.
+this warning, set ``suppress_warning=True``.
 ==================================================
 """
 
@@ -79,6 +80,9 @@ def _default_ylims(
 		y1_max = 1.5 * y.max() - y.min() / 2
 	return y0_min, y1_min, y0_max, y1_max
 
+def _dualvals_are_too_large(nu0, nu1, almost_inf):
+	return max(np.max(np.abs(nu0)), np.max(np.abs(nu1))) > 0.1 * almost_inf
+
 class DualBounds:
 	"""
 	Computes dual bounds on :math:`E[f(Y(0),Y(1), X)].`
@@ -128,6 +132,7 @@ class DualBounds:
 		``support_restriction(y0, y1, x) = False`` asserts that 
 		y0, y1, x is not in the support of :math:`Y(0), Y(1), X`.
 		Defaults to ``None`` (no a-priori support restrictions).
+		See the user guide for important usage tips.
 	model_kwargs : dict
 		Additional kwargs for the ``outcome_model``, e.g.,
 		``feature_transform``. See 
@@ -286,7 +291,7 @@ class DualBounds:
 		nvals,
 		ymin,
 		ymax,
-		alpha=0.001,
+		min_quantile=0.001,
 		ninterp=None,
 		min_yprob=1e-8,
 	):
@@ -344,6 +349,7 @@ class DualBounds:
 				raise ValueError(f"nvals must be larger than {nvals}.")
 			
 			# make sure we get small enough quantiles
+			alpha = min_quantile
 			if alpha is None:
 				alpha = 1 / (2*nvals)
 			alpha = min(1/(2*nvals), max(alpha, 1e-8))
@@ -460,18 +466,20 @@ class DualBounds:
 				x=self.y1_vals[i], y=nu1, newx=new_y1_vals,
 			)
 			# compute required bounds
-			fvals = self.f(
-				y0=new_y0_vals.reshape(-1, 1),
-				y1=new_y1_vals.reshape(1, -1),
+			fvals = self._apply_ot_fn(
+				fn=self.f,
+				y0=new_y0_vals,
+				y1=new_y1_vals,
 				x=self.X[i],
 			)
 			# support restrictions relax constraints
 			if self.support_restriction is not None:
-				not_in_support = ~self.support_restriction(
-					y0=new_y0_vals.reshape(-1, 1),
-					y1=new_y1_vals.reshape(1, -1),
+				not_in_support = ~(self._apply_ot_fn(
+					fn=self.support_restriction,
+					y0=new_y0_vals,
+					y1=new_y1_vals,
 					x=self.X[i],
-				)
+				).astype(bool))
 				# Relax constraints
 				#almost_inf = 1e5 * (np.abs(fvals) + 1).max()
 				if lower:
@@ -523,15 +531,130 @@ class DualBounds:
 		# return
 		return new_y0_vals, new_nu0, new_y1_vals, new_nu1, objval_diff
 
+	def _ensure_primal_feasibility(
+		self,
+		y0_probs: np.array,
+		y1_probs: np.array,
+		y0_vals: np.array,
+		y1_vals: np.array,
+		not_in_support: np.array,
+		i: int,
+		fuzz=0.0001,
+		solver='SCIPY',
+		min_prob=0, ## new
+	):
+		"""
+		fuzz : float
+			Adds fuzz * np.random.uniform() to nonzero values to push 
+			jointprobs into the interior of the primal feasible set.
+		"""
+		nvals0 = len(y0_vals)
+		nvals1 = len(y1_vals)
+		min_ratio = cp.Parameter()
+		# Create variable
+		jointprobs = cp.Variable((nvals0, nvals1), pos=True)
+		y0p = jointprobs.sum(axis=1)
+		y1p = jointprobs.sum(axis=0)
+		constraints = [
+			cp.sum(jointprobs)==1,
+			jointprobs[not_in_support] == 0,
+			y0p >= y0_probs * min_ratio,
+			y1p >= y1_probs * min_ratio,
+		]
+		diffs0 = y0_vals[1:] - y0_vals[:-1]
+		diffs1 = y1_vals[1:] - y1_vals[:-1]
+		obj = cp.abs(cp.cumsum(y0p) - np.cumsum(y0_probs))[:-1] @ diffs0
+		obj += cp.abs(cp.cumsum(y1p) - np.cumsum(y1_probs))[:-1] @ diffs1
+		problem = cp.Problem(cp.Minimize(obj), constraints)
+
+		for mr in [1/2, 1/5, 1/100, 0]:
+			min_ratio.value = mr
+			problem.solve(solver=solver)
+			if problem.status in ['optimal', 'optimal_inaccurate']:
+				break
+
+		if problem.status not in ['optimal', 'optimal_inaccurate']:
+			raise ValueError(f"For i={i}, failed to enforce primal feasibility.")
+		# Clip
+		jp = jointprobs.value
+		jp += fuzz * np.random.uniform(0, 1, size=jp.shape) / (nvals0 * nvals1)
+		jp[not_in_support] = 0
+		jp = jp / jp.sum()
+		return jp.sum(axis=1), jp.sum(axis=0)
+
 	def _solve_single_instance(
 		self, 
-		probs0,
-		probs1,
-		fvals,
-		lower,
+		i: int,
+		probs0: np.array,
+		probs1: np.array,
+		y0_vals: np.array,
+		y1_vals: np.array,
+		fvals: np.array,
+		not_binding: np.array,
+		lower: bool,
+		dual_strategy='ot',
+		lp_solver='SCIPY',
+		qp_solver='CLARABEL',
+		se_solver='CLARABEL',
+		enforce_primal_feas=True,
+		debug=False,
 		**kwargs,
 	):
-		if lower:
+		"""
+		Parameters
+		----------
+		not_binding : boolean array
+			not_binding[i,j] = 1 iff the (i,j)th
+			dual constraint should be ignored.
+		debug : bool
+			If True, becomes highly verbose.
+		dual_strategy : str
+			One of 'ot', 'lp', 'qp', 'se'
+		"""
+		if not lower:
+			nu0, nu1, objval = self._solve_single_instance(
+				probs0=probs0, 
+				probs1=probs1,
+				y0_vals=y0_vals,
+				y1_vals=y1_vals,
+				fvals=-1*fvals,
+				i=i,
+				not_binding=not_binding,
+				lower=1,
+				dual_strategy=dual_strategy,
+				lp_solver=lp_solver,
+				qp_solver=qp_solver,
+				se_solver=se_solver,
+				debug=debug,
+				enforce_primal_feas=enforce_primal_feas,
+				**kwargs,
+			)
+			return -nu0, -nu1, -objval
+
+		### Parse dual solver
+		dual_strategy = str(dual_strategy).lower()
+		if dual_strategy not in ['ot', 'lp', 'qp', 'se']:
+			raise ValueError(
+				f"dual_strategy={dual_strategy} must be one of 'ot', 'lp', 'qp', 'se'"
+			)
+
+		### Structure
+		# 1. initial OT solve  [used by ot]
+		# 2. Ensure_primal_feas [used by all if any constraints are not binding]
+		# 3. OT solve [used by ot]
+		# 4. LP solve [used by lp]
+		# 5. QP solve [used by qp]
+
+		### 1. Initial OT solve
+		if dual_strategy == 'ot':
+			# Use a hack for non-binding constraints.
+			# This only influences the OT solver.
+			almost_inf = 1e5 * np.abs(fvals).max()
+			if np.any(not_binding):
+				fvals = fvals.copy()
+				fvals[not_binding] = almost_inf
+
+			# Attempt to solve with pyot
 			objval, log = ot.lp.emd2(
 				a=probs0,
 				b=probs1,
@@ -540,17 +663,126 @@ class DualBounds:
 				**kwargs,
 			)
 			nu0, nu1 = log['u'], log['v']
-			# center
-			nu1 += nu0.mean()
-			nu0 -= nu0.mean()
-			return nu0, nu1, objval
-		else:
-			nu0, nu1, objval = self._solve_single_instance(
-				probs0=probs0, probs1=probs1, fvals=-1*fvals,
-				lower=1,
+			too_large = _dualvals_are_too_large(nu0, nu1, almost_inf)
+			if (not too_large) or (not np.any(not_binding)):
+				nu1 += nu0.mean()
+				nu0 -= nu0.mean()
+				return nu0, nu1, objval
+
+		### 2. Ensure primal feasibility
+		if np.any(not_binding) and enforce_primal_feas:
+			if debug:
+				print(f"Ensuring primal feasibility. enforce_primal_feas={enforce_primal_feas}")
+			probs0, probs1 = self._ensure_primal_feasibility(
+				y0_probs=probs0,
+				y1_probs=probs1, 
+				y0_vals=y0_vals, 
+				y1_vals=y1_vals, 
+				not_in_support=not_binding, 
+				i=i,
+			)
+
+		## 3. Second OT solve
+		if dual_strategy == 'ot':
+			if debug:
+				print("Trying secondary ot.lp optimization.")
+			objval, log = ot.lp.emd2(
+				a=probs0,
+				b=probs1,
+				M=fvals,
+				log=True,
 				**kwargs,
 			)
-			return -nu0, -nu1, -objval
+			nu0, nu1 = log['u'], log['v'] 
+			nu1 += nu0.mean()
+			nu0 -= nu0.mean()
+			if _dualvals_are_too_large(nu0, nu1, almost_inf):
+				dual_strategy = 'se'
+			
+		## 4/5: solve with LP/QP.
+		if dual_strategy in ['lp', 'qp', 'se']:
+
+			###NOTE: this is 25% faster but less general bc we can't swap in
+			# new solvers.
+			# c = np.concatenate([y0_probs, y1_probs])
+			# i0s, i1s = np.where(in_support)
+			# col_inds = np.concatenate([i0s, i1s + nvals0])
+			# row_inds = np.concatenate([np.arange(len(i0s)), np.arange(len(i0s))])
+			# b = fvals[(i0s, i1s)]
+			# A_sparse = scipy.sparse.csr_matrix(
+			#     (np.ones(len(row_inds)), (row_inds, col_inds)), shape=(len(i0s), len(c))
+			# )
+			# out_upper = scipy.optimize.linprog(
+			#     c=-c, A_ub=A_sparse, b_ub=-b, bounds=(None, None),
+			# )
+
+			nu0 = cp.Variable(len(probs0))
+			nu1 = cp.Variable(len(probs1))
+			nusum = cp.reshape(nu0, (-1, 1)) + cp.reshape(nu1, (1, -1))
+			linobj = nu0 @ probs0 + nu1 @ probs1
+			binding = (~not_binding).astype(int)
+			constraints = [cp.multiply(binding, nusum) <= cp.multiply(binding, fvals)]
+			if dual_strategy == 'lp':
+				if debug:
+					print(f"Solving linear problem with {lp_solver} (not PyOT).")
+				problem = cp.Problem(cp.Maximize(linobj), constraints=constraints)
+				problem.solve(solver=lp_solver)
+				if debug:
+					print(f"LP problem status is {problem.status}.")
+			elif dual_strategy == 'qp':
+				if debug:
+					print(f"Solving quadratic program with {qp_solver} (not PyOT).")
+				pi = self.pis[i]
+				pcat = np.maximum(
+					np.concatenate([probs0 / (1-pi), probs1 / pi]), 
+					1e-6
+				)
+				quad_term = (pcat @ cp.hstack([nu0, nu1]))**2 / self.n
+				problem = cp.Problem(
+					cp.Maximize(linobj - quad_term), constraints=constraints
+				)
+				try:
+					problem.solve(solver=qp_solver)
+				except cp.SolverError:
+					problem.solve(solver=qp_solver)
+
+
+			# maximize mean - 2 standard errors
+			else:
+				if debug:
+					print(f"Solving quadratic problem with {se_solver} (not PyOT).")
+				pcat = np.concatenate([probs0, probs1])
+				pi = self.pis[i]
+				Q = np.diag(np.concatenate([probs0 / (1-pi), probs1 / pi])) - np.outer(pcat, pcat)
+				evals, evecs = np.linalg.eigh(Q)
+				sqrtQ = evecs @ np.diag(np.sqrt(np.maximum(evals, 0))) @ evecs.T
+				stdev = cp.norm2(sqrtQ @ cp.hstack([nu0, nu1]))
+				problem = cp.Problem(
+					cp.Maximize(linobj - 2 * stdev / np.sqrt(self.n)), constraints=constraints
+				)
+				problem.solve(solver=se_solver)
+
+			# Warn the user of failures
+			if problem.status not in ['optimal', 'optimal_inaccurate']:
+				msg = "The final bounds may be vacuous."
+				if problem.status == 'unbounded':
+					msg = f"Dual solver failed due to primal infeasibility for i={i}, lower={lower}. " + msg
+				else:
+					msg = f"Dual solver failed for i={i}, lower={lower} with status {problem.status}. " + msg
+				warnings.warn(msg)
+				nu0 = np.zeros(len(probs0))
+				nu1 = np.zeros(len(probs1))
+				objval = 0
+			else:
+				nu0 = nu0.value
+				nu1 = nu1.value
+				objval = linobj.value
+
+		# center
+		if dual_strategy not in ['qp', 'se']:
+			nu1 += nu0.mean()
+			nu0 -= nu0.mean()
+		return nu0, nu1, objval
 
 	def compute_dual_variables(
 		self,
@@ -561,8 +793,12 @@ class DualBounds:
 		y1_vals: Optional[np.array]=None,
 		y1_probs: Optional[np.array]=None,
 		verbose: bool=True,
-		alpha: Optional[float]=None,
+		min_quantile: Optional[float]=None,
 		ninterp: Optional[int]=None,
+		dual_strategy: str='ot',
+		lp_solver: str='SCIPY',
+		qp_solver: str='CLARABEL',
+		se_solver: str='CLARABEL',
 		nvals0: int=100,
 		nvals1: int=100,
 		interp_fn: callable=interpolation.adaptive_interpolate,
@@ -609,6 +845,30 @@ class DualBounds:
 			(n, nvals1)-length array where ``y1_probs[i, j]``
 			is the estimated probability that :math:`Y_i(1)`
 			equals ``y1_vals[i, j].``
+		dual_strategy : str
+			Specifies the strategy used to find the dual variables.
+			One of the following:
+
+			- 'ot': solves a standard-form optimal transport problem.
+			- 'lp': solves a full linear program.
+			- 'qp': solves a quadratic program which approximately accounts for standard errors.
+			- 'se': solves a convex program which exactly accounts for standard errors.
+
+			'ot' is the default and the fastest, but 'se' can reduce 
+			standard errors in noisy problems.
+
+		lp_solver : str
+			When ``dual_strategy='lp'``, specifies which cvxpy solver 
+			to use to solve the optimal transport LP. Default: SCIPY.
+		qp_solver : str
+			When ``dual_strategy='qp'``, specifies which cvxpy solver 
+			to use to solve the optimal transport QP. Default: CLARABEL.
+		se_solver : str
+			When ``dual_strategy='se'``, specifies which cvxpy solver 
+			to use to solve the convex program. Default: CLARABEL.
+		min_quantile : float
+			Minimum quantile to consider when discretizing. 
+			Defaults to 1 / (2*nvals).		
 		nvals0 : int
 			How many values to use to discretize Y(0). 
 			Defaults to 100. Ignored for discrete Y.
@@ -660,17 +920,13 @@ class DualBounds:
 		# this discretizes if Y is continuous
 		if y0_vals is None or y0_probs is None:
 			y0_vals, y0_probs = self._discretize(
-				y0_dists, nvals=self.nvals0, alpha=alpha,
-				ymin=y0_min,
-				ymax=y0_max,
-				ninterp=ninterp,
+				y0_dists, nvals=self.nvals0, min_quantile=min_quantile,
+				ymin=y0_min, ymax=y0_max, ninterp=ninterp,
 			)
 		if y1_vals is None or y1_probs is None:
 			y1_vals, y1_probs = self._discretize(
-				y1_dists, nvals=self.nvals1, alpha=alpha,
-				ymin=y1_min,
-				ymax=y1_max,
-				ninterp=ninterp,
+				y1_dists, nvals=self.nvals1, min_quantile=min_quantile,
+				ymin=y1_min, ymax=y1_max, ninterp=ninterp,
 			)
 
 		# ensure y1_vals, y1_probs are sorted
@@ -695,18 +951,36 @@ class DualBounds:
 		# loop through
 		for i in utilities.vrange(self.n, verbose=verbose):
 			# set parameter values
-			fx = lambda y0, y1: self.f(y0=y0, y1=y1, x=self.X[i])
-			fvals = np.array(fx(
-				y0=self.y0_vals[i].reshape(-1, 1), 
-				y1=self.y1_vals[i].reshape(1, -1),
-			))
+			fvals = self._apply_ot_fn(
+				fn=self.f,
+				y0=self.y0_vals[i],
+				y1=self.y1_vals[i],
+				x=self.X[i],
+			)
+			if self.support_restriction is not None:
+				not_binding = ~(self._apply_ot_fn(
+					fn=self.support_restriction,
+					y0=self.y0_vals[i],
+					y1=self.y1_vals[i],
+					x=self.X[i],
+				).astype(bool))
+			else:
+				not_binding = np.zeros(fvals.shape).astype(bool)
 			# solve
 			for lower in [1, 0]:
 				nu0x, nu1x, objval = self._solve_single_instance(
 					probs0=self.y0_probs[i],
 					probs1=self.y1_probs[i],
+					y0_vals=self.y0_vals[i],
+					y1_vals=self.y1_vals[i],
 					fvals=fvals,
 					lower=lower,
+					i=i,
+					not_binding=not_binding,
+					dual_strategy=dual_strategy,
+					lp_solver=lp_solver,
+					qp_solver=qp_solver,
+					se_solver=se_solver,
 				)
 				self.objvals[1 - lower, i] = objval
 				# Save solutions
@@ -1053,19 +1327,19 @@ class DualBounds:
 		self._compute_final_bounds(aipw=aipw, alpha=alpha)
 		return self
 
-	# def _plug_in_results(self):
-	#   pests, pses, pcis = utilities.compute_est_bounds(
-	#       summands=self.objvals,
-	#       alpha=self.alpha
-	#   )
-	#   return pd.DataFrame(
-	#       np.stack(
-	#           [pests, pses, pcis], 
-	#           axis=0
-	#       ),
-	#       index=['Estimate', 'SE', 'Conf. Int.'],
-	#       columns=['Lower', 'Upper']
-	#   )
+	def _plug_in_results(self):
+		pests, pses, pcis = utilities.compute_est_bounds(
+			summands=self.objvals,
+			alpha=self.alpha
+		)
+		return pd.DataFrame(
+			np.stack(
+				[pests, pses, pcis], 
+				axis=0
+			),
+			index=['Estimate', 'SE', 'Conf. Int.'],
+			columns=['Lower', 'Upper']
+		)
 
 	def results(self, minval: float=-np.inf, maxval: float=np.inf):
 		"""
@@ -1099,6 +1373,35 @@ class DualBounds:
 		)
 		return self.results_
 
+	def eval_outcome_model(self):
+		"""
+		Thinly wraps ``dist_reg.evaluate_model_predictions``.
+
+		Returns
+		-------
+		sumstats : pd.DataFrame
+			DataFrame summarizing goodness-of-fit metrics for
+			the cross-fit outcome model.
+		"""
+		self._compute_oos_resids()
+		return dist_reg._evaluate_model_predictions(
+			y=self.y, haty=self.oos_preds
+		)
+
+	def eval_treatment_model(self):
+		"""
+		Thinly wraps ``dist_reg.evaluate_model_predictions``.
+
+		Returns
+		-------
+		sumstats : pd.DataFrame
+			DataFrame summarizing goodness-of-fit metrics for
+			the cross-fit propensity scores.
+		"""
+		return dist_reg._evaluate_model_predictions(
+			y=self.W, haty=self.pis
+		)
+
 	def summary(self, minval: float=-np.inf, maxval: float=np.inf):
 		"""
 		Prints a summary of main results from the class.
@@ -1118,28 +1421,25 @@ class DualBounds:
 
 		Notes
 		-----
-		To access the inferential results as a pd.DataFrame, call
-		``DualBounds.results()``.
+		To access the results a DataFrame, call:
+
+		- ``DualBounds.results()`` for inferential results
+		- ``DualBounds.eval_outcome_model()`` for outcome model metrics
+		- ``DualBounds.eval_treatment_model()`` for treatment model metrics
+		- ``DualBounds._plug_in_results()`` for nonrobust plug-in bounds
 		"""
 		print("___________________Inference_____________________")
 		print(self.results(minval=minval, maxval=maxval))
 		print()
 		print("_________________Outcome model___________________")
-		self._compute_oos_resids()
-		sumstats = dist_reg._evaluate_model_predictions(
-			y=self.y, haty=self.oos_preds
-		)
-		print(sumstats)
+		print(self.eval_outcome_model())
 		print()
 		print("_________________Treatment model_________________")
-		sumstats = dist_reg._evaluate_model_predictions(
-			y=self.W, haty=self.pis
-		)
-		print(sumstats)
+		print(self.eval_treatment_model())
 		print()
-		# print("-----------Nonrobust plug-in bounds-----------")
-		# print(self._plug_in_results())
-		# print()
+		print("______________Nonrobust plug-in bounds___________")
+		print(self._plug_in_results())
+		print()
 
 
 def plug_in_no_covariates(
@@ -1225,14 +1525,16 @@ def plug_in_no_covariates(
 		return dict(estimates=np.array([lower, upper]))
 	else:
 		# Estimates
-		ests = plug_in_no_covariates(outcome=y, treatment=W, f=f, B=0)
+		ests = plug_in_no_covariates(
+			outcome=y, treatment=W, f=f, propensities=pis, B=0
+		)['estimates']
 		# Bootstrap
 		bs_ests = np.zeros((B, 2))
 		for b in utilities.vrange(B, verbose=verbose):
 			inds = np.random.choice(np.arange(n), size=n, replace=True)
 			bs_ests[b] = plug_in_no_covariates(
-				outcome=y[inds], treatment=W[inds], f=f, B=0
-			)
+				outcome=y[inds], treatment=W[inds], propensities=pis[inds], f=f, B=0
+			)['estimates']
 		# Bias
 		bias = bs_ests.mean(axis=0) - ests
 		ses = bs_ests.std(axis=0)

@@ -97,6 +97,47 @@ class TestUtils(unittest.TestCase):
 			err_msg=f"parse_dist returns wrong support for uniform with mu=0, sd={sd}"
 		)
 
+	def test_se_computation(self):
+		np.random.seed(123)
+		reps = 200
+		n = 300
+		n_clusters = 80
+		for d, func in zip(
+			[1, 1, 2], [lambda x: x[0], lambda x: x[0]**2, lambda x: x[0] * x[1]**2]
+		):
+
+			# True means, variances and parameters
+			mus = np.random.randn(2, d) + 5
+			sigmas = np.random.uniform(0.5, 1, size=(2, d)) 
+			sigmas += np.array([0, 10]).reshape(2, 1)
+			clusters = np.random.choice(n_clusters, size=n, replace=True)
+			# Initialize storage
+			ests = np.zeros((reps, 2))
+			ses = np.zeros((reps, 2))
+			for r in range(reps):
+				# 100% within-cluster correlation
+				samples = np.random.randn(2, d, n_clusters) * sigmas.reshape(2, d, 1)
+				samples += mus.reshape(2, d, 1)
+				samples = samples[:, :, clusters]
+				# bootstrap + ses
+				ests[r], ses[r], _ = utilities.compute_est_bounds(
+					summands=samples,
+					func=func,
+					clusters=clusters,
+					B=100,
+				)
+
+			# Compare true and estimated ses
+			true_ses = ests.std(axis=0)
+			bs_ses = ses.mean(axis=0)
+			self.assertTrue(
+				np.all(true_ses / bs_ses <= 1.2),
+				f"true_ses={true_ses} and bs_ses={bs_ses} are different"
+			)
+			self.assertTrue(
+				np.all(bs_ses / true_ses <= 1.2),
+				f"true_ses={true_ses} and bs_ses={bs_ses} are different"
+			)
 
 	def test_weighted_quantile(self):
 		np.random.seed(123)

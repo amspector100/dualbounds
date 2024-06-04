@@ -205,14 +205,55 @@ def apply_pool(func, constant_inputs={}, num_processes=1, **kwargs):
 
 	return all_outputs
 
-def compute_est_bounds(summands, alpha=0.05):
+def preprocess_clusters(clusters):
 	"""
-	Helper function to compute confidence intervals.
+	Parameters
+	----------
+	clusters : np.array
+		n-length array of cluster indicators.
+
+	Returns
+	-------
+	new_clusters : np.array
+		n-length array of clusters which takes values
+		from 0 to len(np.unique(clusters))-1.
+	"""
+	new_clusters = np.zeros(clusters.shape)
+	for i, x in enumerate(np.sort(np.unique(clusters))):
+		new_clusters[clusters == x] = i
+	return new_clusters.astype(int)
+
+def compute_est_bounds(
+	summands: np.array,
+	clusters: Optional[callable]=None,
+	func: Optional[callable]=None,
+	B: int=1000,
+	alpha: float=0.05,
+):
+	"""
+	Helper to computes confidence intervals.
+
+	Specifically, computes intervals for 
+
+		``func(summands[k].mean(axis=-1))``
+
+	Provides lower CI for k=0 and upper CI for k=1.
 
 	Parameters
 	----------
 	summands : np.array
-		(2, n)-shaped array
+		(2, n)-shaped array or (2, d, n)-shaped array
+	func : callable
+		A callable that maps a 1D np.array to a scalar.
+		Defaults to ``func=lambda x: x``.
+	clusters : np.array
+		n-shaped array where clusters[i] = j means that observation
+		i is in the jth cluster.
+	B : int
+		Number of bootstrap draws to use. Ignored unless func or
+		clusters are provided.
+	alpha : float
+		Nominal level.
 
 	Returns
 	-------
@@ -222,10 +263,51 @@ def compute_est_bounds(summands, alpha=0.05):
 		2-shaped array of standard errors.
 	bounds : np.array
 		2-shaped array of lower/upper confidence bounds.
+
+	Notes
+	-----
+	This is meant primarily for internal use in the DualBounds class.
 	"""
-	ests = summands.mean(axis=1)
-	ses = summands.std(axis=1) / np.sqrt(summands.shape[1])
 	scale = stats.norm.ppf(1-alpha/2)
+	n = summands.shape[-1]
+	# In the simplest case, use analytical bounds
+	if func is None and clusters is None:
+		ests = summands.mean(axis=-1)
+		ses = summands.std(axis=-1) / np.sqrt(n)
+	# else, use the bootstrap/delta method
+	else:
+		if func is None:
+			func = lambda x: x
+		# Estimators
+		ests = np.array([func(summands[k].mean(axis=-1)).item() for k in [0,1]])
+		bs_ests = np.zeros((2, B))
+		# Non-clustered case-regular nonparametric bootstrap
+		if clusters is None:
+			for b in range(B):
+				inds = np.random.choice(n, n, replace=True)
+				for k in [0,1]:
+					bs_ests[k, b] = func(summands[k][..., inds].mean(axis=-1)).item()
+		# Clustered case
+		else:
+			# Preprocess clusters
+			clusters = preprocess_clusters(clusters).astype(int)
+			n_clusters = len(np.unique(clusters))
+			# cluster_summands[j] = observations from cluster j
+			cluster_summands = [
+				summands[..., clusters==i] for i in range(n_clusters)
+			]
+			# Resample clusters uniformly at random
+			for b in range(B):
+				bs_clusters = np.random.choice(clusters, n_clusters, replace=True)
+				new_summands = np.concatenate(
+					[cluster_summands[i] for i in bs_clusters], axis=-1
+				)
+				for k in [0,1]:
+					bs_ests[k, b] = func(new_summands[k].mean(axis=-1)).item()
+
+		# Standard errors
+		ses = bs_ests.std(axis=1)
+
 	return ests, ses, np.array([
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]
 	])

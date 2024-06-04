@@ -91,12 +91,20 @@ def linear_interpolate(x: np.array, y: np.array, newx: np.array):
 	# 	raise ValueError("NOT SORTED")
 	# interpolate points in the range of x
 	haty = np.interp(newx, x, y)
-	# adjust for points < x.min()
+	# Check if there are any points outside the boundaries
 	lflags = newx < x[0]
+	uflags = newx > x[-1]
+	if not (np.any(lflags) or np.any(uflags)):
+		return haty
+
+	# Prevent div by 0 errors/warnings
+	x, index = np.unique(x, return_index=True)
+	y = y[index]
+
+	# adjust for points < x.min()
 	ldx = (y[1] - y[0]) / (x[1] - x[0])
 	haty[lflags] = y[0] + (newx[lflags] - x[0]) * ldx
 	# adjust for points > x.max()
-	uflags = newx > x[-1]
 	udx = (y[-1] - y[-2]) / (x[-1] - x[-2])
 	haty[uflags] = y[-1] + (newx[uflags] - x[-1]) * udx
 	return haty

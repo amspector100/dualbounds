@@ -337,9 +337,15 @@ class DistReg:
 
 		- 'identity': does not transform the features
 		- 'intercept': adds an intercept
-		- 'interactions' : interaction terms btwn. the treatment/covariates
+		- 'interactions' : adds treatment-covariate interactions
 
 		The default is ``interactions``.
+
+	Notes
+	-----
+	To inherit from this class, simply define the ``fit``
+	and ``predict`` functions, ensuring that they match the 
+	signature in the docs for this class.
 	"""
 
 	def __init__(self, how_transform):
@@ -420,6 +426,8 @@ class DistReg:
 		Z: np.array,
 	):
 		"""
+		Predicts the conditional law of the outcome.
+
 		Parameters
 		----------
 		X : np.array
@@ -460,7 +468,7 @@ class DistReg:
 			Only returned if trained using instrumental variables.
 			Then ydists[z][w] is a batched scipy distribution
 			array whose ith element represents the law of
-			:math:`Y_i(w) | X_i, W_i(z) = w)`.
+			:math:`Y_i(w) | X_i, W_i(z) = w`.
 		"""
 		n = len(X)
 		# Case 1: instrument variables (4 counterfactuals)
@@ -473,9 +481,9 @@ class DistReg:
 			return ydists
 		# Case 2: intent to treat (2 counterfactuals)
 		else:
-			p0s = self.predict(X=X, W=np.zeros(n))
-			p1s = self.predict(X=X, W=np.ones(n))
-			return p0s, p1s
+			y0_dists = self.predict(X=X, W=np.zeros(n))
+			y1_dists = self.predict(X=X, W=np.ones(n))
+			return y0_dists, y1_dists
 
 class CtsDistReg(DistReg):
 	"""
@@ -493,7 +501,8 @@ class CtsDistReg(DistReg):
 		the underlying model. One of several options:
 
 		- 'identity': does not transform the features
-		- 'interactions' : interaction terms btwn. the treatment/covariates
+		- 'intercept': adds an intercept
+		- 'interactions' : adds treatment-covariate interactions
 
 		The default is ``interactions``.
 	eps_dist : str
@@ -502,7 +511,7 @@ class CtsDistReg(DistReg):
 		Defaults to ``empirical``, which uses the empirical law of the
 		residuals of the training data.
 	eps_kwargs : dict
-		kwargs for ``utilities.parse_dist`` for the residual dist.
+		kwargs to ``utilities.parse_dist`` for the residual scipy distribution
 	heterosked_model : str or sklearn class
 		Str specifying a sklearn model class to use to estimate 
 		Var(Y | X) as a function of X. Options are the same as 
@@ -510,14 +519,19 @@ class CtsDistReg(DistReg):
 		case homoskedasticity is assumed (although the final bounds
 		will still be valid in the presence of heteroskedasticity).
 	heterosked_kwargs : dict
-		kwargs for the heterosked model. E.g., for ``knn``,
+		kwargs for the heterosked model. E.g., 
+		if ``heterosked_model=knn``,
 		heterosked_kwargs could include ``n_neighbors``.
 	**model_kwargs : dict
-		kwargs for sklearn base model. E.g., for ``knn``,
+		kwargs for sklearn base model. E.g., if ``model_type=knn``,
 		model_kwargs could include ``n_neighbors``.
 
 	Examples
 	--------
+	Here we instantiate a model which assumes Gaussianity,
+	uses a ridge to make predictions and a lasso to estimate
+	the heteroskedasticity pattern: ::
+
 		import numpy as np
 		import dualbounds
 		import sklearn.linear_model
@@ -688,7 +702,8 @@ class QuantileDistReg(DistReg):
 		the underlying model. One of several options:
 
 		- 'identity': does not transform the features
-		- 'interactions' : interaction terms btwn. the treatment/covariates
+		- 'intercept': adds an intercept
+		- 'interactions' : adds treatment-covariate interactions
 
 		The default is ``interactions``.
 
@@ -788,11 +803,12 @@ class BinaryDistReg(DistReg):
 		the underlying model. One of several options:
 
 		- 'identity': does not transform the features
-		- 'interactions' : interaction terms btwn. the treatment/covariates
+		- 'intercept': adds an intercept
+		- 'interactions' : adds treatment-covariate interactions
 
 		The default is ``interactions``.
-	montonicity: bool
-		If True, ensures `P(Y_i(1) = 1 | X_i) - P(Y_i(0) = 1 | X_i)` >= 0.
+	montonicity : bool
+		If True, ensures :math:`P(Y_i(1) = 1 | X_i) - P(Y_i(0) = 1 | X_i)` >= 0.
 	monotonicity_margin : float
 		When ``self.monotonicity = True``, ensures that
 		:math:`P(Y_i(1) = 1 | X_i) - P(Y_i(0) = 1 | X_i)` >= margin. 
@@ -891,12 +907,29 @@ class BinaryDistReg(DistReg):
 class MonotoneLogisticReg:
 	"""
 	A logistic regression solver which ensures that beta[0] >= 0.
-	Useful for computing Lee bounds which assume monotonicity.
+	Useful for computing bounds which assume monotonicity.
+
+	Notes
+	-----
+	This is meant to be used a the underlying model in a
+	 :class:`BinaryDistReg` object.
 	"""
 	def __init__(self, lmda: float=0.001):
 		self.lmda = lmda
 
-	def fit(self, X: np.array, y: np.array):
+	def fit(self, X: np.array, y: np.array, solver='ECOS'):
+		"""
+		Fits the linear model using a cvxpy backend.
+
+		Parameters
+		----------
+		X : np.array
+			(n,p)-shaped design matrix.
+		y : np.array
+			n-length vector of binary response.
+		solver : str
+			Solver for cvxpy to use. Default: ECOS.
+		"""
 		# Set up data and losses
 		n, p = X.shape
 		sig1 = X[:, 0].std()
@@ -910,12 +943,26 @@ class MonotoneLogisticReg:
 		obj = cp.Maximize(cp.sum(term1 - term2) - term3)
 		problem = cp.Problem(objective=obj, constraints=[beta[0] >= 0])
 		try:
-			problem.solve(solver='ECOS', max_iters=100)
+			problem.solve(solver=solver, max_iters=100)
 		except cp.error.SolverError:
-			problem.solve(solver='ECOS', max_iters=500)
+			problem.solve(solver=solver, max_iters=500)
 		self.beta = beta.value
 
 	def predict_proba(self, X: np.array):
+		"""
+		Probability predictions for the response.
+
+		Parameters
+		----------
+		X : np.array
+			(n,p)-shaped design matrix.
+
+		Returns
+		-------
+		probs : np.array
+			(n,2)-shaped array of probabilities where
+			probs[i, k] = P(Y = k | X = X[i]) for k in {0,1}.
+		"""
 		mu = X @ self.beta
 		p1s = np.exp(mu) / (1 + np.exp(mu))
 		return np.stack([1 - p1s, p1s], axis=1)

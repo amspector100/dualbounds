@@ -25,7 +25,7 @@ class TestDeltaDualBounds(unittest.TestCase):
 		data = gen_data.gen_regression_data(n=1000, p=5, dgp_seed=1, sample_seed=1)
 		# Bootstrap variant
 		deltadb  = delta.DeltaDualBounds(
-			h=lambda f, z1, z0: f - (z1-z0)**2,
+			h=lambda fval, z1, z0: fval - (z1-z0)**2,
 			z1=lambda y1, x: y1,
 			z0=lambda y0, x: y0,
 			f=lambda y0, y1, x: (y0-y1)**2,

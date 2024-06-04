@@ -464,12 +464,12 @@ class LeeDualBounds(generic.DualBounds):
 		# discretize if Y is continuous
 		if y1_vals is None or y1_probs is None:
 			# tolerance parameter
-			alpha = min([np.min(s0_probs/s1_probs), np.min(1 - s0_probs/s1_probs)])
+			min_quantile = min([np.min(s0_probs/s1_probs), np.min(1 - s0_probs/s1_probs)])
 			# law of Y(1) | S(1) = 1, Xi
 			y1_vals, y1_probs = self._discretize(
 				y1_dists, 
 				nvals=self.nvals1-1, 
-				alpha=alpha/2,
+				min_quantile=min_quantile/2,
 				ninterp=1,
 				ymin=ymin,
 				ymax=ymax,
@@ -527,9 +527,13 @@ class LeeDualBounds(generic.DualBounds):
 				# Relax constraints due to monotonicity
 				fvals[1][0] = max_fval if lower else -max_fval
 				nu0x, nu1x, objval = self._solve_single_instance(
+					i=i,
 					probs0=probs0,
 					probs1=self.y1_probs_adj[i],
+					y0_vals=np.array([0,1]),
+					y1_vals=self.y1_vals_adj[i],
 					fvals=fvals,
+					not_binding=np.zeros(fvals.shape).astype(bool),
 					lower=lower
 				)
 				self.objvals[1 - lower, i] = objval

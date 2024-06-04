@@ -40,6 +40,20 @@ Variance bounds
    ~dualbounds.varite.VarITEDualBounds
    ~dualbounds.varcate.VarCATEDualBounds
 
+Distributional regression
+=========================
+
+.. autosummary::
+   :toctree: generated/varbounds/
+   :template: autosummary/class.rst
+
+   ~dualbounds.dist_reg.DistReg
+   ~dualbounds.dist_reg.BinaryDistReg
+   ~dualbounds.dist_reg.CtsDistReg
+   ~dualbounds.dist_reg.QuantileDistReg
+   ~dualbounds.dist_reg.MonotoneLogisticReg
+   ~dualbounds.dist_reg.cross_fit_predictions
+
 Utility functions
 =================
 
