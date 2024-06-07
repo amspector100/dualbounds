@@ -248,7 +248,7 @@ def lee_bound_no_covariates(
 		B=B,
 		verbose=verbose,
 	)
-	cis = estimates
+	cis = estimates.copy()
 	cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
 	cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]
 	return dict(
