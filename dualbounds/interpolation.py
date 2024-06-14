@@ -111,6 +111,8 @@ def linear_interpolate(x: np.array, y: np.array, newx: np.array):
 
 def spline_interpolate(
     x, y, newx
-):
-    spline_rep = sp.interpolate.splrep(x=x, y=y)
-    return sp.interpolate.splev(newx, spline_rep)
+):	
+	if not utilities.haslength(newx):
+		newx = np.array([newx])
+	spline_rep = sp.interpolate.splrep(x=x, y=y)
+	return sp.interpolate.splev(newx, spline_rep)

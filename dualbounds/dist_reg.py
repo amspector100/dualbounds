@@ -197,134 +197,6 @@ def ridge_loo_resids(
 	loo_resids = (y - preds) / (1 - scales)
 	return loo_resids
 
-def cross_fit_predictions(
-	W,
-	X,
-	y,
-	Z=None,
-	S=None,
-	nfolds=2,
-	train_on_selections=True,
-	model=None,
-	model_cls=None, 
-	probs_only=False,
-	verbose=False,
-	**model_kwargs
-):
-	"""
-	Performs cross-fitting on a model class inheriting from ``dist_reg.DistReg.``
-
-	Parameters
-	----------
-	model : DistReg
-		instantiation of ``dist_reg.DistReg`` class. This will
-		be copied. E.g., 
-		``model=dist_reg.CtsDistReg(model_type='ridge', eps_dist="empirical").``
-	model_cls : 
-		Alterantively, give the class name and have it constructed.
-		E.g, ``model_cls=dist_reg.CtsDistReg``.
-	model_kwargs : dict
-		kwargs to construct model; used only if model_cls is specified.
-		E.g., ``model_kwargs=dict(eps_dist=empirical)``.
-	Z : np.array
-		Optional n-length array of binary instruments.
-	S : np.array
-		Optional n-length array of selection indicators.
-	train_on_selections : bool
-		If True, trains model only on data where S[i] == 1.
-	probs_only : bool
-		For binary data, returns P(Y = 1 | X, W) instead of a distribution.
-		Defaults to False.
-
-	Returns
-	-------
-	y0_dists : list
-		list of batched scipy distributions whose shapes sum to n.
-		the ith distribution is the out-of-sample estimate of
-		the conditional law of Yi(0) | X[i]
-	y1_dists : list
-		list of batched scipy distributions whose shapes sum to n.
-		the ith distribution is the out-of-sample estimate of
-		the conditional law of Yi(1) | X[i]
-	"""
-	# concatenate S to features
-	n = len(X)
-	if S is None:
-		S_flag = False
-		S = np.ones(n)
-	else:
-		S_flag = True
-		X = np.concatenate([S.reshape(n, 1), X], axis=1)
-
-	# create folds
-	starts, ends = create_folds(n=n, nfolds=nfolds)
-	# loop through folds
-	counterfactual_preds = []# results for different values of W/Z
-	oos_preds = [] # results for true W/Z
-	fit_models = []
-	for ii in vrange(len(starts), verbose=verbose):
-		start = starts[ii]; end = ends[ii]
-		# Pick out data from the other folds
-		not_in_fold = [i for i in np.arange(n) if i < start or i >= end]
-		if train_on_selections:
-			opt2 = [i for i in not_in_fold if S[i] == 1]
-			if len(opt2) == 0:
-				warnings.warn(f"S=0 for all folds except {start}-{end}.")
-			else:
-				not_in_fold = opt2
-
-		# Fit model
-		if model is None:
-			reg_model = model_cls(**model_kwargs)
-		else:
-			reg_model = copy.deepcopy(model)
-		
-		reg_model.fit(
-			W=W[not_in_fold], X=X[not_in_fold], y=y[not_in_fold],
-			Z=None if Z is None else Z[not_in_fold],
-		)
-
-		# predict and append on this fold
-		subX = X[start:end].copy(); 
-		if S_flag:
-			subX[:, 0] = 1 # set selection = 1 for predictions
-
-		# Actual predictions
-		oos_pred = reg_model.predict(
-			subX, W[start:end], Z=None if Z is None else Z[start:end]
-		)
-		counterfactual_pred = reg_model.predict_counterfactuals(subX)
-
-		# Save predictions and model fits
-		counterfactual_preds.append(counterfactual_pred)
-		oos_preds.append(oos_pred)
-		fit_models.append(reg_model)
-
-	# Appropriately concatenate counterfactual predictions. 
-	# Requires different code for the IV/non-IV case.
-	if Z is not None:
-		cf_output = [[np.nan, np.nan], [np.nan, np.nan]]
-		for z in [0,1]:
-			for w in [0,1]:
-				cf_output[z][w] = [x[z][w] for x in counterfactual_preds]
-				# Concatenate probabilities if we're only interested in them
-				if probs_only:
-					cf_output[z][w] = np.concatenate(
-						[x.probs[:, 1] for x in cf_output[z][w]]
-					)
-
-	else:
-		cf_output = [[], []]
-		for z in [0,1]:
-			cf_output[z] = [x[z] for x in counterfactual_preds]
-			# Concatenate probabilities if we're only interested in probabilities
-			if probs_only:
-				cf_output[z] = np.concatenate([x.probs[:, 1] for x in cf_output[z]])
-
-
-
-	return cf_output, fit_models, oos_preds
-
 class DistReg:
 	"""
 	A generic class for distributional regressions, meant for subclassing.
@@ -358,6 +230,7 @@ class DistReg:
 		X: np.array,
 		y: np.array,
 		Z: Optional[np.array]=None,
+		sample_weight: Optional[np.array]=None,
 	):
 		"""
 		Fits model on the data.
@@ -373,6 +246,15 @@ class DistReg:
 		Z : np.array
 			Optional n-length array of instrument values
 			for the instrumental variables setting.
+		sample_weight : np.array
+			Optional n-length array of weights to use when
+			fitting the underlying model.
+
+		Notes
+		-----
+		Not all model_types can be trained using sample_weight.
+		For some models (e.g. KNNRegressors), including
+		sample_weight will yield an error.
 		"""
 		raise NotImplementedError()
 
@@ -484,6 +366,211 @@ class DistReg:
 			y0_dists = self.predict(X=X, W=np.zeros(n))
 			y1_dists = self.predict(X=X, W=np.ones(n))
 			return y0_dists, y1_dists
+
+class ModelSelector():
+	"""
+	Class which selects a distributional regression model.
+
+	Notes
+	-----
+	This class selects the model with the best out-of-sample
+	R^2. However, by wrapping this class, other selection metrics
+	can be used (simply overwrite the ``select_model`` functionality).
+	"""
+	def __init__(self):
+		pass
+
+	def select_model(
+		self,
+		models: list[DistReg],
+		W: np.array,
+		X: np.array,
+		y: np.array,
+		Z: Optional[np.array]=None,
+		sample_weight: Optional[np.array]=None,
+		propensities: Optional[np.array]=None,
+		**kwargs
+	) -> DistReg:
+		"""
+		Parameters
+		----------
+		models : list
+			list of ``dist_reg.DistReg`` classes.
+		"""
+		# Evaluate out-of-sample R^2s
+		r2s = np.zeros(len(models))
+		for i, model in enumerate(models):
+			_, _, oos_preds = cross_fit_predictions(
+				W=W, X=X, y=y, Z=Z, 
+				sample_weight=sample_weight,
+				propensities=propensities,
+				model=model,
+				model_selector=None,
+				verbose=False,
+			)
+			results = _evaluate_model_predictions(
+				y, haty=np.concatenate([x.mean() for x in oos_preds])
+			)
+			r2s[i] = results.loc['Out-of-sample R^2', 'Model'].item()
+		# Pick the best-performing model
+		return models[np.argmax(r2s)]
+
+
+def cross_fit_predictions(
+	W: np.array,
+	X: np.array,
+	y: np.array,
+	Z: Optional[np.array]=None,
+	S: Optional[np.array]=None,
+	propensities: Optional[np.array]=None,
+	sample_weight: Optional[np.array]=None,
+	nfolds: int=5,
+	train_on_selections: bool=True,
+	model: Optional[Union[list, DistReg]]=None,
+	probs_only: bool=False,
+	verbose: bool=False,
+	model_selector: Optional[ModelSelector]=None,
+):
+	"""
+	Performs cross-fitting for a model inheriting from ``dist_reg.DistReg.``
+
+	Parameters
+	----------
+	W : np.array
+		n-length array of binary treatment indicators.
+	X : np.array
+		(n, p)-shaped array of covariates.
+	y : np.array
+		n-length array of outcome measurements.
+	Z : np.array
+		Optional n-length array of binary instrument values
+		for the instrumental variables setting.
+	S : np.array
+		Optional n-length array of selection indicators.
+	propensities : np.array
+		Optional n-length array of propensity scores. 
+		This argument is only used when ``model_selector``
+		is provided.
+	sample_weight : np.array
+		Optional n-length array of weights to use when
+		fitting the underlying model.
+	nfolds : int
+		Number of cross-fitting folds to use.
+	model : DistReg
+		instantiation of ``dist_reg.DistReg`` class. This will
+		be copied. E.g., 
+		``model=dist_reg.CtsDistReg(model_type='ridge', eps_dist="empirical").``
+		Alternatively, one may provide a list of
+		``dist_reg.DistReg`` classes and a ``model_selector`` which
+		adaptively chooses between them.
+	train_on_selections : bool
+		If True, trains model only on data where S[i] == 1.
+	probs_only : bool
+		For binary data, returns P(Y = 1 | X, W) instead of a distribution.
+		Defaults to False.
+	verbose : bool
+		If True, provides progress reports.
+
+	Returns
+	-------
+	y0_dists : list
+		list of batched scipy distributions whose shapes sum to n.
+		the ith distribution is the out-of-sample estimate of
+		the conditional law of Yi(0) | X[i]
+	y1_dists : list
+		list of batched scipy distributions whose shapes sum to n.
+		the ith distribution is the out-of-sample estimate of
+		the conditional law of Yi(1) | X[i]
+	"""
+	# concatenate S to features
+	n = len(X)
+	if S is None:
+		S_flag = False
+		S = np.ones(n)
+	else:
+		S_flag = True
+		X = np.concatenate([S.reshape(n, 1), X], axis=1)
+
+	# create folds
+	starts, ends = create_folds(n=n, nfolds=nfolds)
+	# loop through folds
+	counterfactual_preds = []# results for different values of W/Z
+	oos_preds = [] # results for true W/Z
+	fit_models = []
+	for ii in vrange(len(starts), verbose=verbose):
+		start = starts[ii]; end = ends[ii]
+		# Pick out data from the other folds
+		not_in_fold = [i for i in np.arange(n) if i < start or i >= end]
+		if train_on_selections:
+			opt2 = [i for i in not_in_fold if S[i] == 1]
+			if len(opt2) == 0:
+				warnings.warn(f"S=0 for all folds except {start}-{end}.")
+			else:
+				not_in_fold = opt2
+
+		# Possibly perform model selection
+		fold_args = dict(
+			W=W[not_in_fold], 
+			X=X[not_in_fold], 
+			y=y[not_in_fold],
+			Z=None if Z is None else Z[not_in_fold],
+			sample_weight=None if sample_weight is None else sample_weight[not_in_fold],
+		)
+		if isinstance(model, list):
+			if model_selector is None:
+				model_selector = ModelSelector()
+			reg_model = copy.deepcopy(model_selector.select_model(
+				models=model,
+				propensities=None if propensities is None else propensities[not_in_fold],
+				**fold_args,
+			))
+		else:
+			reg_model = copy.deepcopy(model)
+		
+		# Fit model
+		reg_model.fit(**fold_args)
+
+		# predict and append on this fold
+		subX = X[start:end].copy(); 
+		if S_flag:
+			subX[:, 0] = 1 # set selection = 1 for predictions
+
+		# Actual predictions
+		oos_pred = reg_model.predict(
+			subX, W[start:end], Z=None if Z is None else Z[start:end]
+		)
+		counterfactual_pred = reg_model.predict_counterfactuals(subX)
+
+		# Save predictions and model fits
+		counterfactual_preds.append(counterfactual_pred)
+		oos_preds.append(oos_pred)
+		fit_models.append(reg_model)
+
+	# Appropriately concatenate counterfactual predictions. 
+	# Requires different code for the IV/non-IV case.
+	if Z is not None:
+		cf_output = [[np.nan, np.nan], [np.nan, np.nan]]
+		for z in [0,1]:
+			for w in [0,1]:
+				cf_output[z][w] = [x[z][w] for x in counterfactual_preds]
+				# Concatenate probabilities if we're only interested in them
+				if probs_only:
+					cf_output[z][w] = np.concatenate(
+						[x.probs[:, 1] for x in cf_output[z][w]]
+					)
+
+	else:
+		cf_output = [[], []]
+		for z in [0,1]:
+			cf_output[z] = [x[z] for x in counterfactual_preds]
+			# Concatenate probabilities if we're only interested in probabilities
+			if probs_only:
+				cf_output[z] = np.concatenate([x.probs[:, 1] for x in cf_output[z]])
+
+
+
+	return cf_output, fit_models, oos_preds
+
 
 class CtsDistReg(DistReg):
 	"""
@@ -598,15 +685,23 @@ class CtsDistReg(DistReg):
 			self.model_kwargs['alphas'] = self.model_kwargs.get("alphas", DEFAULT_ALPHAS)
 		
 
-	def fit(self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None) -> None:
+	def fit(
+		self, W: np.array,
+		X: np.array,
+		y: np.array,
+		Z: Optional[np.array]=None,
+		sample_weight: Optional[np.array]=None
+	) -> None:
 		self._iv = Z is not None
 		self.Wtrain = W
 		# fit model
 		features = self.feature_transform(W=W, X=X, Z=Z)
 		self.model = self.model_type(**self.model_kwargs)
-		self.model.fit(features, y)
+		# Possibly use sample_weight
+		fit_kwargs = dict() if sample_weight is None else dict(sample_weight=sample_weight)
+		self.model.fit(features, y, **fit_kwargs)
 
-		# compute residuals. Use Cheap LOO resids for ridge
+		# compute residuals. Use cheap LOO resids for ridge
 		if isinstance(self.model, lm.RidgeCV) and self.use_loo:
 			self.resids = ridge_loo_resids(features, y=y, ridge_cv_model=self.model)
 		else:
@@ -616,7 +711,7 @@ class CtsDistReg(DistReg):
 		self.hatsigma = np.sqrt(np.mean(self.resids**2))
 		if self.heterosked:
 			self.sigma2_model = self.sigma2_model_type(**self.sigma2_model_kwargs)
-			self.sigma2_model.fit(features, self.resids**2)
+			self.sigma2_model.fit(features, self.resids**2, **fit_kwargs)
 			self.hatsigma_preds = np.sqrt(np.clip(
 				self.sigma2_model.predict(features),
 				0.01 * self.hatsigma**2, 
@@ -631,12 +726,20 @@ class CtsDistReg(DistReg):
 			self.rvals0 = np.sort(norm_resids[W == 0])
 			# Center to ensure we don't scale a small mean by a large amount
 			# when heterosked=True.
-			self.rvals0 -= self.rvals0.mean()
-			self.rprobs0 = np.ones(len(self.rvals0)) / len(self.rvals0)
+			if sample_weight is None:
+				self.rprobs0 = np.ones(len(self.rvals0)) / len(self.rvals0)
+			else:
+				self.rprobs0 = sample_weight[W == 0].copy()
+				self.rprobs0 /= self.rprobs0.sum()
+			self.rvals0 -= self.rvals0 @ self.rprobs0
 			# Repeat for treatment
 			self.rvals1 = np.sort(norm_resids[W == 1])
-			self.rvals1 -= self.rvals1.mean()
-			self.rprobs1 = np.ones(len(self.rvals1)) / len(self.rvals1)
+			if sample_weight is None:
+				self.rprobs1 = np.ones(len(self.rvals1)) / len(self.rvals1)
+			else:
+				self.rprobs1 = sample_weight[W == 1].copy()
+				self.rprobs1 /= self.rprobs1.sum()
+			self.rvals1 -= self.rvals1 @ self.rprobs1
 			# adjust support size for computational reasons
 			adj_kwargs = dict(
 				new_nvals=self.eps_kwargs.get("nvals", 90), ymin=y.min(), ymax=y.max()
@@ -723,7 +826,14 @@ class QuantileDistReg(DistReg):
 		self.probs = self.quantiles[1:] - self.quantiles[0:-1]
 		self.alphas = alphas
 
-	def fit(self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None) -> None:
+	def fit(
+		self,
+		W: np.array, 
+		X: np.array, 
+		y: np.array, 
+		Z: Optional[np.array]=None, 
+		sample_weight: Optional[np.array]=None
+	) -> None:
 		self._iv = Z is not None
 		# Pick regularization by using CV lasso reg. strength
 		features = self.feature_transform(W=W, X=X, Z=Z)
@@ -735,15 +845,17 @@ class QuantileDistReg(DistReg):
 		self.scores = {}
 		self.ymin = y.min()
 		self.ymax = y.max()
+		fit_kwargs = dict() if sample_weight is None else dict(sample_weight=sample_weight)
 		for quantile in self.quantiles:
 			if quantile not in [0,1]:
 				if len(self.alphas) == 1:
 					qr = lm.QuantileRegressor(
 						alpha=self.alphas[0], quantile=quantile, 
 					)
-					qr.fit(features, y)
+					qr.fit(features, y, **fit_kwargs)
 					self.model[quantile] = qr
 				# Cross-validate the quantile regression
+				# TODO: this currently does not use sample_weight even if provided
 				else:
 					scores = []
 					for alpha in self.alphas:
@@ -846,7 +958,12 @@ class BinaryDistReg(DistReg):
 
 
 	def fit(
-		self, W: np.array, X: np.array, y: np.array, Z: Optional[np.array]=None
+		self,
+		W: np.array, 
+		X: np.array,
+		y: np.array,
+		Z: Optional[np.array]=None,
+		sample_weight: Optional[np.array]=None,
 	) -> None:
 		self._iv = Z is not None
 		# check y is binary
@@ -855,7 +972,9 @@ class BinaryDistReg(DistReg):
 		# fit 
 		features = self.feature_transform(W=W, X=X, Z=Z)
 		self.model = self.model_type(**self.model_kwargs)
-		self.model.fit(features, y)
+		# Possibly use sample weights
+		fit_kwargs = dict() if sample_weight is None else dict(sample_weight=sample_weight)
+		self.model.fit(features, y, **fit_kwargs)
 
 	def predict_proba(
 		self, X: np.array, W: np.array, Z: Optional[np.array]=None,
@@ -864,20 +983,6 @@ class BinaryDistReg(DistReg):
 		return self.model.predict_proba(
 			self.feature_transform(W, X, Z=Z)
 		)[:, 1]
-		# else:
-		# 	# make predictions for W = 0 and W = 1
-		# 	n = len(X)
-		# 	W0 = np.zeros(n); W1 = np.ones(n)
-		# 	p0s, p1s = self.predict_proba(X, W=W0), self.predict_proba(X, W=W1)
-		# 	p0s = np.minimum(1-TOL, np.maximum(TOL, p0s))
-		# 	p1s = np.minimum(1-TOL, np.maximum(TOL, p1s))
-		# 	# enforce monotonicity
-		# 	if self.monotonicity:
-		# 		flags = p0s > p1s - margin
-		# 		avg = (p0s[flags] + p1s[flags]) / 2
-		# 		p0s[flags] = np.maximum(TOL, avg-margin)
-		# 		p1s[flags] = np.minimum(1-TOL, avg+margin)
-		# 	return p0s, p1s
 
 	def predict(self, X: np.array, W: np.array, Z: Optional[np.array]=None):
 		return BatchedCategorical.from_binary_probs(
@@ -901,7 +1006,6 @@ class BinaryDistReg(DistReg):
 		# Case 2: intent to treat (2 counterfactuals)
 		else:
 			return _enforce_monotonicity(ydists[0], ydists[1], margin=self.margin)
-
 
 
 class MonotoneLogisticReg:

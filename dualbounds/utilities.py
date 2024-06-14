@@ -358,6 +358,12 @@ class BatchedCategorical:
 			The desired quantile values of the categorical distributions.
 		"""
 		m = q.shape[0]
+		# To be compatible with scipy, if q is (m, 1)
+		# change it to (m,)
+		if len(q.shape) == 2:
+			if q.shape[1] == 1:
+				q = q[:, 0]
+		# Vectorize
 		if len(q.shape) == 1:
 			q = np.stack([q for _ in range(self.n)], axis=1)
 		# use a for loop to save memory

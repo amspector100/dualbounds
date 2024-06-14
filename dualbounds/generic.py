@@ -25,6 +25,12 @@ this warning, set ``suppress_warning=True``.
 """
 
 def get_default_model(discrete, support, outcome_model=None, **model_kwargs):
+	# Handle the case where we have a list of outcome models
+	if isinstance(outcome_model, list):
+		return [
+			get_default_model(outcome_model=x, discrete=discrete, support=support, **model_kwargs)
+			for x in outcome_model
+		]
 	if isinstance(outcome_model, dist_reg.DistReg):
 		return outcome_model
 	outcome_model = 'ridge' if outcome_model is None else outcome_model
@@ -521,17 +527,19 @@ class DualBounds:
 			# Adjust and recompute interp_nu0/interp_nu1
 			if adj_axis == 0:
 				new_nu0 -= deltas0
-				nu0 = self.interp_fn(
+				adj_nu0 = self.interp_fn(
 					x=new_y0_vals, y=new_nu0, newx=self.y0_vals[i],
 				)
+				adj_nu1 = nu1
 			else:
 				new_nu1 -= deltas1
-				nu1 = self.interp_fn(
+				adj_nu1 = self.interp_fn(
 					x=new_y1_vals, y=new_nu1, newx=self.y1_vals[i],
 				)
+				adj_nu0 = nu0
 
 			## Track change in objective
-			new_objval = nu0 @ self.y0_probs[i] + nu1 @ self.y1_probs[i]
+			new_objval = adj_nu0 @ self.y0_probs[i] + adj_nu1 @ self.y1_probs[i]
 			objval_diff = obj_orig - new_objval
 
 		else:
@@ -1193,6 +1201,7 @@ class DualBounds:
 		nfolds: int=5,
 		suppress_warning: bool=False,
 		verbose: bool=True,
+		weight_by_propensities: bool=False,
 	):
 		"""
 		Cross-fits the outcome model.
@@ -1205,6 +1214,9 @@ class DualBounds:
 			If True, suppresses a potential warning about cross-fitting.
 		verbose : bool
 			If True, prints progress reports.
+		weight_by_propensities : bool
+			If True, when cross-fitting the outcome model, upweights
+			observations with low propensity scores.
 
 		Returns
 		-------
@@ -1234,8 +1246,16 @@ class DualBounds:
 			)
 			if verbose:
 				print("Cross-fitting the outcome model.")
+			# Possibly create sample weights
+			if weight_by_propensities:
+				self.sample_weight = 1 / self.pis.copy()
+				self.sample_weight[self.W == 0] = 1 / (1 - self.pis[self.W == 0])
+			else:
+				self.sample_weight = None
+
 			y_out = dist_reg.cross_fit_predictions(
 				W=self.W, X=self.X, y=self.y, 
+				sample_weight=self.sample_weight, 
 				nfolds=nfolds, 
 				model=self.outcome_model,
 				verbose=verbose,
@@ -1266,6 +1286,7 @@ class DualBounds:
 		y1_dists: Optional[list[rv_generic]] = None,
 		verbose: bool = True,
 		suppress_warning: bool = False,
+		weight_by_propensities: bool = False,
 		**solve_kwargs,
 	):
 		"""
@@ -1302,6 +1323,9 @@ class DualBounds:
 			If True, gives occasional progress reports.
 		suppress_warning : bool
 			If True, suppresses a warning about cross-fitting.
+		weight_by_propensities : bool
+			If True, when cross-fitting the outcome model, upweights
+			observations with low propensity scores.
 		solve_kwargs : dict
 			Additional (optional) kwargs for the ``compute_dual_variables``
 			method, e.g. ``nvals0``, ``nvals1``, ``grid_size``.
@@ -1313,7 +1337,10 @@ class DualBounds:
 		# Fit model of W | X and Y | X if not provided
 		self.y0_dists, self.y1_dists = y0_dists, y1_dists
 		self.cross_fit(
-			nfolds=nfolds, suppress_warning=suppress_warning, verbose=verbose,
+			nfolds=nfolds, 
+			suppress_warning=suppress_warning, 
+			verbose=verbose,
+			weight_by_propensities=weight_by_propensities,
 		)
 
 		# compute dual variables
@@ -1372,7 +1399,29 @@ class DualBounds:
 			index=['Estimate', 'SE', 'Conf. Int.'],
 			columns=['Lower', 'Upper']
 		)
-		return self.results_
+		return self.results_ 
+
+	def diagnostics(self):
+		"""
+		Reports a set of technical diagnostics.
+
+		Parameters
+		----------
+		plot : bool
+			If True, creates a set of diagnostic plots.
+
+		Returns
+		-------
+		df : pd.DataFrame
+			DataFrame of technical diagnostic information.
+
+		Notes
+		-----
+		Please see the user guide for more details on the
+		meaning of the outputs.
+		"""
+		self.objdiffs.mean(axis=1)
+		raise NotImplementedError()
 
 	def eval_outcome_model(self):
 		"""
