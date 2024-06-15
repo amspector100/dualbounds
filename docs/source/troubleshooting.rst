@@ -1,5 +1,5 @@
-Choosing the outcome model
-==========================
+How can I choose the outcome model?
+===================================
 
 Out-of-support estimators
 =========================

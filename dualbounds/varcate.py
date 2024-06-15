@@ -107,6 +107,13 @@ class VarCATEDualBounds(generic.DualBounds):
 	def _compute_ipw_summands(self):
 		pass
 
+	def diagnostics(self, plot=True, aipw=True):
+		return None
+
+	def results(self, minval: float=0, maxval: float=np.inf):
+		# minval is always zero
+		return super().results(minval=0, maxval=maxval)
+
 	def _plug_in_results(self, B: int=1000):
 		# Estimates
 		pests = np.array([self.cates.std()**2, np.nan])

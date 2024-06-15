@@ -82,6 +82,10 @@ class VarITEDualBounds(DualBounds):
 		kwargs['f'] = lambda y0, y1, x: (y0-y1)**2
 		super().__init__(*args, **kwargs)
 
+	def results(self, minval: float=0, maxval: float=np.inf):
+		# minval is always zero
+		return super().results(minval=0, maxval=maxval)
+
 	def _compute_final_bounds(self, aipw=True, alpha=0.05):
 		"""
 		Computes final bounds based in (A)IPW summands,

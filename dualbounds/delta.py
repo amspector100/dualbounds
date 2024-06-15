@@ -94,12 +94,13 @@ class DeltaDualBounds(DualBounds):
 	clusters : np.array
 		Optional n-length array of clusters, so ``clusters[i] = j``
 		indicates that observation i is in cluster j.
-	outcome_model : str | dist_reg.DistReg
-		The model for estimating the law of :math:`Y \mid X, W`.
-		Two options:
+	outcome_model : str | dist_reg.DistReg | list
+		The model for estimating the law of :math:`Y | X, W`.
+		Three options:
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
 		- An object inheriting from ``dist_reg.DistReg``. 
+		- A list of ``dist_reg.DistReg`` objects to automatically choose between.
 
 		E.g., when ``outcome`` is continuous, the default is
 		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
@@ -109,6 +110,10 @@ class DeltaDualBounds(DualBounds):
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
 		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
+	model_selector : dist_reg.ModelSelector
+		A ModelSelector object which can choose between several outcome models.
+		The default performs within-fold nested cross-validation. Note: this
+		argument is ignored unless ``outcome_model`` is a list.
 	discrete : bool
 		If True, treats the outcome as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).

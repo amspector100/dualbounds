@@ -42,20 +42,23 @@ Bibtex entry::
 
    quickstart.ipynb
 
-
 .. toctree::
-   :caption: Tutorials
+   :caption: User Guide
    :hidden:
 
-   tutorials.ipynb
+   tutorials/math_review.ipynb
+   tutorials/dualbounds_class.ipynb
+   tutorials/deltadualbounds.ipynb
+   tutorials/model_selection.ipynb
+   tutorials/support_restrictions.ipynb
+   tutorials/additional_estimands.ipynb
+   tutorials/diagnostics.ipynb
 
 .. toctree::
-   :caption: Tips & Tricks
+   :caption: Troubleshooting
    :hidden:
 
-   tips.rst
-
-   openproblems.rst
+   troubleshooting.rst
 
 .. toctree::
    :caption: API Reference

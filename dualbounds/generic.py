@@ -115,12 +115,13 @@ class DualBounds:
 	clusters : np.array | pd.Series
 		Optional n-length array of clusters, so ``clusters[i] = j``
 		indicates that observation i is in cluster j.
-	outcome_model : str | dist_reg.DistReg
+	outcome_model : str | dist_reg.DistReg | list
 		The model for estimating the law of :math:`Y | X, W`.
-		Two options:
+		Three options:
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
 		- An object inheriting from ``dist_reg.DistReg``. 
+		- A list of ``dist_reg.DistReg`` objects to automatically choose between.
 
 		E.g., when ``outcome`` is continuous, the default is
 		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
@@ -130,6 +131,10 @@ class DualBounds:
 
 		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
 		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
+	model_selector : dist_reg.ModelSelector
+		A ModelSelector object which can choose between several outcome models.
+		The default performs within-fold nested cross-validation. Note: this
+		argument is ignored unless ``outcome_model`` is a list.
 	discrete : bool
 		If True, treats the outcome as a discrete variable. 
 		Defaults to ``None`` (inferred from the data).
@@ -184,8 +189,9 @@ class DualBounds:
 		covariates: Optional[Union[np.array, pd.DataFrame]]=None,
 		propensities: Optional[Union[np.array, pd.Series]]=None,
 		clusters: Optional[Union[np.array, pd.Series]]=None,
-		outcome_model: Union[str, dist_reg.DistReg]='ridge',
+		outcome_model: Union[str, dist_reg.DistReg, list]='ridge',
 		propensity_model: Union[str, sklearn.base.BaseEstimator]='ridge',
+		model_selector: Optional[dist_reg.ModelSelector]=None,
 		discrete: Optional[np.array]=None,
 		support: Optional[np.array]=None,
 		support_restriction: Optional[callable]=None,
@@ -253,6 +259,7 @@ class DualBounds:
 		)
 		self.outcome_model = outcome_model
 		self.propensity_model = propensity_model
+		self.model_selector = model_selector
 		self.model_kwargs = model_kwargs
 
 		## Support restrictions
@@ -1258,6 +1265,7 @@ class DualBounds:
 				sample_weight=self.sample_weight, 
 				nfolds=nfolds, 
 				model=self.outcome_model,
+				model_selector=self.model_selector,
 				verbose=verbose,
 			)
 			counterfactuals, self.model_fits, self.oos_dist_preds = y_out
@@ -1399,9 +1407,37 @@ class DualBounds:
 			index=['Estimate', 'SE', 'Conf. Int.'],
 			columns=['Lower', 'Upper']
 		)
-		return self.results_ 
+		return self.results_
 
-	def diagnostics(self):
+	def plot_dual_variables(self, i=0):
+		"""
+		Plots the estimated dual variables for the ith data-point.
+
+		Parameters
+		----------
+		i : int
+			Integer ranging from 0 to n-1, specifying which datapoint to plot.
+		"""
+		import matplotlib.pyplot as plt
+		fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+		for name, j, ax in zip(['Lower', 'Upper'], [0,1], axes):
+			# Plot dual variables
+			for yvals, nus, color, label in zip(
+				[self.y0_vals[i], self.y1_vals[i]],
+				[self.nu0s[j, i], self.nu1s[j, i]],
+				['red', 'blue'],
+				['Control', 'Treatment'],
+			):
+				axes[j].scatter(yvals, nus, color=color, label=label)
+			# Plot realized value
+			hatnu = self.hatnu0s[j, i] if self.W[i] == 0 else self.hatnu1s[j, i]
+			axes[j].axvline(self.y[i], color='black', label='Realized outcome value')
+			axes[j].scatter(self.y[i], hatnu, color='red' if self.W[i] == 0 else 'blue')
+			axes[j].set(xlabel='Outcome', ylabel='Dual variable', title=f'{name} Bound')
+			axes[j].legend()
+		plt.show()
+
+	def diagnostics(self, plot=False, aipw=True):
 		"""
 		Reports a set of technical diagnostics.
 
@@ -1420,8 +1456,39 @@ class DualBounds:
 		Please see the user guide for more details on the
 		meaning of the outputs.
 		"""
-		self.objdiffs.mean(axis=1)
-		raise NotImplementedError()
+		summands = self.aipw_summands if aipw else self.ipw_summands
+		aipw_name = 'AIPW' if aipw else 'IPW'
+		# Plot AIPW dual summands
+		if plot:
+			import matplotlib.pyplot as plt
+			fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+			for j, name in zip([0,1], ['Lower', 'Upper']):
+				for w, color, label in zip([0,1], ['red', 'blue'], ['Control', 'Treatment']):
+					axes[j].scatter(
+						self.y[self.W == w], 
+						self.aipw_summands[j][self.W == w], 
+						color=color, 
+						label=label
+					)
+				axes[j].legend()
+				axes[j].set(xlabel='Outcome', ylabel=f'Dual {aipw_name} Summand', title=f"{name} Dual Bound")
+			plt.show()
+		# Leverage
+		s2s = (summands - summands.mean(axis=1).reshape(-1, 1))**2
+		leverages = np.max(s2s, axis=1) / s2s.sum(axis=1)
+		# Max contribution
+		max_contribs = np.array(
+			[summands[0].min() / self.n, summands[1].max() / self.n]
+		)
+		return pd.DataFrame(
+			np.stack(
+				[self.objdiffs.mean(axis=1), leverages, max_contribs],
+				axis=0
+			),
+			index=['Loss from gridsearch', 'Max leverage', f'Worst dual {aipw_name} summand'],
+			columns=['Lower', 'Upper']
+		)
+		
 
 	def eval_outcome_model(self):
 		"""
@@ -1477,6 +1544,7 @@ class DualBounds:
 		- ``DualBounds.eval_outcome_model()`` for outcome model metrics
 		- ``DualBounds.eval_treatment_model()`` for treatment model metrics
 		- ``DualBounds._plug_in_results()`` for nonrobust plug-in bounds
+		- ``DualBounds.diagnostics()`` for technical diagnostic information
 		"""
 		print("___________________Inference_____________________")
 		print(self.results(minval=minval, maxval=maxval))
@@ -1490,7 +1558,14 @@ class DualBounds:
 		print("______________Nonrobust plug-in bounds___________")
 		print(self._plug_in_results())
 		print()
-
+		# possibly print diagnostics. This logic is useful
+		# because some classes inheriting from 
+		# DualBounds (e.g. VarCATEDualBounds) don't produce diagnostics.
+		diagnostics = self.diagnostics(plot=False)
+		if diagnostics is not None:
+			print("_______________Technical diagnostics_____________")
+			print(diagnostics)
+			print()
 
 def _plug_in_no_covariates(
 	f: callable,

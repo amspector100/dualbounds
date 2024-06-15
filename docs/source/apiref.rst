@@ -39,12 +39,13 @@ Variance bounds
 
    ~dualbounds.varite.VarITEDualBounds
    ~dualbounds.varcate.VarCATEDualBounds
+   :exclude-members: diagnostics
 
 Distributional regression
 =========================
 
 .. autosummary::
-   :toctree: generated/varbounds/
+   :toctree: generated/dist_reg/
    :template: autosummary/class.rst
 
    ~dualbounds.dist_reg.DistReg
@@ -52,6 +53,7 @@ Distributional regression
    ~dualbounds.dist_reg.CtsDistReg
    ~dualbounds.dist_reg.QuantileDistReg
    ~dualbounds.dist_reg.MonotoneLogisticReg
+   ~dualbounds.dist_reg.ModelSelector
    ~dualbounds.dist_reg.cross_fit_predictions
 
 Utility functions
@@ -89,4 +91,3 @@ Miscellaneous
    ~dualbounds.utilities.compute_est_bounds
    ~dualbounds.utilities.weighted_quantile
    ~dualbounds.utilities.adjust_support_size
-   ~dualbounds.utilities.apply_pool_factorial
