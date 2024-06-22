@@ -4,7 +4,7 @@ Methods for bounding Var(E[Y(1) - Y(0) | X]).
 import warnings
 import numpy as np
 from scipy import stats
-from . import generic
+from . import generic, utilities
 from .generic import infer_discrete, get_default_model
 import pandas as pd
 
@@ -164,3 +164,64 @@ class VarCATEDualBounds(generic.DualBounds):
 		self.estimates = np.array([estimate, np.nan])
 		self.ses = np.array([se, np.nan])
 		self.cis = np.array([lower_ci, np.nan])
+
+def varcate_cluster_bootstrap(
+	varcate_objects: list[VarCATEDualBounds],
+	aipw: bool=True,
+	alpha: float=0.05,
+	B: int=1000,
+	verbose: bool=False,
+):
+	"""
+	Combines evidence across multiple VarCATEDualBounds classes
+	using a (clustered) bootstrap.
+
+	Parameters
+	----------
+	varcate_objects : list
+		A list of fit VarCATEDualBounds objects.
+	alpha : float
+		Nominal level, between 0 and 1.
+	B : int
+		Number of bootstrap replications.
+	verbose : bool
+		If True, prints a progress report.
+	"""
+	K = len(varcate_objects)
+	# Initial estimates and ses
+	estimates = np.stack([x.estimates for x in varcate_objects], axis=-1)[0] # K-length array
+	ses = np.stack([x.ses for x in varcate_objects], axis=-1)[0] # K-length array
+	# Create data: n x 2 x K
+	data = np.stack(
+		[np.stack([vdb.cates, vdb.sy1 - vdb.sy0], axis=1) for vdb in varcate_objects],
+		axis=2
+	)
+	# Function which maps data to maximum VarCATE estimate
+	def compute_estimates(data):
+		K = data.shape[-1]
+		ests = np.zeros(K)
+		for k in range(K):
+			cov_truecate = np.cov(data[:, 0, k], data[:, 1, k])[0,1]
+			var_estcate = np.std(data[:, 0, k])**2
+			ests[k] = 2 * cov_truecate - var_estcate
+		return ests
+	# Cluster bootstrap
+	_, bs_estimators = utilities.cluster_bootstrap_se(
+		data=data,
+		clusters=varcate_objects[0].clusters,
+		func=compute_estimates,
+		B=B,
+		verbose=verbose,
+	) # B x K
+	# Centered BS estimators and quantile
+	centered = (bs_estimators - estimates) / ses
+	hatq = np.quantile(centered.max(axis=-1), 1-alpha)
+	# Take maximums
+	combined_estimates = np.maximum(np.array([np.max(estimates), np.nan]), 0)
+	cis = np.maximum(np.array([np.max(estimates - hatq * ses), np.nan]), 0)
+	# Return
+	return pd.DataFrame(
+		np.stack([combined_estimates, cis], axis=0),
+		index=['Estimate', 'Conf. Int.'],
+		columns=['Lower', 'Upper'],
+	)

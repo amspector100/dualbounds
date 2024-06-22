@@ -388,6 +388,19 @@ class TestGenericDualBounds(context.DBTest):
 			propensities=data['pis'],
 		).fit(nfolds=2).summary()
 
+	def test_generic_model_selection_no_error(self):
+		# Make sure that using multiple outcome models doesn't lead to an error
+		data = db.gen_data.gen_regression_data(n=100, p=1, sample_seed=123)
+		gdb = db.generic.DualBounds(
+			f=lambda y0, y1, x: np.maximum(y1-y0,0),
+			outcome=data['y'],
+			covariates=data['X'],
+			treatment=data['W'],
+			propensities=data['pis'],
+			# outcome models with and without interactions
+			outcome_model=['ridge', db.dist_reg.CtsDistReg('ridge', how_transform='identity')],
+		).fit(nfolds=3)
+
 	@pytest.mark.slow
 	def test_support_restriction_consistency(self):
 		tau = 1

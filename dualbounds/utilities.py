@@ -123,7 +123,8 @@ def cluster_bootstrap_se(
 	Parameters
 	----------
 	data : np.array
-		n-shaped or (n, d)-shaped array of data.
+		array whose zeroth axis reflects the number of observations n.
+		Typically a n-shaped or (n,d)-shaped array.
 	func : callable
 		A callable that maps an np.array to a scalar or array.
 		Defaults to ``func=lambda x: x.mean()``.
@@ -140,6 +141,8 @@ def cluster_bootstrap_se(
 	-------
 	se : float | np.array
 		standard error of the estimator.
+	bs_ests : np.array
+		Array of bootstrapped estimators.
 	"""
 	# parse function
 	n = len(data)
@@ -167,7 +170,8 @@ def cluster_bootstrap_se(
 				[data_clusters[i] for i in bs_clusters], axis=0
 			)
 			bs_ests.append(func(new_data))
-	return np.stack(bs_ests, axis=0).std(axis=0)
+	bs_ests = np.stack(bs_ests, axis=0)
+	return bs_ests.std(axis=0), bs_ests
 
 def compute_est_bounds(
 	summands: np.array,
@@ -234,7 +238,7 @@ def compute_est_bounds(
 				clusters=clusters,
 				func=new_func,
 				B=B,
-			))
+			)[0])
 
 	return ests, ses, np.array([
 		ests[0] - scale * ses[0], ests[1] + scale * ses[1]

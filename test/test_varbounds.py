@@ -135,6 +135,49 @@ class TestVarCATE(unittest.TestCase):
 					err_msg=f"VarCATE {name} is inaccurate (r2={r2}, eps_dist={eps_dist})"
 				)
 
+	def test_varcate_cluster_bootstrap(self):
+		data = db.gen_data.gen_regression_data(n=300, p=10, sparsity=0.8, sample_seed=123)
+		# Fit multiple varcate models
+		vdbs = []
+		outcome_models = ['lasso', db.dist_reg.CtsDistReg('knn', n_neighbors=50)]
+		for outcome_model in outcome_models:
+			vdb = db.varcate.VarCATEDualBounds(
+				outcome=data['y'],
+				treatment=data['W'],
+				covariates=data['X'],
+				propensities=data['pis'],
+				outcome_model=outcome_model,
+			).fit(verbose=False)
+			vdbs.append(vdb)
+		# Combine
+		vdb_results = db.varcate.varcate_cluster_bootstrap(vdbs, verbose=False, alpha=0.05, B=1000)
+		# Check estimate
+		expected_estimate = np.max([x.estimates[0] for x in vdbs])
+		estimate = vdb_results.loc['Estimate', 'Lower'].item()
+		self.assertTrue(
+			estimate==expected_estimate,
+			msg=f"Combined estimate={estimate} is different than the max estimate {expected_estimate}"
+		)
+		# Check CI
+		expected_ci = np.max([x.cis[0] for x in vdbs])
+		ci = vdb_results.loc['Conf. Int.', 'Lower'].item()
+		ci_tol = vdbs[np.argmin([x.cis[0] for x in vdbs])].ses[0]
+		self.assertTrue(
+			ci >= expected_ci - 2 * ci_tol,
+			msg=f"Combined CI={ci} <= max lower_ci={expected_ci} plus tolerance {ci_tol}"
+		)
+		self.assertTrue(
+			ci <= expected_ci,
+			msg=f"Combined CI={ci} is somehow sharper than max lower_ci={expected_ci}"
+		)
+
+		# for expected, output, tol, decimal, name in zip(
+		# 	[expected_estimate, expected_ci], 
+		# 	[estimate, ci],
+		# 	[0, ci_tol],
+		# ):
+
+
 
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev

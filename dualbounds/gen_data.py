@@ -34,12 +34,22 @@ def create_cov(p, covmethod='identity'):
 	else:
 		raise ValueError(f"Unrecognized covmethod={covmethod}")
 
-def _sample_norm_vector(dim, norm):
+def _sample_norm_vector(dim, norm, sparsity=0):
 	""" samples x ~ N(0, dim) and then normalizes so |x|_2 = norm """
 	if norm == 0:
 		return np.zeros(dim)
-	x = np.random.randn(dim)
-	return x / np.sqrt(np.power(x, 2).sum() / norm)
+	# Possibly select sparse subset
+	if sparsity > 0:
+		x = np.zeros(dim)
+		n_nonzero = int(max(1, np.ceil((1-sparsity) * dim)))
+		x[np.random.choice(dim, n_nonzero, replace=False)] = _sample_norm_vector(
+			dim=n_nonzero, norm=norm, sparsity=0,
+		)
+		return x
+	# Else create a dense vector
+	else:
+		x = np.random.randn(dim)
+		return x / np.sqrt(np.power(x, 2).sum() / norm)
 
 def gen_regression_data(
 	n: int,
@@ -49,6 +59,7 @@ def gen_regression_data(
 	heterosked: str='constant',
 	tauv: float=1, # Var(Y(1) | X ) / Var(Y(0) | X)
 	r2: float=0.95,
+	sparsity: float=0,
 	interactions: bool=True,
 	tau: float=3,
 	betaW_norm: float=0,
@@ -80,6 +91,9 @@ def gen_regression_data(
 		Ratio of Var(Y(1) | X) / Var(Y(0) | X)
 	r2 : float
 		Population r^2 of 1 - E[Var(Y | X)] / Var(Y).
+	sparsity : float
+		Proportion of covariates with zero coefficients.
+		Defaults to zero (no sparsity).
 	interactions : bool	
 		If True (default), 
 		Y = X beta + W * X * beta_int + epsilon.
@@ -114,16 +128,16 @@ def gen_regression_data(
 	beta_norm = r2 / (1 - r2) if r2 > 0 else 0
 	# No interactions with treatment
 	if not interactions:
-		beta = _sample_norm_vector(p, beta_norm)
+		beta = _sample_norm_vector(p, beta_norm, sparsity=sparsity)
 		beta_int = np.zeros(p)
 	# interactions with treatment
 	else:
-		beta = _sample_norm_vector(2*p, beta_norm)
+		beta = _sample_norm_vector(2*p, beta_norm, sparsity=sparsity)
 		beta_int = beta[p:].copy()
 		beta = beta[0:p].copy()
 
 	# Create beta_W (for W | X)
-	betaW = _sample_norm_vector(p, betaW_norm)
+	betaW = _sample_norm_vector(p, betaW_norm, sparsity=sparsity)
 
 	# sample X
 	np.random.seed(sample_seed)
@@ -235,6 +249,7 @@ def gen_iv_data(
 	betaZ_norm: float=0,
 	betaW_norm: float=0.5,
 	r2: float=0.95,
+	sparsity: float=0,
 	eps_dist: str='gaussian',
 	lmda_dist: str='constant',
 	interactions: bool=True,
@@ -271,6 +286,9 @@ def gen_iv_data(
 		Ratio of Var(Y(1) | X) / Var(Y(0) | X)
 	r2 : float
 		Population r^2 of 1 - E[Var(Y | X)] / Var(Y).
+	sparsity : float
+		Proportion of covariates with zero coefficients.
+		Defaults to zero (no sparsity).
 	interactions : bool
 		If True, there are interactions in the regression
 		of Y on X.
@@ -291,17 +309,17 @@ def gen_iv_data(
 	beta_norm = r2 / (1 - r2) if r2 > 0 else 0
 	# No interactions with treatment
 	if not interactions:
-		beta = _sample_norm_vector(p, beta_norm)
+		beta = _sample_norm_vector(p, beta_norm, sparsity=sparsity)
 		beta_int = np.zeros(p)
 	# interactions with treatment
 	else:
-		beta = _sample_norm_vector(2*p, beta_norm)
+		beta = _sample_norm_vector(2*p, beta_norm, sparsity=sparsity)
 		beta_int = beta[p:].copy()
 		beta = beta[0:p].copy()
 
 	# Create beta_W (for W | X)
-	betaW = _sample_norm_vector(p, betaW_norm)
-	betaZ = _sample_norm_vector(p, betaZ_norm)
+	betaW = _sample_norm_vector(p, betaW_norm, sparsity=sparsity)
+	betaZ = _sample_norm_vector(p, betaZ_norm, sparsity=sparsity)
 
 	# sample X
 	np.random.seed(sample_seed)

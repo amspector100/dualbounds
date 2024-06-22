@@ -61,9 +61,9 @@ class TestMultiplierBootstrap(unittest.TestCase):
 					f"Multiplier bootstrap error={error} > alpha={alpha} for {name} CI with d={d}."
 				)
 
-	def test_multiplier_bootstrap_db_no_error(self):
+	def test_db_multiplier_cluster_bootstrap_agree(self):
 		# Fit two dualbounds objects
-		data = db.gen_data.gen_regression_data(n=200, p=5)
+		data = db.gen_data.gen_regression_data(n=200, p=5, sample_seed=123)
 		db_objects = []
 		for Y_model in ['ridge', 'knn']:
 			gdb = db.generic.DualBounds(
@@ -72,12 +72,24 @@ class TestMultiplierBootstrap(unittest.TestCase):
 				treatment=data['W'], 
 				propensities=data['pis'],
 				outcome_model=Y_model,
-				f=lambda y0, y1, x: (y1 < y0).astype(float) 
+				f=lambda y0, y1, x: (y1 < y0).astype(float)
 			)
 			gdb.fit(nfolds=2)
 			db_objects.append(gdb)
 
 		# Run mult bootstrap
-		bootstrap.dualbound_multiplier_bootstrap(
-			db_objects, alpha=0.1, B=100
+		alpha = 0.1
+		mbs_output = bootstrap.dualbound_multiplier_bootstrap(
+			db_objects, alpha=alpha, B=10000
+		)
+		# Run cluster bootstrap
+		cbs_output = bootstrap.dualbound_cluster_bootstrap(
+			db_objects, alpha=alpha, B=10000
+		)
+		# Check that the results agree
+		np.testing.assert_array_almost_equal(
+			mbs_output.values,
+			cbs_output.values,
+			decimal=2,
+			err_msg=f"Multiplier and cluster bootstrap do not agree."
 		)

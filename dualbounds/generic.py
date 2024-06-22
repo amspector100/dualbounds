@@ -1680,7 +1680,7 @@ def plug_in_no_covariates(
 		func=func,
 		B=B,
 		verbose=verbose,
-	)
+	)[0]
 	cis = estimates.copy()
 	cis[0] -= stats.norm.ppf(1-alpha/2) * ses[0]
 	cis[1] += stats.norm.ppf(1-alpha/2) * ses[1]

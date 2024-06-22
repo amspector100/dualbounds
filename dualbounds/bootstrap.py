@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from .utilities import vrange
+from .utilities import vrange, cluster_bootstrap_se, itemize
 from .generic import DualBounds
+from .delta import DeltaDualBounds
 
 def multiplier_bootstrap(
 	samples: np.array, 
@@ -98,10 +99,99 @@ def multiplier_bootstrap(
 	)
 	return estimate, ci
 
+def dualbound_cluster_bootstrap(
+	db_objects: list[DualBounds],
+	aipw: bool=True,
+	alpha: float=0.05,
+	B: int=1000,
+):
+	"""
+	Combines evidence across multiple DualBounds classes
+	using a (clustered) bootstrap.
+
+	Parameters
+	----------
+	db_objects : list
+		A list of fit DualBounds classes.
+	aipw : bool
+		If True, uses AIPW estimators to reduce variance
+		(highly recommended).
+	alpha : float
+		Nominal level, between 0 and 1.
+	B : int
+		Number of bootstrap replications.
+	"""
+	# Learn dimensionality
+	K = len(db_objects)
+	n = db_objects[0].aipw_summands.shape[1]
+	# Original estimates and SEs
+	estimates = np.stack([x.estimates for x in db_objects], axis=-1) # 2 X K
+	ses = np.stack([x.ses for x in db_objects], axis=-1) # 2 X K
+	# Combine all of the summands appropriately
+	if aipw:
+		summands = np.stack([x.aipw_summands for x in db_objects], axis=-1) # 2 X n x K
+	else:
+		summands = np.stack([x.ipw_summands for x in db_objects], axis=-1)
+	if isinstance(db_objects[0], DeltaDualBounds):
+		z0summands = np.stack([x.z0summands for x in db_objects], axis=-1) # n x d0 x K
+		z1summands = np.stack([x.z1summands for x in db_objects], axis=-1) # n x d1 x K
+		# Extract functions
+		h = db_objects[0].h
+	else:
+		z0summands = np.zeros((n, 1, K))
+		z1summands = np.zeros((n, 1, K))
+		# Dummy versions of the DeltaDualBounds functions
+		h = lambda fval, z0, z1: fval
+
+	d0 = z0summands.shape[1]
+	def compute_estimate(data):
+		hatmu = data.mean(axis=0) # (1 + d0 + d1) x K
+		return np.array([
+			itemize(h(fval=hatmu[0, k], z0=hatmu[1:(d0+1), k], z1=hatmu[(d0+1):, k]))
+			for k in range(K)
+		])
+		
+	# Bootstrap
+	combined_estimates = np.zeros(2)
+	cis = np.zeros(2)
+	#abe = np.zeros((2, B, K))
+	#cbe = np.zeros((2, B, K))
+	for lower in [0, 1]:
+		samples = np.concatenate(
+			[summands[1-lower].reshape(n, 1, K), z0summands, z1summands], axis=1
+		) # n x (1 + d0 + d1) x K
+		# Bootstrapped estimators
+		_, bs_estimators = cluster_bootstrap_se(
+			data=samples, 
+			clusters=db_objects[0].clusters,
+			func=compute_estimate,
+			B=B,
+			verbose=False,
+		) # B x K
+		# Centerd and standardized variant
+		centered = (bs_estimators - estimates[1-lower]) / ses[1-lower]
+		# Compute final estimates and bounds
+		if lower == 1:
+			hatq = np.quantile(centered.max(axis=-1), 1-alpha/2)
+			combined_estimates[1-lower] = np.max(estimates[1-lower])
+			cis[1-lower] = np.max(estimates[1-lower] - hatq * ses[1-lower])
+		else:
+			hatq = np.quantile(centered.min(axis=-1), alpha/2)
+			combined_estimates[1-lower] = np.min(estimates[1-lower])
+			cis[1-lower] = np.min(estimates[1-lower] - hatq * ses[1-lower])
+	# Return
+	return pd.DataFrame(
+		np.stack([combined_estimates, cis], axis=0),
+		index=['Estimate', 'Conf. Int.'],
+		columns=['Lower', 'Upper'],
+	)
+
+
+
 def dualbound_multiplier_bootstrap(
 	db_objects: list[DualBounds], 
 	aipw: bool=True,
-	alpha: float=0.1,
+	alpha: float=0.05,
 	**kwargs,
 ) -> pd.DataFrame:
 	"""
@@ -152,6 +242,6 @@ def dualbound_multiplier_bootstrap(
 	cis = np.array([lower_ci, upper_ci])
 	return pd.DataFrame(
 		np.stack([estimates, cis], axis=0),
-		index=['Estimate', 'Conf. Int'],
+		index=['Estimate', 'Conf. Int.'],
 		columns=['Lower', 'Upper'],
 	)
