@@ -301,6 +301,22 @@ class DistReg:
 			else:
 				return np.concatenate([features, Z], axis=1)
 
+	def features_to_WX(self, features: np.array):
+		"""
+		Inverse of feature_transform.
+		"""
+		# Raise error
+		if self._iv:
+			raise NotImplementedError("features_to_XW not implemented for IV regressions.")
+		# Reverse transform
+		if self.how_transform in ['none', 'identity']:
+			return features[:, 0], features[:, 1:]
+		elif self.how_transform in ['intercept']:
+			return features[:, 0], features[:, 2:]
+		else:
+			p = int((features.shape[1] - 1) / 2)
+			return features[:, 0], features[:, 1:(p+1)]
+
 	def predict(
 		self, 
 		X: np.array,
@@ -375,7 +391,7 @@ class ModelSelector():
 	-----
 	This class selects the model with the best out-of-sample
 	R^2. However, by wrapping this class, other selection metrics
-	can be used (simply overwrite the ``select_model`` functionality).
+	can be used (simply overwrite the ``select_model`` method).
 	"""
 	def __init__(self):
 		pass
@@ -396,6 +412,27 @@ class ModelSelector():
 		----------
 		models : list
 			list of ``dist_reg.DistReg`` classes.
+		W : np.array
+			n-length array of binary treatment indicators.
+		X : np.array
+			(n, p)-shaped array of covariates.
+		y : np.array
+			n-length array of outcome measurements.
+		Z : np.array
+			Optional n-length array of binary instrument values
+			for the instrumental variables setting.
+		propensities : np.array
+			Optional n-length array of propensity scores. 
+			This argument is only used when ``model_selector``
+			is provided.
+		sample_weight : np.array
+			Optional n-length array of weights to use when
+			fitting the underlying model.
+
+		Returns
+		-------
+		selected_model : ``dist_reg.DistReg``
+			The selected model.
 		"""
 		# Evaluate out-of-sample R^2s
 		r2s = np.zeros(len(models))
@@ -686,7 +723,8 @@ class CtsDistReg(DistReg):
 		
 
 	def fit(
-		self, W: np.array,
+		self, 
+		W: np.array,
 		X: np.array,
 		y: np.array,
 		Z: Optional[np.array]=None,

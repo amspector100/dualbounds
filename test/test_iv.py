@@ -112,6 +112,7 @@ class TestDualIVBounds(unittest.TestCase):
 			covariates=None,
 			discrete=True,
 			support=set([0,1]),
+			suppress_iv_warning=True,
 		)
 		ydists_cat = [[np.nan, np.nan], [np.nan, np.nan]]
 		for z in [0,1]:
@@ -193,6 +194,7 @@ class TestDualIVBounds(unittest.TestCase):
 			propensities=data['pis'],
 			covariates=None,
 			support_restriction=lambda w0, w1, y0, y1, x: w0 <= w1,
+			suppress_iv_warning=True,
 		)
 		dbiv.compute_dual_variables(
 			wprobs=data['wprobs'],
@@ -214,11 +216,11 @@ class TestDualIVBounds(unittest.TestCase):
 				err_msg=f"{name} DualIV objective values do not match LATE numerator under monotonicity"
 			)
 
-	def test_consistency(self):
-		"""
-		Check that the final bounds are similar to the oracle bounds.
-		"""
-		pass
+	# def test_consistency(self):
+	# 	"""
+	# 	Check that the final bounds are similar to the oracle bounds.
+	# 	"""
+	# 	pass
 
 
 

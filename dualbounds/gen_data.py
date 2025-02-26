@@ -262,6 +262,7 @@ def gen_iv_data(
 	sample_seed: Optional[int]=None,
 ):
 	"""
+	Generates IV data.
 	
 	Parameters
 	----------
@@ -302,6 +303,11 @@ def gen_iv_data(
 		Random seed for the data-generating parameters.
 	sample_seed : int
 		Random seed for the randomness from sampling.
+
+	Returns
+	-------
+	data_dictionary : dict
+		Dictionary of various data-generating parameters plus raw data.
 	"""
 	# create parameters
 	np.random.seed(dgp_seed)

@@ -49,9 +49,9 @@ Bibtex entry::
    tutorials/math_review.ipynb
    tutorials/dualbounds_class.ipynb
    tutorials/deltadualbounds.ipynb
+   tutorials/additional_estimands.ipynb
    tutorials/model_selection.ipynb
    tutorials/support_restrictions.ipynb
-   tutorials/additional_estimands.ipynb
    tutorials/diagnostics.ipynb
 
 .. toctree::

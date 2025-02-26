@@ -177,7 +177,21 @@ class TestVarCATE(unittest.TestCase):
 		# 	[0, ci_tol],
 		# ):
 
-
+	def test_calibrated_varcate_db(self):
+		outcome_models = ['ridge', 'knn']
+		for eps_dist, outcome_models in zip(
+			['gaussian', 'bernoulli'],
+			[['ridge', 'knn'], ['knn', db.dist_reg.BinaryDistReg('rf', min_samples_leaf=50, n_estimators=3)]],
+		):
+			data = db.gen_data.gen_regression_data(n=300, p=5, sample_seed=123, eps_dist=eps_dist)
+			# fit
+			vdb = db.varcate.CalibratedVarCATEDualBounds(
+				outcome=data['y'],
+				treatment=data['W'],
+				covariates=data['X'],
+				propensities=data['pis'],
+				outcome_model=outcome_models,
+			).fit(nfolds=3, verbose=False).summary()
 
 if __name__ == "__main__":
 	# Run all tests---useful if using cprofilev

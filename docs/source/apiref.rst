@@ -1,5 +1,8 @@
-Generic DualBounds
+Core API Reference
 ==================
+
+Generic DualBounds
+-----------------
 .. autosummary::
    :toctree: generated/generic/
    :template: autosummary/class.rst
@@ -11,7 +14,7 @@ Generic DualBounds
    ~dualbounds.generic.plug_in_no_covariates
 
 Bootstrap methods
-=================
+-----------------
 .. autosummary::
    :toctree: generated/bootstrap/
    :template:
@@ -20,7 +23,7 @@ Bootstrap methods
    ~dualbounds.bootstrap.multiplier_bootstrap
 
 Lee bounds
-==========
+----------
 .. autosummary::
    :toctree: generated/lee/
    :template: autosummary/class.rst
@@ -32,17 +35,27 @@ Lee bounds
    ~dualbounds.lee.compute_analytical_lee_bound
 
 Variance bounds
-===============
+---------------
 .. autosummary::
    :toctree: generated/varbounds/
    :template: autosummary/class.rst
 
    ~dualbounds.varite.VarITEDualBounds
    ~dualbounds.varcate.VarCATEDualBounds
+   ~dualbounds.varcate.CalibratedVarCATEDualBounds
    :exclude-members: diagnostics
 
+IV Bounds (in beta)
+-------------------
+.. autosummary::
+   :toctree: generated/iv/
+   :template: autosummary/class.rst
+
+   ~dualbounds.iv.DualIVBounds
+
+
 Distributional regression
-=========================
+-------------------------
 
 .. autosummary::
    :toctree: generated/dist_reg/

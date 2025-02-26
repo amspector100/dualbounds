@@ -25,6 +25,10 @@ this warning, set ``suppress_warning=True``.
 """
 
 def get_default_model(discrete, support, outcome_model=None, **model_kwargs):
+	# Prevent errors when eps_dist is provided for discrete data
+	if discrete:
+		model_kwargs.pop("eps_dist", None)
+
 	# Handle the case where we have a list of outcome models
 	if isinstance(outcome_model, list):
 		return [
@@ -1492,7 +1496,7 @@ class DualBounds:
 
 	def eval_outcome_model(self):
 		"""
-		Thinly wraps ``dist_reg.evaluate_model_predictions``.
+		Thinly wraps ``dist_reg._evaluate_model_predictions``.
 
 		Returns
 		-------
@@ -1507,7 +1511,7 @@ class DualBounds:
 
 	def eval_treatment_model(self):
 		"""
-		Thinly wraps ``dist_reg.evaluate_model_predictions``.
+		Thinly wraps ``dist_reg._evaluate_model_predictions``.
 
 		Returns
 		-------

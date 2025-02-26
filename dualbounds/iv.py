@@ -32,18 +32,88 @@ def _compute_max_dualval(logs):
 
 class DualIVBounds(generic.DualBounds):
 	"""
-	This docstring needs to be constructed. Notes:
-	(1) many parameter descriptions need to be changed,
-	including f and support_restriction
-	(2) instrument = Z, exposure = W. So propensities are Z | X.
+	Beta version. Computes dual bounds on 
+	:math:`E[f(W(0), W(1), Y(0),Y(1), X)].`
+	in the instrumental variables context.
 
-	Other notes:
-	1. self._discretize does not need to be changed.
-	2. self._ensure_feasibility needs to be changed
-	3. self._solve_single_instance can be wrapped, I think.
-	4. compute_dual_variables def needs to be changed
-	5. so does _interpolate_and_ensure_feas, 
-	_compute_realized_dual_variables, _compute_ipw_summands, fit, etc.
+	Here, :math:`X` are covariates, :math:`Y(0), Y(1)` are 
+	potential outcomes, and :math:`W(0), W(1)` are potential
+	outcomes of a binary exposure/treatment.
+
+	Parameters
+	----------
+	f : function
+		Function which defines the partially identified estimand.
+		Must be a function of three arguments: w0, w1, y0, y1, x 
+		(in that order). E.g.,
+		``f = lambda w0, w1, y0, y1, x : (y0 <= y1) * (w0 <= w1)``
+	outcome : np.array | pd.Series
+		n-length array of outcome measurements (Y).
+	instrument : np.array | pd.Series
+		n-length array of binary instrument (Z).
+	exposure : np.array | pd.Series
+		n-length array of binary exposure (W).
+	covariates : np.array | pd.Series
+		(n, p)-shaped array of covariates (X).
+	propensities : np.array | pd.Series
+		n-length array of propensity scores :math:`P(Z=1 | X)`. 
+		If ``None``, will be estimated from the data.
+	clusters : np.array | pd.Series
+		Optional n-length array of clusters, so ``clusters[i] = j``
+		indicates that observation i is in cluster j.
+	outcome_model : str | dist_reg.DistReg | list
+		The model for estimating the law of :math:`Y | X, W, Z`.
+		Three options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An object inheriting from ``dist_reg.DistReg``. 
+		- A list of ``dist_reg.DistReg`` objects to automatically choose between.
+
+		E.g., when ``outcome`` is continuous, the default is
+		``outcome_model=dist_reg.CtsDistReg(model_type='ridge')``.
+	exposure_model : str | dist_reg.DistReg
+		The model for estimating the law of :math:`W | X, Z`.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An object inheriting from ``dist_reg.DistReg``.
+		The default is
+		``exposure_model=dist_reg.BinaryDistReg(model_type='ridge')``.
+
+	propensity_model : str | sklearn classifier
+		How to estimate the propensity scores if they are not provided.
+		Two options:
+
+		- A str identifier, e.g., 'ridge', 'lasso', 'elasticnet', 'randomforest', 'knn'.
+		- An sklearn classifier, e.g., ``sklearn.linear_model.LogisticRegressionCV()``.
+	model_selector : dist_reg.ModelSelector
+		A ModelSelector object which can choose between several outcome models.
+		The default performs within-fold nested cross-validation. Note: this
+		argument is ignored unless ``outcome_model`` is a list.
+	discrete : bool
+		If True, treats the outcome as a discrete variable. 
+		Defaults to ``None`` (inferred from the data).
+	support : np.array
+		Optional support of the outcome, if known and discrete.
+		Defaults to ``None`` (inferred from the data).
+	support_restriction : function
+		Boolean-valued function of w0, w1, y0, y1, x where 
+		``support_restriction(w0, w1, y0, y1, x) = False`` asserts that 
+		w0, w1, y0, y1, x is not in the support of 
+		:math:`W(0), W(1), Y(0), Y(1), X`.
+		Defaults to ``None`` (no a-priori support restrictions).
+		See the user guide for important usage tips.
+	model_kwargs : dict
+		Additional kwargs for the ``outcome_model``, e.g.,
+		``feature_transform``. See 
+		:class:`dualbounds.dist_reg.CtsDistReg` or 
+		:class:`dualbounds.dist_reg.BinaryDistReg` for more kwargs.
+	suppress_iv_warning : bool
+		If True, suppresses the beta warning for DualIVBounds.
+
+	Notes
+	-----
+	This is currently slower than the ``DualBounds`` class.
 	"""
 
 	def __init__(
@@ -51,9 +121,12 @@ class DualIVBounds(generic.DualBounds):
 		exposure: Union[np.array, pd.Series],
 		instrument: Union[np.array, pd.Series],
 		exposure_model: Union[str, dist_reg.DistReg]='ridge',
+		suppress_iv_warning: bool=False,
 		*args, 
 		**kwargs,
 	):
+		if not suppress_iv_warning:
+			print("Note: DualIVBounds are in beta. Feedback is welcome. To suppress this warning, set suppress_iv_warning=True.")
 		# Initialize base class
 		super().__init__(
 			treatment=exposure,
@@ -701,7 +774,8 @@ class DualIVBounds(generic.DualBounds):
 		**kwargs
 	):
 		"""
-		Docs in progress.
+		Same signature as `generic.DualBounds.compute_dual_variables`
+		with the following exceptions.
 
 		Parameters
 		----------
@@ -1022,27 +1096,38 @@ class DualIVBounds(generic.DualBounds):
 		self._compute_final_bounds(aipw=aipw, alpha=alpha)
 		return self
 
+	def eval_treatment_model():
+		return dist_reg._evaluate_model_predictions(
+			y=self.Z, haty=self.pis
+		)
+
+	def eval_exposure_model():
+		"""
+		Thinly wraps dist_reg._evaluate_model_predictions.
+
+		Returns
+		-------
+		sumstats : pd.DataFrame
+			DataFrame summarizing goodness-of-fit metrics for
+			the cross-fit exposure scores.
+		"""
+		return dist_reg._evaluate_model_predictions(
+			y=self.W, 
+			haty=self.wprobs[(np.arange(self.n), self.Z.astype(int))]
+		)
+
+
 	def summary(self, minval=-np.inf, maxval=np.inf):
 		print("___________________Inference_____________________")
 		print(self.results(minval=minval, maxval=maxval))
 		print()
 		print("_________________Outcome model___________________")
-		self._compute_oos_resids()
-		sumstats = dist_reg._evaluate_model_predictions(
-			y=self.y, haty=self.oos_preds
-		)
-		print(sumstats)
+		print(self.eval_outcome_model())
 		print()
 		print("_________________Exposure model__________________")
-		sumstats = dist_reg._evaluate_model_predictions(
-			y=self.W, 
-			haty=self.wprobs[(np.arange(self.n), self.Z.astype(int))]
-		)
-		print(sumstats)
+		print(self.eval_exposure_model())
 		print()
 		print("_________________Treatment model_________________")
-		sumstats = dist_reg._evaluate_model_predictions(
-			y=self.Z, haty=self.pis
-		)
+		print(self.eval_treatment_model())
 		print(sumstats)
 		print()

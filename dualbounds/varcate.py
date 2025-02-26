@@ -5,8 +5,10 @@ import warnings
 import numpy as np
 from scipy import stats
 from . import generic, utilities
-from .generic import infer_discrete, get_default_model
+from .generic import infer_discrete
 import pandas as pd
+import copy
+from typing import Optional
 
 def _moments2varcate(
 	hxy1, hxy0, hx, y1, y0, shx2,
@@ -83,6 +85,11 @@ class VarCATEDualBounds(generic.DualBounds):
 	def __init__(self, *args, **kwargs):
 		# Initialize with no f function
 		kwargs['f'] = None
+		# change default eps_dist for cts to Gaussian
+		# (eps_dist has zero impact on the final results here 
+		# and Gaussian is the most computationally efficient)
+		kwargs['eps_dist'] = 'gaussian'
+		# Initialize
 		super().__init__(*args, **kwargs)
 
 	def _ensure_feasibility(self):
@@ -217,11 +224,108 @@ def varcate_cluster_bootstrap(
 	centered = (bs_estimators - estimates) / ses
 	hatq = np.quantile(centered.max(axis=-1), 1-alpha)
 	# Take maximums
-	combined_estimates = np.maximum(np.array([np.max(estimates), np.nan]), 0)
-	cis = np.maximum(np.array([np.max(estimates - hatq * ses), np.nan]), 0)
+	optimal_index = np.argmax(estimates - hatq * ses)
+	combined_estimates = np.maximum(np.array([estimates[optimal_index], np.nan]), 0)
+	final_ses = np.array([ses[optimal_index], np.nan])
+	cis = np.maximum(np.array([(estimates - hatq * ses)[optimal_index], np.nan]), 0)
 	# Return
 	return pd.DataFrame(
-		np.stack([combined_estimates, cis], axis=0),
-		index=['Estimate', 'Conf. Int.'],
+		np.stack([combined_estimates, final_ses, cis], axis=0),
+		index=['Estimate', 'SE', 'Conf. Int.'],
 		columns=['Lower', 'Upper'],
 	)
+
+DEFAULT_SHRINKAGE_VALUES = np.array([0.001, 0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 1, 1.5, 2])
+
+class CalibratedVarCATEDualBounds(VarCATEDualBounds):
+	"""
+	Improved lower bounds on :math:`Var(E[Y(1) - Y(0) | X])`.
+
+	This has the same signature as ``varcate.VarCATEDualBounds`` 
+	except it takes one additional argument. 
+
+	Parameters
+	----------
+	shrinkages : np.array
+		Array of shrinkage values s, where the CATEs are replaced with
+		(1-s) * CATE + s * ATE. 
+
+	Notes
+	-----
+	This class is identical to ``varcate.VarCATEDualBounds``
+	except it selects a shrinkage parameter which shrinks
+	estimated CATEs towards the ATE. Also, if ``outcome_model`` is a list,
+	it uses the multiplier bootstrap to perform model selection. 
+
+	This class should not be used for observational studies.
+	"""
+	def __init__(self, *args, shrinkages=DEFAULT_SHRINKAGE_VALUES, **kwargs):
+		self.shrinkages = shrinkages
+		# initialize outcome models
+		self.outcome_models = kwargs.pop("outcome_model", ['ridge'])
+		if not isinstance(self.outcome_models, list):
+			self.outcome_models = [self.outcome_models]
+		# create vdbs
+		self.vdbs = []
+		for outcome_model in self.outcome_models:
+			self.vdbs.append(
+				VarCATEDualBounds(*args, **kwargs, outcome_model=outcome_model)
+			)
+
+	def fit(self, B: int=1000, **kwargs):
+		# Fit all models
+		verbose = kwargs.get("verbose", True)
+		counter = 0
+		for outcome_model, vdb in zip(self.outcome_models, self.vdbs):
+			if verbose and len(self.vdbs) > 1:
+				print(f"Fitting model={outcome_model}, num. {counter} out of {len(self.vdbs)}.")
+				counter += 1
+			vdb.fit(**kwargs)
+		
+		# Run multiplier bootstrap at various shrinkages
+		self.shrunk_vdb_objects = []
+		for vdb in self.vdbs:	
+			hatate = np.mean(
+				vdb.mu1 - vdb.mu0
+				+ vdb.W*(vdb.y - vdb.mu1)/vdb.pis
+				- (1-vdb.W) * (vdb.y - vdb.mu0)/ (1-vdb.pis)
+			)
+			mu0_homogeneous = (vdb.mu0 + vdb.mu1) / 2 - hatate/2
+			mu1_homogeneous = (vdb.mu0 + vdb.mu1) / 2 + hatate/2
+			aipw = vdb.sy1 - vdb.sy0
+			for s in self.shrinkages:
+				new_mu0 = vdb.mu0 * s + (1 - s) * mu0_homogeneous
+				new_mu1 = vdb.mu1 * s + (1 - s) * mu1_homogeneous
+				new_vdb = VarCATEDualBounds(
+					outcome=vdb.y,
+					treatment=vdb.W,
+					propensities=vdb.pis,
+				).fit(
+					y0_dists=stats.norm(loc=new_mu0),
+					y1_dists=stats.norm(loc=new_mu1),
+					suppress_warning=True,
+				)
+				self.shrunk_vdb_objects.append(new_vdb)
+
+		# Cluster bootstrap
+		if verbose:
+			print("Fitting cluster bootstrap to aggregate results.")
+		results = varcate_cluster_bootstrap(
+			self.shrunk_vdb_objects, B=B, verbose=verbose, alpha=self.vdbs[0].alpha
+		)
+		self.estimates = results.loc['Estimate'].values
+		self.ses = results.loc['SE'].values
+		self.cis = results.loc['Conf. Int.'].values
+		return self
+
+
+	def summary(self, minval: Optional[float]=0, maxval: Optional[float]=np.inf):
+		print("___________________Inference_____________________")
+		print(self.results(minval=minval, maxval=maxval))
+		print()
+		print("_________________Outcome models__________________")
+		# Loop through and print model diagnostics
+		for outcome_model, vdb in zip(self.outcome_models, self.vdbs):
+			print(f"Outcome model: {outcome_model}")
+			print(vdb.eval_outcome_model())
+

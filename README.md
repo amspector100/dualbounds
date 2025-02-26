@@ -12,36 +12,28 @@ Documentation and tutorials are available at https://dualbounds.readthedocs.io/e
 
 ## Quickstart
 
-Given a response vector ``y``, binary treatment vector ``W``, covariate matrix ``X``, and an (optional) propensity score vector ``pis``, dualbounds allows analysts to perform inference on partially identified estimands of the form E[f(Y(0), Y(1), X)], for any choice of f. For example, the code below shows how to perform inference in P(Y(0) < Y(1)), the proportion of individuals who benefit from the treatment. Dual bounds can wrap on top of *any* machine learning model to provide provably valid confidence intervals in randomized experiments.
+Given a response vector ``y``, binary treatment vector ``W``, covariate matrix ``X``, and an (optional) propensity score vector ``pis``, dualbounds allows analysts to perform inference on partially identified estimands of the form :math:`E[f(Y(0), Y(1), X)]`, for any choice of f. For example, the code below shows how to perform inference on :math:`P(Y(0) < Y(1))`, the proportion of individuals who benefit from the treatment. Dual bounds can wrap on top of *any* machine learning model to provide provably valid confidence intervals in randomized experiments.
 
 ```
 	import dualbounds as db
-	# Generate synthetic data from a heavy-tailed linear model
-	data = db.gen_data.gen_regression_data(
-		n=900, # Num. datapoints
-		p=30, # Num. covariates
-		r2=0.95, # population R^2
-		tau=3, # average treatment effect
-		interactions=True, # ensures treatment effect is heterogenous
-		eps_dist='laplace', # heavy-tailed residuals
-		sample_seed=123, # random seed
-	)
+	from dualbounds.generic import DualBounds
+
+	# Generate synthetic data
+	data = db.gen_data.gen_regression_data(n=900, p=30, sample_seed=123)
 
 	# Initialize dual bounds object
-	dbnd = db.generic.DualBounds(
-		f=lambda y0, y1, x: y0 < y1, # defines the estimand
-		X=data['X'], # n x p covariate matrix
-		W=data['W'], # n-length treatment vector
-		y=data['y'], # n-length outcome vector
-		pis=data['pis'], # n-length propensity scores (optional)
-		Y_model='ridge', # description of model for Y | X, W
+	dbnd = DualBounds(
+	    f=lambda y0, y1, x: y0 < y1,
+	    covariates=data['X'],
+	    treatment=data['W'],
+	    outcome=data['y'],
+	    propensities=data['pis'],
+	    outcome_model='ridge',
 	)
 
-	# Perform inference
-	dbnd.compute_dual_bounds(
-		nfolds=5, # number of cross-fitting folds
-		alpha=0.05 # nominal level
-	)
+	# Compute dual bounds and observe output
+	results = dbnd.fit(alpha=0.05).results()
+
 
 ```
 
